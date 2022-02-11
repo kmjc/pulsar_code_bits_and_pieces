@@ -203,7 +203,7 @@ verbose_message(1, "Memory size below is an approximation and based on the size 
 verbose_message(1, "(Based on very minimal testing on a small observation!) it can be 2x this")
 
 print("")
-print(f"{'gulp':<20} {'nchunks':<10} {'approx size':<14} {'x1.25':<10} {'x1.5':<10} {'x2'}")
+print(f"{'gulp':<20} {'nchunks':<10} {'approx size':<14} {'x1.25':<10} {'x1.5':<10} {'x2':<10}")
 overhead = 464  # no idea what determines this or what makes it vary
 nbytes = header['nbits'] // 8
 for gulp in factors_over_maxDT:
@@ -213,6 +213,6 @@ for gulp in factors_over_maxDT:
     # from (very minimal!!) testing with mprun, it runs at ~ double this
     fudge_factor = 2
     print(f"{gulp:<20} {nchunks:<10} {sizeof_fmt(byte_size_data):<14} "
-          f"{sizeof_fmt(1.25*byte_size_data)} "
-          f"{sizeof_fmt(1.5*byte_size_data)} "
-          f"{sizeof_fmt(2*byte_size_data)}")
+          f"{sizeof_fmt(1.25*byte_size_data):<10} "
+          f"{sizeof_fmt(1.5*byte_size_data):<10} "
+          f"{sizeof_fmt(2*byte_size_data):<10}")
