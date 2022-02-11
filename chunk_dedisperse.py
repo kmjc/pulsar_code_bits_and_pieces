@@ -117,7 +117,7 @@ parser.add_argument('-o', '--out_filename', type=str, default=None,
                     help='Filename to write the output to (otherwise will append _DM<DM>.fil)')
 parser.add_argument('gulp', type=int,
                     help='Number of spectra (aka number of time samples) to read in at once')
-parser.add_argument('-g', '--dont_optimize_gulp', action='store_false',
+parser.add_argument('-g', '--dont_optimize_gulp', action='store_true',
                     help="""Don't optimize gulp. (Generally a good idea to optimize but option exists in case of memory constraints)
 Optimization
   - finds the factors of the total number of samples in the file, N
@@ -313,7 +313,6 @@ prev_array[:,:] = end_array[:,:]
 end_array[:,:] = 0
 intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
 
-
 while True:
     for i in range(1, nchans - 1 ):
         dt = shifts[i]
@@ -325,6 +324,7 @@ while True:
     outf.write(prev_array.ravel().astype(arr_dtype))
     # write mid_array
     outf.write(mid_array.ravel().astype(arr_dtype))
+
 
     # set up next chunk
     prev_array[:,:] = end_array[:,:]
