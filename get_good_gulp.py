@@ -218,6 +218,12 @@ for gulp in factors_over_maxDT:
     byte_size_data = (2*gulp*nchans + maxDT*nchans)*nbytes + overhead
 
     if args.fudge * byte_size_data > args.max:
+        if args.last_only:
+            gulp, nchunks, byte_size_data = prev
+            print(f"{gulp:<20} {nchunks:<10} {sizeof_fmt(byte_size_data):<14} "
+                  f"{sizeof_fmt(1.25*byte_size_data):<10} "
+                  f"{sizeof_fmt(1.5*byte_size_data):<10} "
+                  f"{sizeof_fmt(2*byte_size_data):<10}")
         break
 
     if not args.last_only:
@@ -227,10 +233,3 @@ for gulp in factors_over_maxDT:
               f"{sizeof_fmt(2*byte_size_data):<10}")
 
     prev = [gulp, nchunks, byte_size_data]
-
-if args.last_only:
-    gulp, nchunks, byte_size_data = prev
-    print(f"{gulp:<20} {nchunks:<10} {sizeof_fmt(byte_size_data):<14} "
-          f"{sizeof_fmt(1.25*byte_size_data):<10} "
-          f"{sizeof_fmt(1.5*byte_size_data):<10} "
-          f"{sizeof_fmt(2*byte_size_data):<10}")
