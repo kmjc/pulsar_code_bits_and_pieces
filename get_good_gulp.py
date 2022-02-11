@@ -195,7 +195,7 @@ print(f"Minimum gulp size is {maxDT}")  # I think mid_array being 0 size won't b
 
 factors = np.array(factorize(nsamples))
 factors_over_maxDT = factors[factors > maxDT]
-print(f"\ngulps > maxDT ({maxDT}) which are also factors of nsamples ({nsamples}):\n", factors_over_maxDT)
+verbose_message(1, f"\ngulps > maxDT ({maxDT}) which are also factors of nsamples ({nsamples}):\n", factors_over_maxDT)
 
 
 verbose_message(1, "Memory size below is an approximation and based on the size of the main arrays for the calculation")
