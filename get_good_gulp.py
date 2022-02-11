@@ -127,7 +127,7 @@ g.add_argument('-t', '--maxdt', type=check_positive_float, default=0,
 parser.add_argument('--where_channel_ref', default='center', choices=['center', 'lower', 'upper'],
                      help='Where within the channel ')
 
-parser.add_argument('-m', '--max', default=1E9, help="max number of bytes to allow")
+parser.add_argument('-m', '--max', default=1E9, type=float, help="max number of bytes to allow")
 parser.add_argument('-f', '--fudge', default=1, type=float,
     help=f"fudge factor for max bytes to allow\n"
          f"aka if pass in 512E6 for max -> 512MB\n"
