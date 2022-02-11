@@ -252,6 +252,7 @@ else:
 
 if gulp < maxDT:
     raise AttributeError(f"gulp {gulp} less than maxDT {maxDT}. Increase gulp")
+verbose_message(1, f"{nsamples // gulp} chunks to process")
 
 if header.get("nsamples", ""):
     verbose_message(2, f"Updating header, nsamples ({header['nsamples']}) will be decreased by {maxDT + cut_off_extra}")
