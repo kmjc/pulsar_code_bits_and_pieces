@@ -127,10 +127,9 @@ g.add_argument('-t', '--maxdt', type=check_positive_float, default=0,
 parser.add_argument('--where_channel_ref', default='center', choices=['center', 'lower', 'upper'],
                      help='Where within the channel ')
 
-parser.add_argument('-v', '--verbosity', action='count', default=0,
-                    help='''-v = some information
--vv = more information
--vvv = the most information''')
+parser.add_argument('--max', default=1E9, help="max number of bytes to allow")
+
+parser.add_argument('-v', '--verbosity', action='count', default=0)
 
 args = parser.parse_args()
 
@@ -210,6 +209,8 @@ for gulp in factors_over_maxDT:
     nchunks = int(nsamples / gulp)
     byte_size_data = (2*gulp*nchans + maxDT*nchans)*nbytes + overhead
 
+    if byte_size_data > args.max:
+        break
     # from (very minimal!!) testing with mprun, it runs at ~ double this
     fudge_factor = 2
     print(f"{gulp:<20} {nchunks:<10} {sizeof_fmt(byte_size_data):<14} "
