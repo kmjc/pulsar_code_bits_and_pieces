@@ -95,6 +95,12 @@ def check_positive_float(value):
         raise argparse.ArgumentTypeError("%s is an invalid positive float value" % value)
     return fvalue
 
+def try_remove(thing, from_list):
+    try:
+        from_list.remove(thing)
+    except ValueError:
+        pass
+
 ########################## DEFINE FUNCTIONS ###########################
 #######################################################################
 
@@ -270,15 +276,29 @@ outf = open(out_filename, 'wb')
 
 # Write header
 verbose_message(1, f"Writing header to {out_filename}")
-outf.write(sigproc.addto_hdr("HEADER_START", None))
-for paramname in list(header.keys()):
+#outf.write(sigproc.addto_hdr("HEADER_START", None))
+header_list = list(header.keys())
+manual_head_start_end = False
+if header_list[0] != "HEADER_START" or header_list[-1] != "HEADER_END":
+    verbose_message(3,
+        f"HEADER_START not first and/or HEADER_END not last in header_list"
+        f"removing them from header_list (if present) and writing them manually"
+        )
+    try_remove("HEADER_START", header_list)
+    try_remove("HEADER_END", header_list)
+    manual_head_start_end = True
+
+if manual_head_start_end:
+    outf.write(sigproc.addto_hdr("HEADER_START", None))
+for paramname in header_list:
     if paramname not in sigproc.header_params:
         # Only add recognized parameters
         continue
     verbose_message(3, "Writing header param (%s)" % paramname)
     value = header[paramname]
     outf.write(sigproc.addto_hdr(paramname, value))
-outf.write(sigproc.addto_hdr("HEADER_END", None))
+if manual_head_start_end:
+    outf.write(sigproc.addto_hdr("HEADER_END", None))
 
 
 #######################################################################
@@ -315,26 +335,28 @@ prev_array[:,:] = end_array[:,:]
 end_array[:,:] = 0
 intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
 
-while True:
-    for i in range(1, nchans - 1 ):
-        dt = shifts[i]
-        prev_array[maxDT - dt:, i] += intensities[:dt, i]
-        mid_array[:, i] = intensities[dt:gulp-(maxDT - dt), i]
-        end_array[:(maxDT - dt), i] = intensities[gulp - (maxDT - dt):, i]
+if gulp != nsamples:
+    while True:
+        for i in range(1, nchans - 1 ):
+            dt = shifts[i]
+            prev_array[maxDT - dt:, i] += intensities[:dt, i]
+            mid_array[:, i] = intensities[dt:gulp-(maxDT - dt), i]
+            end_array[:(maxDT - dt), i] = intensities[gulp - (maxDT - dt):, i]
 
-    # write prev_array
-    outf.write(prev_array.ravel().astype(arr_dtype))
-    # write mid_array
-    outf.write(mid_array.ravel().astype(arr_dtype))
+        # write prev_array
+        outf.write(prev_array.ravel().astype(arr_dtype))
+        # write mid_array
+        outf.write(mid_array.ravel().astype(arr_dtype))
 
 
-    # set up next chunk
-    prev_array[:,:] = end_array[:,:]
-    end_array[:,:] = 0
-    intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
+        # set up next chunk
+        prev_array[:,:] = end_array[:,:]
+        end_array[:,:] = 0
+        intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
 
-    if intensities.shape[0] < gulp:  # fromfile doesn't detect EOF, have to do it manually
-        break
+        if intensities.shape[0] < gulp:  # fromfile doesn't detect EOF, have to do it manually
+            break
+
 t4 = time.perf_counter()
 print(f"TIME for other chunks: {t4-t3} s")
 print(f"TIME total: {t4-t0} s")
