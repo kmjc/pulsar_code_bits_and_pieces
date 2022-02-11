@@ -2,38 +2,12 @@ import numpy as np
 from presto_without_presto import sigproc
 import copy
 import time
+import argparse
 
 t0 = time.perf_counter()
 
-######################## SET SOME PARAMETERS #########################
-
-verbosity = 3
-verbose = verbosity > 2
-filename = "test_fil/SURVEYv0_point122_DM103_59599_pow_middle0.1min.fil"
-out_filename = None
-# If set DM it'll use that, otherwise it uses maxDT
-DM = 20
-maxDT = 0
-dmprec = 3
-
-gulp = 20000
-optimize_gulp = True
-# this will find the factors of the number of samples in the file,
-# chucks anything < maxDT, and picks the one closest to gulp
-
-# where want the reference frequency for dedispersion to be for a channel
-where_channel_ref_freq = "center"  # "lower" "upper"
-
-
 #######################################################################
 ########################## DEFINE FUNCTIONS ###########################
-
-def verbose_message(verbosity_level, message):
-    global verbosity
-    if verbosity_level <= verbosity:
-        print(message)
-    else:
-        pass
 
 def factorize(num):
     return [n for n in range(1, num + 1) if num % n == 0]
@@ -115,8 +89,81 @@ def not_zero_or_none(thing):
     else:
         return False
 
+def check_positive_float(value):
+    fvalue = float(value)
+    if fvalue <= 0:
+        raise argparse.ArgumentTypeError("%s is an invalid positive float value" % value)
+    return fvalue
+
 ########################## DEFINE FUNCTIONS ###########################
 #######################################################################
+
+parser = argparse.ArgumentParser(
+    formatter_class=argparse.RawTextHelpFormatter,
+    description="""Incoherently dedisperse a filterbank file (in chunks), outputs another filterbank
+    Note:
+        - Uses the Manchester-Taylor 1/2.4E-4 convention for dedispersion
+        - Aligns other channels to the frequency of the uppermost channel (fch1)
+          (whether it's the center, upper edge or lower edge is given by <where_channel_ref>, default=center)
+          such that tstart in the header is referenced to that same frequency
+        - if gulp is optimized, the number of time samples in the output file will be N - maxdt
+    Limitations:
+        - untested on a reversed band (positive foff); I assume it'll break
+        - not written to deal with multiple polarization data"""
+)
+parser.add_argument('filename', type=str,
+                    help='Filterbank file to dedisperse')
+parser.add_argument('-o', '--out_filename', type=str, default=None,
+                    help='Filename to write the output to (otherwise will append _DM<DM>.fil)')
+parser.add_argument('gulp', type=int,
+                    help='Number of spectra (aka number of time samples) to read in at once')
+parser.add_argument('-g', '--dont_optimize_gulp', action='store_false',
+                    help="""Don't optimize gulp. (Generally a good idea to optimize but option exists in case of memory constraints)
+Optimization
+  - finds the factors of the total number of samples in the file, N
+  - disregards any less than the maximum time delay (maxdt)
+  - selects the value closest to <gulp>
+
+Note, without optimization, if <gulp> is not a factor of N, you'll be discarding some data and the end""")
+
+g = parser.add_mutually_exclusive_group(required=True)
+g.add_argument('-d', '--dm', type=float, default=0,
+               help="DM (cm-3pc) to dedisperse to")
+g.add_argument('-t', '--maxdt', type=check_positive_float, default=0,
+               help="Number of time samples corresponding to the DM delay between the lowest and highest channel\n(must be positive)")
+
+parser.add_argument('--where_channel_ref', default='center', choices=['center', 'lower', 'upper'],
+                     help='Where within the channel ')
+parser.add_argument('--dmprec', type=int, default=3,
+                    help='DM precision (only used when writing filename if <out_filename> not given)')
+
+parser.add_argument('-v', '--verbosity', action='count', default=0,
+                    help='''-v = some information
+-vv = more information
+-vvv = the most information''')
+
+args = parser.parse_args()
+
+# being too lazy to refactor
+verbosity = args.verbosity
+verbose = verbosity > 2  # for the stdin=verbose things
+filename = args.filename
+out_filename = args.out_filename
+DM = args.dm
+maxDT = args.maxdt
+dmprec = args.dmprec
+gulp = args.gulp
+optimize_gulp = not args.dont_optimize_gulp
+where_channel_ref_freq = args.where_channel_ref
+
+
+
+def verbose_message(verbosity_level, message):
+    global verbosity
+    if verbosity_level <= verbosity:
+        print(message)
+    else:
+        pass
 
 
 #######################################################################
