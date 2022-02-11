@@ -134,6 +134,7 @@ parser.add_argument('-f', '--fudge', default=1, type=float,
          f"and pass in a fudge of 2\n"
          f"it'll stop when 2 * estimated byte size > 512MB"
 )
+parser.add_argument('-l', '--last_only', action='store_true', help="only print last line (useful with <max>)")
 
 parser.add_argument('-v', '--verbosity', action='count', default=0)
 
@@ -211,6 +212,7 @@ print("")
 print(f"{'gulp':<20} {'nchunks':<10} {'approx size':<14} {'x1.25':<10} {'x1.5':<10} {'x2':<10}")
 overhead = 464  # no idea what determines this or what makes it vary
 nbytes = header['nbits'] // 8
+prev = []
 for gulp in factors_over_maxDT:
     nchunks = int(nsamples / gulp)
     byte_size_data = (2*gulp*nchans + maxDT*nchans)*nbytes + overhead
@@ -218,6 +220,16 @@ for gulp in factors_over_maxDT:
     if args.fudge * byte_size_data > args.max:
         break
 
+    if not args.last_only:
+        print(f"{gulp:<20} {nchunks:<10} {sizeof_fmt(byte_size_data):<14} "
+              f"{sizeof_fmt(1.25*byte_size_data):<10} "
+              f"{sizeof_fmt(1.5*byte_size_data):<10} "
+              f"{sizeof_fmt(2*byte_size_data):<10}")
+
+    prev = [gulp, nchunks, byte_size_data]
+
+if args.last_only:
+    gulp, nchunks, byte_size_data = prev
     print(f"{gulp:<20} {nchunks:<10} {sizeof_fmt(byte_size_data):<14} "
           f"{sizeof_fmt(1.25*byte_size_data):<10} "
           f"{sizeof_fmt(1.5*byte_size_data):<10} "
