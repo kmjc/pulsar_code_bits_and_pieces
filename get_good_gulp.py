@@ -201,17 +201,15 @@ print(f"\ngulps > maxDT ({maxDT}) which are also factors of nsamples ({nsamples}
 
 verbose_message(1, "Memory size below is an approximation and based on the size of the main arrays for the calculation")
 verbose_message(1, "It includes a fudge factor of 2 (which is based on very minimal testing!!)")
-arr_dtype = get_dtype(header['nbits'])
+#arr_dtype = get_dtype(header['nbits'])
+print("")
+print(f"{'gulp':<20} {'nchunks':<10} {'approx size'}")
+overhead = 464  # no idea what determines this or what makes it vary
+nbytes = header['nbits'] // 8
 for gulp in factors_over_maxDT:
     nchunks = int(nsamples / gulp)
+    byte_size_data = (2*gulp*nchans + maxDT*nchans)*nbytes + overhead
 
-    intensities = np.zeros((gulp*nchans,), dtype=arr_dtype)
-    prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
-    mid_array = np.zeros((gulp-maxDT, nchans), dtype=arr_dtype)
-    end_array = np.zeros_like(prev_array)
-
-    approx_size_bytes = sys.getsizeof(intensities) + sys.getsizeof(prev_array) + sys.getsizeof(mid_array) + sys.getsizeof(end_array)
     # from (very minimal!!) testing with mprun, it runs at ~ double this
     fudge_factor = 2
-
-    print(f"{gulp} \t {nchunks} \t {sizeof_fmt(fudge_factor*approx_size_bytes)}")
+    print(f"{gulp:<20} {nchunks:<10} {sizeof_fmt(fudge_factor*byte_size_data)}")
