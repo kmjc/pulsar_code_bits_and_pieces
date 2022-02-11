@@ -201,7 +201,7 @@ print(f"\ngulps > maxDT ({maxDT}) which are also factors of nsamples ({nsamples}
 
 verbose_message(1, "Memory size below is an approximation and based on the size of the main arrays for the calculation")
 verbose_message(1, "It includes a fudge factor of 2 (which is based on very minimal testing!!)")
-#arr_dtype = get_dtype(header['nbits'])
+
 print("")
 print(f"{'gulp':<20} {'nchunks':<10} {'approx size'}")
 overhead = 464  # no idea what determines this or what makes it vary
