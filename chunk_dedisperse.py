@@ -236,7 +236,9 @@ if max(shifts) != maxDT:
 # always chuck the last maxDT of data since it's partial
 if optimize_gulp:  # pick the closest factor of nsamples (which is also >maxDT)
     factors = np.array(factorize(nsamples))
-    factors_over_maxDT = factors[factors > maxDT]
+    factors_over_maxDT = factors[factors >= maxDT]  # I think the "=" case should work fine
+    if not factors_over_maxDT:
+        raise ValueError(f"No factors ({factors}) found over maxDT ({maxDT})")
     gulp = factors_over_maxDT[abs(factors_over_maxDT - gulp).argmin()]
     verbose_message(1, f"Optimized gulp to {gulp}")
     cut_off_extra = 0
