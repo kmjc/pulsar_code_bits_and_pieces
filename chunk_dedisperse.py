@@ -3,6 +3,7 @@ from presto_without_presto import sigproc
 import copy
 import time
 import argparse
+import sys
 
 t0 = time.perf_counter()
 
@@ -174,14 +175,12 @@ def verbose_message(verbosity_level, message):
 
 #######################################################################
 ################## Get header and derive some stuff from it ###########
+verbose_message(0, f"Working on file: {filename}")
 header, hdrlen = sigproc.read_header(filename)
 nsamples = int(sigproc.samples_per_file(filename, header, hdrlen))
 
-verbose_message(1, header)
-verbose_message(1, f"nsamples: {nsamples}")
+verbose_message(2, header)
 
-filfile = open(filename, 'rb')
-filfile.seek(hdrlen)
 
 
 if header["nifs"] != 1:
@@ -195,7 +194,7 @@ nchans = header["nchans"]
 # calculate fmin and fmax FROM HEADER
 fmax = header["fch1"] - header["foff"]/2
 fmin = fmax + nchans * header["foff"]
-verbose_message(2, f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp}")
+verbose_message(0, f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}")
 
 
 #######################################################################
@@ -215,9 +214,9 @@ else:
     raise AttributeError(f"Must set either DM ({DM}) or maxDT{maxDT}")
 
 
-verbose_message(1, f"Max DM is {DM}")
+verbose_message(0, f"Max DM is {DM}")
 verbose_message(1, f"Maximum DM delay need to shift by is {maxdelay_s} s")
-verbose_message(1, f"This corresponds to {maxDT} time samples")
+verbose_message(0, f"This corresponds to {maxDT} time samples")
 
 # align it to to center of the highest frequency channel
 shifts = round_to_samples(DM_delay(DM, fs, fs[-1]), tsamp)
@@ -246,10 +245,13 @@ if optimize_gulp:  # pick the closest factor of nsamples (which is also >maxDT)
     if not factors_over_maxDT:
         raise ValueError(f"No factors ({factors}) found over maxDT ({maxDT})")
     gulp = factors_over_maxDT[abs(factors_over_maxDT - gulp).argmin()]
-    verbose_message(1, f"Optimized gulp to {gulp}")
+    verbose_message(0, f"Optimized gulp to {gulp}")
     cut_off_extra = 0
 else:
+    verbose_message(0, f"Using input gulp of {gulp}")
     cut_off_extra = nsamples % gulp
+    if cut_off_extra:
+        verbose_message(1, f"{cut_off_extra} extra samples will be cut off at the end of the file")
 #    leftover = nsamples % gulp
 #    if leftover > maxDT:
 #        cut_off_extra = 0
@@ -260,7 +262,8 @@ else:
 
 if gulp < maxDT:
     raise AttributeError(f"gulp {gulp} less than maxDT {maxDT}. Increase gulp")
-verbose_message(1, f"{nsamples // gulp} chunks to process")
+nchunks = nsamples // gulp
+verbose_message(1, f"{nchunks} chunks to process")
 
 if header.get("nsamples", ""):
     verbose_message(2, f"Updating header, nsamples ({header['nsamples']}) will be decreased by {maxDT + cut_off_extra}")
@@ -275,7 +278,7 @@ outf = open(out_filename, 'wb')
 
 
 # Write header
-verbose_message(1, f"Writing header to {out_filename}")
+verbose_message(0, f"Writing header to {out_filename}")
 #outf.write(sigproc.addto_hdr("HEADER_START", None))
 header_list = list(header.keys())
 manual_head_start_end = False
@@ -311,9 +314,11 @@ mid_array = np.zeros((gulp-maxDT, nchans), dtype=arr_dtype)
 end_array = np.zeros_like(prev_array)
 
 t1 = time.perf_counter()
-print(f"TIME to intialize: {t1-t0} s")
+verbose_message(1, f"TIME to intialize: {t1-t0} s")
 
-
+verbose_message(0, f"Starting dedispersion")
+filfile = open(filename, 'rb')
+filfile.seek(hdrlen)
 # read in FIRST chunk
 # separate as you need to not write the prev_array, and I didn't want an extra if clause in my loop
 intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
@@ -323,18 +328,20 @@ for i in range(1, nchans - 1 ):
     end_array[:(maxDT - dt), i] = intensities[gulp - (maxDT - dt):, i]
 
 t2 = time.perf_counter()
-print(f"TIME to dedisperse first chunk: {t2-t1} s")
+verbose_message(1, f"TIME to dedisperse first chunk: {t2-t1} s")
 
 # write mid_array ONLY
 outf.write(mid_array.ravel().astype(arr_dtype))
 t3 = time.perf_counter()
-print(f"TIME to write first chunk: {t3-t2} s")
+verbose_message(0, f"Processed chunk 1 of {nchunks}")
+verbose_message(1, f"TIME to write first chunk: {t3-t2} s")
 
 # set up next chunk
 prev_array[:,:] = end_array[:,:]
 end_array[:,:] = 0
 intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
 
+k = 1
 if gulp != nsamples:
     while True:
         for i in range(1, nchans - 1 ):
@@ -347,19 +354,22 @@ if gulp != nsamples:
         outf.write(prev_array.ravel().astype(arr_dtype))
         # write mid_array
         outf.write(mid_array.ravel().astype(arr_dtype))
+        verbose_message(0, f"Processed chunk {k} of {nchunks}")
 
 
         # set up next chunk
         prev_array[:,:] = end_array[:,:]
         end_array[:,:] = 0
         intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
-
+        k += 1
         if intensities.shape[0] < gulp:  # fromfile doesn't detect EOF, have to do it manually
             break
 
 t4 = time.perf_counter()
-print(f"TIME for other chunks: {t4-t3} s")
-print(f"TIME total: {t4-t0} s")
+verbose_message(1, f"TIME for other chunks: {t4-t3} s")
+verbose_message(0, "Done")
+verbose_message(0, f"TIME total: {t4-t0} s")
 
 outf.close()
 filfile.close()
+sys.exit()
