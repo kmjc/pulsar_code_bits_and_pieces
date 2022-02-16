@@ -10,43 +10,43 @@ from presto_without_presto import infodata
 #from presto.Pgplot import *
 
 # only tweak is commenting out the plot sections, since can't access presto.Pgplot
-
-"""
-class rfifind:
-    Read in stats and mask information from an rfifind run.
-    Use that information to make a list of bad channels to
-    zap and/or weight and offset properly to (hopefully) improve
-    your overall signal-to-noise ratio.
-
-    A typical usage would be something like:
-        In [1]: import rfifind
-
-        In [2]: a = rfifind.rfifind('SPIGOT_040424_1614-22_rfifind.mask')
-
-        In [3]: a.set_zap_chans(power=1000)
-        Recommending to zap 75 channels:
-          55 channels from Fourier power levels > 1000.0
-          6 channels from avgs levels being off by > 5.0 sigma
-          2 channels from stds levels being off by > 2.0 sigma
-          20 channels for being within 0.01 of the band edge
-          0 channels were specified by the user
-          0 channels for having no variation
-          The mask recommends 116 additional bad channels
-          adding them to the zap_chans list.
-
-              << Plot is shown here >>
-
-           Type <RETURN> for next page:
-
-        In [4]: a.write_zap_chans()
-
-        In [5]: a.set_weights_and_offsets()
-
-        In [6]: a.write_weights_and_offsets()
-
-"""
+# also moved the comment string -> the class docstring since that's clearly where it's supposed to be
 
 class rfifind(object):
+    """
+    class rfifind:
+        Read in stats and mask information from an rfifind run.
+        Use that information to make a list of bad channels to
+        zap and/or weight and offset properly to (hopefully) improve
+        your overall signal-to-noise ratio.
+
+        A typical usage would be something like:
+            In [1]: import rfifind
+
+            In [2]: a = rfifind.rfifind('SPIGOT_040424_1614-22_rfifind.mask')
+
+            In [3]: a.set_zap_chans(power=1000)
+            Recommending to zap 75 channels:
+              55 channels from Fourier power levels > 1000.0
+              6 channels from avgs levels being off by > 5.0 sigma
+              2 channels from stds levels being off by > 2.0 sigma
+              20 channels for being within 0.01 of the band edge
+              0 channels were specified by the user
+              0 channels for having no variation
+              The mask recommends 116 additional bad channels
+              adding them to the zap_chans list.
+
+                  << Plot is shown here >>
+
+               Type <RETURN> for next page:
+
+            In [4]: a.write_zap_chans()
+
+            In [5]: a.set_weights_and_offsets()
+
+            In [6]: a.write_weights_and_offsets()
+
+    """
     def __init__(self, filename):
         self.basename = filename[:filename.find("_rfifind.")+8]
         self.idata = infodata.infodata(self.basename+".inf")
