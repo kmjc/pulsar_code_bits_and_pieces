@@ -2,3 +2,4 @@ test_fil/
 jupyter_notebooks/.ipynb_checkpoints/
 .DS_Store
 presto_without_presto/__pycache__/
+jupyter_notebooks/test_data/
