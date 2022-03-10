@@ -496,7 +496,7 @@ if __name__ == '__main__':
         factors_over_maxDT = factors[
             factors >= maxDT
         ]  # I think the "=" case should work fine
-        if not factors_over_maxDT:
+        if factors_over_maxDT.size == 0:
             raise ValueError(f"No factors ({factors}) found over maxDT ({maxDT})")
         gulp = factors_over_maxDT[abs(factors_over_maxDT - gulp).argmin()]
         verbose_message(0, f"Optimized gulp to {gulp}")
