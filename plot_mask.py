@@ -1,4 +1,5 @@
 import numpy as np
+import argparse
 from presto_without_presto import rfifind
 
 def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
