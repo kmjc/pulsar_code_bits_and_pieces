@@ -27,7 +27,7 @@ def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
     return mask
 
 
-if __name__ == __main__:
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Plot a rfifind mask")
     parser.add_argument("maskfile", type=str, help="rfifind .mask file")
     parser.add_argument("-c", "--compare", type=str, help="compare to this other mask")
