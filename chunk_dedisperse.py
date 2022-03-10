@@ -567,7 +567,7 @@ if __name__ == '__main__':
 
     # Initialize arrays
     arr_dtype = get_dtype(header["nbits"])
-    verbose_message(3, f"{header["nbits"]} in header -> dtype {arr_dtype}")
+    verbose_message(3, f"{header['nbits']} in header -> dtype {arr_dtype}")
     # If masking then intensities end up as float32 though!
     if not_zero_or_none(args.mask):
         verbose_message(3, f"Masking, so all arrays will endup with dtype {mask.running_medavg.dtype}")
