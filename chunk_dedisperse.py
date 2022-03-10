@@ -277,7 +277,7 @@ class EmptyThinnedMask:
 #######################################################################
 
 
-if __name__ == __main__:
+if __name__ == '__main__':
     parser = argparse.ArgumentParser(
         formatter_class=argparse.RawTextHelpFormatter,
         description="""Incoherently dedisperse a filterbank file (in chunks), outputs another filterbank
