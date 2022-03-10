@@ -25,21 +25,6 @@ def sizeof_fmt(num, use_kibibyte=False):
 def factorize(num):
     return [n for n in range(1, num + 1) if num % n == 0]
 
-# presto's filterbank has a get_dtype could use too, but haven't without_presto-ed that yet
-def get_dtype(nbits):
-    """
-    Returns:
-        dtype of the data
-    """
-    if nbits == 8:
-        return np.uint8
-    elif nbits == 16:
-        return np.uint16
-    elif nbits == 32:
-        return np.float32
-    else:
-        raise RuntimeError(f"nbits={nbits} not supported")
-
 def DM_delay(DM, freq, *ref_freq):
     """
     Pass in DM (cm-3pc), freq (MHz), and optionally a reference frequency
@@ -212,6 +197,8 @@ print("")
 print(f"{'gulp':<20} {'nchunks':<10} {'approx size':<14} {'x1.25':<10} {'x1.5':<10} {'x2':<10}")
 overhead = 464  # no idea what determines this or what makes it vary
 nbytes = header['nbits'] // 8
+if nbytes < 4:
+    verbose_message(0, f"WARNING {nbytes} bytes used for size estimation BUT if using a mask everyhing gets converted to floats - times by ~{int(4/nbytes)}")
 prev = []
 for gulp in factors_over_maxDT:
     nchunks = int(nsamples / gulp)

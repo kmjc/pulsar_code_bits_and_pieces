@@ -567,6 +567,14 @@ if __name__ == '__main__':
 
     # Initialize arrays
     arr_dtype = get_dtype(header["nbits"])
+    verbose_message(3, f"{header["nbits"]} in header -> dtype {arr_dtype}")
+    # If masking then intensities end up as float32 though!
+    if not_zero_or_none(args.mask):
+        verbose_message(3, f"Masking, so all arrays will endup with dtype {mask.running_medavg.dtype}")
+        prev_array = np.zeros((maxDT, nchans), dtype=mask.running_medavg.dtype)
+        mid_array = np.zeros((gulp - maxDT, nchans), dtype=mask.running_medavg.dtype)
+        end_array = np.zeros_like(prev_array)
+
     prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
     mid_array = np.zeros((gulp - maxDT, nchans), dtype=arr_dtype)
     end_array = np.zeros_like(prev_array)
