@@ -7,14 +7,15 @@ import argparse
 import sys
 
 
-
 #######################################################################
 ########################## DEFINE FUNCTIONS ###########################
 
 # GENERAL FUNCTIONS:
 
+
 def factorize(num):
     return [n for n in range(1, num + 1) if num % n == 0]
+
 
 def zero_or_none(thing):
     """returns True if thing is 0/[]/""/etc or None
@@ -24,6 +25,7 @@ def zero_or_none(thing):
     else:
         return True
 
+
 def not_zero_or_none(thing):
     """returns False if thing is 0/[]/""/etc or None
     returns True for anything else, aka value isn't empty/0/None"""
@@ -32,11 +34,15 @@ def not_zero_or_none(thing):
     else:
         return False
 
+
 def check_positive_float(value):
     fvalue = float(value)
     if fvalue <= 0:
-        raise argparse.ArgumentTypeError("%s is an invalid positive float value" % value)
+        raise argparse.ArgumentTypeError(
+            "%s is an invalid positive float value" % value
+        )
     return fvalue
+
 
 def try_remove(thing, from_list):
     try:
@@ -65,17 +71,19 @@ def get_dtype(nbits):
 
 # DM FUNCTIONS:
 
+
 def DM_delay(DM, freq, *ref_freq):
     """
     Pass in DM (cm-3pc), freq (MHz), and optionally a reference frequency
     Returns time delay in seconds
     Uses Manchester-Taylor 1/2.4E-4 convention
     """
-    K = 1.0 / 2.41E-4  # Manchester-Taylor convention, units in MHz cm-3pc s
+    K = 1.0 / 2.41e-4  # Manchester-Taylor convention, units in MHz cm-3pc s
     if ref_freq:
-        return K * DM * (1/freq**2 - 1/ref_freq[0]**2)
+        return K * DM * (1 / freq**2 - 1 / ref_freq[0] ** 2)
     else:
         return K * DM / freq**2
+
 
 def inverse_DM_delay(delay_s, freq, *ref_freq):
     """Inverse of DM_delay
@@ -83,11 +91,12 @@ def inverse_DM_delay(delay_s, freq, *ref_freq):
     (if not included it's referenced to infinite frequency)
     Returns the DM which would produce that delay in cm-3pc
     Uses Manchester-Taylor 1/2.4E-4 convention"""
-    K = 1.0 / 2.41E-4  # Manchester-Taylor convention, units in MHz cm-3pc s
+    K = 1.0 / 2.41e-4  # Manchester-Taylor convention, units in MHz cm-3pc s
     if ref_freq:
-        return delay_s / (1/freq**2 - 1/ref_freq[0]**2) / K
+        return delay_s / (1 / freq**2 - 1 / ref_freq[0] ** 2) / K
     else:
         return delay_s * freq**2 / K
+
 
 def get_fs(fmin, fmax, nchans, type="center", **kwargs):
     """Get channel frequencies for a band with edges fmin, fmax
@@ -101,11 +110,16 @@ def get_fs(fmin, fmax, nchans, type="center", **kwargs):
     if type == "lower":
         return np.linspace(fmin, fmax, nchans, endpoint=False, **kwargs)
     if type == "center":
-        return np.linspace(fmin + df/2, fmax - df/2, nchans, endpoint=True, **kwargs)
+        return np.linspace(
+            fmin + df / 2, fmax - df / 2, nchans, endpoint=True, **kwargs
+        )
     if type == "upper":
         return np.linspace(fmin + df, fmax, nchans, endpoint=True, **kwargs)
     else:
-        raise AttributeError(f"type {type} not recognised, must be one of 'center', 'lower', 'upper'")
+        raise AttributeError(
+            f"type {type} not recognised, must be one of 'center', 'lower', 'upper'"
+        )
+
 
 def round_to_samples(delta_t, sampling_time):
     """Round a time delay to the nearest number of time samples"""
@@ -113,6 +127,7 @@ def round_to_samples(delta_t, sampling_time):
 
 
 # MASKING FUNCTIONS:
+
 
 def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
     """Return the mask as a numpy array of size (nint, nchan)
@@ -128,16 +143,17 @@ def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
     NB if using original rfifind.py note that some type conversion will be needed as
     mask_zap_ints is an array and mask_zap_chans_per_int is a list of arrays
     """
-    mask = np.zeros((nint,nchan), dtype=bool)
+    mask = np.zeros((nint, nchan), dtype=bool)
     if len(zap_ints) != 0:
-        mask[tuple(zap_ints),:] = 1
+        mask[tuple(zap_ints), :] = 1
     if len(zap_chans) != 0:
-        mask[:,tuple(zap_chans)] = 1
+        mask[:, tuple(zap_chans)] = 1
     for i in range(nint):
         if len(zap_chans_per_int[i]) != 0:
-            mask[i,tuple(zap_chans_per_int[i])] = 1
+            mask[i, tuple(zap_chans_per_int[i])] = 1
 
     return mask
+
 
 # don't want to have a whole mask with all the stats in memory
 # extract relevant bits, make the running median
@@ -155,7 +171,13 @@ class ThinnedMask:
         # original rfimask has this as a list of arrays, convert to set if necessary
         self.mask_zap_chans_per_int = [set(x) for x in rfimask.mask_zap_chans_per_int]
 
-        self.mask = array_from_mask_params(self.nint, self.nchan, self.mask_zap_ints, self.mask_zap_chans, self.mask_zap_chans_per_int)
+        self.mask = array_from_mask_params(
+            self.nint,
+            self.nchan,
+            self.mask_zap_ints,
+            self.mask_zap_chans,
+            self.mask_zap_chans_per_int,
+        )
 
         masked_avgs = np.ma.array(rfimask.std_stats, mask=self.mask)
 
@@ -164,8 +186,9 @@ class ThinnedMask:
         self.running_medavg = generic_filter(
             masked_avgs.filled(fill_value=np.nan),
             np.nanmedian,
-            size=(medlen,1),
-            mode='nearest')
+            size=(medlen, 1),
+            mode="nearest",
+        )
 
     def time_sample_to_interval(self, time_sample):
         """for a given time sample,return the index of the corresponding interval"""
@@ -176,26 +199,26 @@ class ThinnedMask:
     def time_sample_mask(self, time_sample):
         "get the mask for a single time sample (result has size nchan)"
         interval_id = self.time_sample_to_interval(time_sample)
-        return self.mask[interval_id,:]
+        return self.mask[interval_id, :]
 
     def time_sample_medavg(self, time_sample):
         "get the running median of the avg_stats for a single time sample (result has size nchan)"
         interval_id = self.time_sample_to_interval(time_sample)
-        return self.running_medavg[interval_id,:]
+        return self.running_medavg[interval_id, :]
 
     def chunk_mask(self, start_tsamp, end_tsamp):
         """get the mask for a chunk of time samples start_tsamp:end_tsamp
         result has shape (end_tsamp - start_tsamp, nchan)"""
         time_samples = np.arange(start_tsamp, end_tsamp)
-        interval_ids =  np.array(list(map(self.time_sample_to_interval, time_samples)))
-        return self.mask[interval_ids,:]
+        interval_ids = np.array(list(map(self.time_sample_to_interval, time_samples)))
+        return self.mask[interval_ids, :]
 
     def chunk_medavg(self, start_tsamp, end_tsamp):
         """get the running median of the avg_stats for a chunk of time samples start_tsamp:end_tsamp
         result has shape (end_tsamp - start_tsamp, nchan)"""
         time_samples = np.arange(start_tsamp, end_tsamp)
-        interval_ids =  np.array(list(map(self.time_sample_to_interval, time_samples)))
-        return self.running_medavg[interval_ids,:]
+        interval_ids = np.array(list(map(self.time_sample_to_interval, time_samples)))
+        return self.running_medavg[interval_ids, :]
 
     def mask_chunk(self, start_tsamp, end_tsamp, data, ignorechans=set()):
         """
@@ -209,14 +232,17 @@ class ThinnedMask:
         returns a new array of masked (and median avg subtracted) data
         """
         if end_tsamp - start_tsamp != data.shape[0]:
-            raise ValueError(f"Time sample range ({end_tsamp} - {start_tsamp} = {end_tsamp - start_tsamp}) does not match data shape {data.shape}")
+            raise ValueError(
+                f"Time sample range ({end_tsamp} - {start_tsamp} = {end_tsamp - start_tsamp}) does not match data shape {data.shape}"
+            )
 
         msk = self.chunk_mask(start_tsamp, end_tsamp)
         medavg = self.chunk_medavg(start_tsamp, end_tsamp)
         out = data - medavg
         out[msk] = 0
-        out[:,list(ignorechans)] = 0
+        out[:, list(ignorechans)] = 0
         return out
+
 
 class EmptyThinnedMask:
     def __init__(self):
@@ -243,8 +269,9 @@ class EmptyThinnedMask:
         returns a new array with any ignorechans set to 0
         """
         out = copy.copy(data)
-        out[:,list(ignorechans)] = 0
+        out[:, list(ignorechans)] = 0
         return out
+
 
 ########################## DEFINE FUNCTIONS ###########################
 #######################################################################
@@ -262,49 +289,89 @@ if __name__ == __main__:
             - if gulp is optimized, the number of time samples in the output file will be N - maxdt
         Limitations:
             - untested on a reversed band (positive foff); I assume it'll break
-            - not written to deal with multiple polarization data"""
+            - not written to deal with multiple polarization data""",
     )
-    parser.add_argument('filename', type=str,
-                        help='Filterbank file to dedisperse')
-    parser.add_argument('-o', '--out_filename', type=str, default=None,
-                        help='Filename to write the output to (otherwise will append _DM<DM>.fil)')
-    parser.add_argument('gulp', type=int,
-                        help="""Number of spectra (aka number of time samples) to read in at once
-                        NOTE: this is also the length over which the median is calculated for masking""")
-    parser.add_argument('-g', '--dont_optimize_gulp', action='store_true',
-                        help="""Don't optimize gulp. (Generally a good idea to optimize but option exists in case of memory constraints)
+    parser.add_argument("filename", type=str, help="Filterbank file to dedisperse")
+    parser.add_argument(
+        "-o",
+        "--out_filename",
+        type=str,
+        default=None,
+        help="Filename to write the output to (otherwise will append _DM<DM>.fil)",
+    )
+    parser.add_argument(
+        "gulp",
+        type=int,
+        help="""Number of spectra (aka number of time samples) to read in at once
+                        NOTE: this is also the length over which the median is calculated for masking""",
+    )
+    parser.add_argument(
+        "-g",
+        "--dont_optimize_gulp",
+        action="store_true",
+        help="""Don't optimize gulp. (Generally a good idea to optimize but option exists in case of memory constraints)
     Optimization
       - finds the factors of the total number of samples in the file, N
       - disregards any less than the maximum time delay (maxdt)
       - selects the value closest to <gulp>
 
-    Note, without optimization, if <gulp> is not a factor of N, you'll be discarding some data and the end""")
+    Note, without optimization, if <gulp> is not a factor of N, you'll be discarding some data and the end""",
+    )
 
     g = parser.add_mutually_exclusive_group(required=True)
-    g.add_argument('-d', '--dm', type=float, default=0,
-                   help="DM (cm-3pc) to dedisperse to")
-    g.add_argument('-t', '--maxdt', type=check_positive_float, default=0,
-                   help="Number of time samples corresponding to the DM delay between the lowest and highest channel\n(must be positive)")
+    g.add_argument(
+        "-d", "--dm", type=float, default=0, help="DM (cm-3pc) to dedisperse to"
+    )
+    g.add_argument(
+        "-t",
+        "--maxdt",
+        type=check_positive_float,
+        default=0,
+        help="Number of time samples corresponding to the DM delay between the lowest and highest channel\n(must be positive)",
+    )
 
-    parser.add_argument('--where_channel_ref', default='center', choices=['center', 'lower', 'upper'],
-                         help='Where within the channel ')
-    parser.add_argument('--dmprec', type=int, default=3,
-                        help='DM precision (only used when writing filename if <out_filename> not given)')
+    parser.add_argument(
+        "--where_channel_ref",
+        default="center",
+        choices=["center", "lower", "upper"],
+        help="Where within the channel ",
+    )
+    parser.add_argument(
+        "--dmprec",
+        type=int,
+        default=3,
+        help="DM precision (only used when writing filename if <out_filename> not given)",
+    )
 
-    parser.add_argument('-v', '--verbosity', action='count', default=0,
-                        help='''-v = some information
+    parser.add_argument(
+        "-v",
+        "--verbosity",
+        action="count",
+        default=0,
+        help="""-v = some information
     -vv = more information
-    -vvv = the most information''')
+    -vvv = the most information""",
+    )
 
     # masking options, this will definitely break for an inverted band
-    parser.add_argument('-m', '--mask', type=str, default ="",
-                        help="""rfifind .mask file to apply.
+    parser.add_argument(
+        "-m",
+        "--mask",
+        type=str,
+        default="",
+        help="""rfifind .mask file to apply.
                         * a per-channel running median of avg_stats is calcualted, ignoring masked values
                         * this running median is sutracted from the data
-                        * data to be masked are filled with 0s""")
-    #parser.add_argument('--noclip', action='store_true',
+                        * data to be masked are filled with 0s""",
+    )
+    # parser.add_argument('--noclip', action='store_true',
     #                    help="Don't apply clipping (a la presto) time samples to clip are based on the running median and standard deviation of the DM0 time series")
-    parser.add_argument('--ignorechan', type=str, help="Comma separated string (no spaces!) of channels to ignore. PRESTO convention (lowest frequency channel = 0)", default="")
+    parser.add_argument(
+        "--ignorechan",
+        type=str,
+        help="Comma separated string (no spaces!) of channels to ignore. PRESTO convention (lowest frequency channel = 0)",
+        default="",
+    )
 
     args = parser.parse_args()
 
@@ -320,14 +387,12 @@ if __name__ == __main__:
     optimize_gulp = not args.dont_optimize_gulp
     where_channel_ref_freq = args.where_channel_ref
 
-
     def verbose_message(verbosity_level, message):
         global verbosity
         if verbosity_level <= verbosity:
             print(message)
         else:
             pass
-
 
     t0 = time.perf_counter()
     #######################################################################
@@ -338,8 +403,6 @@ if __name__ == __main__:
 
     verbose_message(2, header)
 
-
-
     if header["nifs"] != 1:
         raise ValueError(f"Code not written to deal with unsummed polarization data")
 
@@ -348,9 +411,12 @@ if __name__ == __main__:
     nchans = header["nchans"]
 
     # calculate fmin and fmax FROM HEADER
-    fmax = header["fch1"] - header["foff"]/2
+    fmax = header["fch1"] - header["foff"] / 2
     fmin = fmax + nchans * header["foff"]
-    verbose_message(0, f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}")
+    verbose_message(
+        0,
+        f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}",
+    )
 
     #######################################################################
     ########################## Set up for masking #########################
@@ -362,20 +428,26 @@ if __name__ == __main__:
         verbose_message(1, f"TIME to load mask: {t002-t001} s")
         mask = ThinnedMask(rfimask)
         t003 = time.perf_counter()
-        verbose_message(0, f"Calculated the running median of avg_stats over {overall_mask.medlen} intervals. All set")
-        verbose_message(1, f"TIME to get running median etc: {t003-t002} s for {rfimask.nint} intervals")
+        verbose_message(
+            0,
+            f"Calculated the running median of avg_stats over {overall_mask.medlen} intervals. All set",
+        )
+        verbose_message(
+            1,
+            f"TIME to get running median etc: {t003-t002} s for {rfimask.nint} intervals",
+        )
         del rfimask
     else:
         mask = EmptyThinnedMask()
 
-
     # get indices of channels not included in ignorechan
     if not_zero_or_none(args.ignorechan):
         # convert string to list of ints, and invert so index 0 = highest freq channel as per sigproc filterbank convention
-        ignorechans =  set([nchans - 1 - int(chan) for chan in args.ignorechan.split(",")])
+        ignorechans = set(
+            [nchans - 1 - int(chan) for chan in args.ignorechan.split(",")]
+        )
     else:
         ignorechans = set()
-
 
     #######################################################################
     ###### Get the maximum DM delay, and the delays for each channel ######
@@ -393,7 +465,6 @@ if __name__ == __main__:
     else:
         raise AttributeError(f"Must set either DM ({DM}) or maxDT{maxDT}")
 
-
     verbose_message(0, f"Max DM is {DM}")
     verbose_message(1, f"Maximum DM delay need to shift by is {maxdelay_s} s")
     verbose_message(0, f"This corresponds to {maxDT} time samples")
@@ -401,14 +472,15 @@ if __name__ == __main__:
     # align it to to center of the highest frequency channel
     shifts = round_to_samples(DM_delay(DM, fs, fs[-1]), tsamp)
     # check all positive
-    assert (np.array(shifts) >= 0).all(), "Some shifts are negative, indexing may go wonky"
+    assert (
+        np.array(shifts) >= 0
+    ).all(), "Some shifts are negative, indexing may go wonky"
     # check max(shifts) = maxDT
     if max(shifts) != maxDT:
         raise ValueError(
             f"Maximum shift ({max(shifts)}) does not match maxDT ({maxDT}),"
             f" something went wrong with DM<->maxDT conversion or in the shift calculation"
         )
-
 
     #######################################################################
     ######################### Update header ###############################
@@ -421,7 +493,9 @@ if __name__ == __main__:
     # always chuck the last maxDT of data since it's partial
     if optimize_gulp:  # pick the closest factor of nsamples (which is also >maxDT)
         factors = np.array(factorize(nsamples))
-        factors_over_maxDT = factors[factors >= maxDT]  # I think the "=" case should work fine
+        factors_over_maxDT = factors[
+            factors >= maxDT
+        ]  # I think the "=" case should work fine
         if not factors_over_maxDT:
             raise ValueError(f"No factors ({factors}) found over maxDT ({maxDT})")
         gulp = factors_over_maxDT[abs(factors_over_maxDT - gulp).argmin()]
@@ -431,7 +505,10 @@ if __name__ == __main__:
         verbose_message(0, f"Using input gulp of {gulp}")
         cut_off_extra = nsamples % gulp
         if cut_off_extra:
-            verbose_message(1, f"{cut_off_extra} extra samples will be cut off at the end of the file")
+            verbose_message(
+                1,
+                f"{cut_off_extra} extra samples will be cut off at the end of the file",
+            )
     #    leftover = nsamples % gulp
     #    if leftover > maxDT:
     #        cut_off_extra = 0
@@ -446,27 +523,29 @@ if __name__ == __main__:
     verbose_message(1, f"{nchunks} chunks to process")
 
     if header.get("nsamples", ""):
-        verbose_message(2, f"Updating header, nsamples ({header['nsamples']}) will be decreased by {maxDT + cut_off_extra}")
-        header["nsamples"] -= (maxDT + cut_off_extra)
+        verbose_message(
+            2,
+            f"Updating header, nsamples ({header['nsamples']}) will be decreased by {maxDT + cut_off_extra}",
+        )
+        header["nsamples"] -= maxDT + cut_off_extra
         verbose_message(1, f"Updated header, nsamples = {header['nsamples']}")
-
 
     # Open file
     if zero_or_none(out_filename):
         out_filename = filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
-    outf = open(out_filename, 'wb')
-
+    outf = open(out_filename, "wb")
 
     # Write header
     verbose_message(0, f"Writing header to {out_filename}")
-    #outf.write(sigproc.addto_hdr("HEADER_START", None))
+    # outf.write(sigproc.addto_hdr("HEADER_START", None))
     header_list = list(header.keys())
     manual_head_start_end = False
     if header_list[0] != "HEADER_START" or header_list[-1] != "HEADER_END":
-        verbose_message(3,
+        verbose_message(
+            3,
             f"HEADER_START not first and/or HEADER_END not last in header_list"
-            f"removing them from header_list (if present) and writing them manually"
-            )
+            f"removing them from header_list (if present) and writing them manually",
+        )
         try_remove("HEADER_START", header_list)
         try_remove("HEADER_END", header_list)
         manual_head_start_end = True
@@ -483,37 +562,35 @@ if __name__ == __main__:
     if manual_head_start_end:
         outf.write(sigproc.addto_hdr("HEADER_END", None))
 
-
     #######################################################################
     ########################### Dedisperse ################################
 
     # Initialize arrays
-    arr_dtype = get_dtype(header['nbits'])
+    arr_dtype = get_dtype(header["nbits"])
     prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
-    mid_array = np.zeros((gulp-maxDT, nchans), dtype=arr_dtype)
+    mid_array = np.zeros((gulp - maxDT, nchans), dtype=arr_dtype)
     end_array = np.zeros_like(prev_array)
 
     t1 = time.perf_counter()
     verbose_message(1, f"TIME to intialize: {t1-t0} s")
 
     verbose_message(0, f"Starting dedispersion")
-    filfile = open(filename, 'rb')
+    filfile = open(filename, "rb")
     filfile.seek(hdrlen)
     # read in FIRST chunk
     # separate as you need to not write the prev_array, and I didn't want an extra if clause in my loop
     k = 0  # tracks which gulp I'm in
-    intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
+    intensities = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
+        -1, nchans
+    )
     intensities = mask.mask_chunk(
-        k * gulp,
-        (k + 1) * gulp,
-        intensities,
-        ignorechans=ignorechans
+        k * gulp, (k + 1) * gulp, intensities, ignorechans=ignorechans
     )
 
-    for i in range(1, nchans - 1 ):
+    for i in range(1, nchans - 1):
         dt = shifts[i]
-        mid_array[:, i] = intensities[dt:gulp-(maxDT - dt), i]
-        end_array[:(maxDT - dt), i] = intensities[gulp - (maxDT - dt):, i]
+        mid_array[:, i] = intensities[dt : gulp - (maxDT - dt), i]
+        end_array[: (maxDT - dt), i] = intensities[gulp - (maxDT - dt) :, i]
 
     t2 = time.perf_counter()
     verbose_message(1, f"TIME to dedisperse first chunk: {t2-t1} s")
@@ -525,25 +602,24 @@ if __name__ == __main__:
     verbose_message(1, f"TIME to write first chunk: {t3-t2} s")
 
     # set up next chunk
-    prev_array[:,:] = end_array[:,:]
-    end_array[:,:] = 0
-    intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
+    prev_array[:, :] = end_array[:, :]
+    end_array[:, :] = 0
+    intensities = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
+        -1, nchans
+    )
 
     k += 1
     if gulp != nsamples:
         while True:
             intensities = mask.mask_chunk(
-                k * gulp,
-                (k + 1) * gulp,
-                intensities,
-                ignorechans=ignorechans
+                k * gulp, (k + 1) * gulp, intensities, ignorechans=ignorechans
             )
 
-            for i in range(1, nchans - 1 ):
+            for i in range(1, nchans - 1):
                 dt = shifts[i]
-                prev_array[maxDT - dt:, i] += intensities[:dt, i]
-                mid_array[:, i] = intensities[dt:gulp-(maxDT - dt), i]
-                end_array[:(maxDT - dt), i] = intensities[gulp - (maxDT - dt):, i]
+                prev_array[maxDT - dt :, i] += intensities[:dt, i]
+                mid_array[:, i] = intensities[dt : gulp - (maxDT - dt), i]
+                end_array[: (maxDT - dt), i] = intensities[gulp - (maxDT - dt) :, i]
 
             # write prev_array
             outf.write(prev_array.ravel().astype(arr_dtype))
@@ -552,15 +628,18 @@ if __name__ == __main__:
             verbose_message(0, f"Processed chunk {k} of {nchunks}")
 
             # set up next chunk
-            prev_array[:,:] = end_array[:,:]
-            end_array[:,:] = 0
-            intensities = np.fromfile(filfile, count=gulp*nchans, dtype=arr_dtype).reshape(-1, nchans)
+            prev_array[:, :] = end_array[:, :]
+            end_array[:, :] = 0
+            intensities = np.fromfile(
+                filfile, count=gulp * nchans, dtype=arr_dtype
+            ).reshape(-1, nchans)
 
-            if intensities.shape[0] < gulp:  # fromfile doesn't detect EOF, have to do it manually
+            if (
+                intensities.shape[0] < gulp
+            ):  # fromfile doesn't detect EOF, have to do it manually
                 break
 
             k += 1
-
 
     t4 = time.perf_counter()
     verbose_message(1, f"TIME for other chunks: {t4-t3} s")
