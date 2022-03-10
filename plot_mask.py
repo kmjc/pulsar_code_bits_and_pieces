@@ -35,6 +35,8 @@ if __name__ == '__main__':
     parser.add_argument("-c", "--compare", type=str, help="compare to this other mask")
     args = parser.parse_args()
 
+    fig, ax = plt.subplots(figsize=(10,6))
+
     rfimask = rfifind.rfifind(args.maskfile)
     rfimaskarr = array_from_mask_params(
         rfimask.nint,
@@ -45,7 +47,7 @@ if __name__ == '__main__':
     )
 
     if args.compare is None:
-        im = plt.pcolormesh(rfimaskarr)
+        im = ax.pcolormesh(rfimaskarr)
         plt.colorbar(im)
         plt.title(f"{rfimask.basename} (1 = masked)")
     else:
@@ -67,12 +69,12 @@ if __name__ == '__main__':
         comparearr[(rfimaskarr == False) & (rfimaskarr2 == True)] = -1
         comparearr[(rfimaskarr == False) & (rfimaskarr2 == False)] = np.nan
 
-        im = plt.pcolormesh(comparearr, vmin=-1, vmax=1, cmap='cool')
+        im = ax.pcolormesh(comparearr, vmin=-1, vmax=1, cmap='cool')
         plt.colorbar(im)
         plt.title(f"A ({rfimask.basename}) compared with B({rfimask2.basename}) \n"
                   f"0 = both masked, +1 = A masked & B unmasked, -1 = A unmasked & B masked")
 
-    plt.xlabel("channel")
-    plt.ylabel("interval")
+    ax.set_xlabel("channel")
+    ax.set_ylabel("interval")
 
     plt.show()
