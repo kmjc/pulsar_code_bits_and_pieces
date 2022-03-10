@@ -363,7 +363,7 @@ if __name__ == __main__:
         mask = ThinnedMask(rfimask)
         t003 = time.perf_counter()
         verbose_message(0, f"Calculated the running median of avg_stats over {overall_mask.medlen} intervals. All set")
-        verbose_message(1, f"TIME to get running median etc: {t003-t002} s")
+        verbose_message(1, f"TIME to get running median etc: {t003-t002} s for {rfimask.nint} intervals")
         del rfimask
     else:
         mask = EmptyThinnedMask()
