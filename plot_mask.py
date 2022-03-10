@@ -67,7 +67,7 @@ if __name__ == '__main__':
         comparearr[(rfimaskarr == False) & (rfimaskarr2 == True)] = -1
         comparearr[(rfimaskarr == False) & (rfimaskarr2 == False)] = np.nan
 
-        im = plt.pcolormesh(comparearr)
+        im = plt.pcolormesh(comparearr, vmin=-1, vmax=1, cmap='cool')
         plt.colorbar(im)
         plt.title(f"A ({rfimask.basename}) compared with B({rfimask2.basename}) \n"
                   f"0 = both masked, +1 = A masked & B unmasked, -1 = A unmasked & B masked")
