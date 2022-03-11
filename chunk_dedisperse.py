@@ -574,10 +574,10 @@ if __name__ == '__main__':
         prev_array = np.zeros((maxDT, nchans), dtype=mask.running_medavg.dtype)
         mid_array = np.zeros((gulp - maxDT, nchans), dtype=mask.running_medavg.dtype)
         end_array = np.zeros_like(prev_array)
-
-    prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
-    mid_array = np.zeros((gulp - maxDT, nchans), dtype=arr_dtype)
-    end_array = np.zeros_like(prev_array)
+    else:
+        prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
+        mid_array = np.zeros((gulp - maxDT, nchans), dtype=arr_dtype)
+        end_array = np.zeros_like(prev_array)
 
     t1 = time.perf_counter()
     verbose_message(1, f"TIME to intialize: {t1-t0} s")
