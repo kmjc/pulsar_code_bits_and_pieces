@@ -386,6 +386,14 @@ if __name__ == '__main__':
         default="",
     )
 
+    parser.add_argument(
+        "--dropsig",
+        type=float,
+        help=f"""CHIME filterbanks don't handle dropped packets well, this looks for where data is < median - <dropsig> * std
+                (set to 0 to turn this off)""",
+        default=4.5,
+    )
+
     args = parser.parse_args()
 
     # being too lazy to refactor
@@ -618,9 +626,23 @@ if __name__ == '__main__':
     intensities = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
         -1, nchans
     )
+    prem_med = np.median(intensities, axis=0)
+    prem_avg = np.mean(intensities, axis=0)
+    prem_std = np.mean(intensities, axis=0)
+
+    for i in np.arange(nchans):
+        print(f"chan {i}, med {prem_med[i]}, avg {prem_avg[i]}, std {prem_std}, thresh {prem_med[i] - args.dropsig * prem_std[i]}, number {(intensities[:,i] < prem_med[i] - args.dropsig * prem_std[i]).sum()}")
+
     intensities = mask.mask_chunk(
         k * gulp, (k + 1) * gulp, intensities, ignorechans=ignorechans
     )
+
+    post_med = np.median(intensities, axis=0)
+    post_avg = np.mean(intensities, axis=0)
+    post_std = np.mean(intensities, axis=0)
+
+    for i in np.arange(nchans):
+        print(f"chan {i}, med {post_med[i]}, avg {post_avg[i]}, std {post_std}, thresh {post_med[i] - args.dropsig * post_std[i]}, number {(intensities[:,i] < post_med[i] - args.dropsig * post_std[i]).sum()}")
 
     for i in range(1, nchans - 1):
         dt = shifts[i]
