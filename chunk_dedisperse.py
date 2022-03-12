@@ -75,7 +75,7 @@ def get_nbits(dtype):
     """
     if dtype == np.uint8:
         return 8
-    elif dtype == np.unit16:
+    elif dtype == np.uint16:
         return 16
     elif dtype == np.float32:
         return 32
