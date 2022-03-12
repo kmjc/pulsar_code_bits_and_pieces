@@ -192,7 +192,7 @@ class ThinnedMask:
             self.mask_zap_chans_per_int,
         )
 
-        masked_avgs = np.ma.array(rfimask.std_stats, mask=self.mask)
+        masked_avgs = np.ma.array(rfimask.avg_stats, mask=self.mask)
 
         # found generic_filter, filling with nans and using np.nanmedian
         # calculates the median in a window centered on the index, and deals with nans properly
@@ -589,7 +589,7 @@ if __name__ == '__main__':
 
 
     ### WRITE HEADER
-    # has to be here because need to change the nbits in the header if masking 
+    # has to be here because need to change the nbits in the header if masking
     if manual_head_start_end:
         outf.write(sigproc.addto_hdr("HEADER_START", None))
     for paramname in header_list:
