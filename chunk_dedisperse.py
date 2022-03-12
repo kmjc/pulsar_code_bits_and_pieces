@@ -68,6 +68,19 @@ def get_dtype(nbits):
     else:
         raise RuntimeError(f"nbits={nbits} not supported")
 
+def get_nbits(dtype):
+    """
+    Returns:
+        number of bits of the data
+    """
+    if dtype == np.uint8:
+        return 8
+    elif dtype == np.unit16:
+        return 16
+    elif dtype == np.float32:
+        return 32
+    else:
+        raise RuntimeError(f"dtype={dtype} not supported")
 
 # DM FUNCTIONS:
 
@@ -550,6 +563,33 @@ if __name__ == '__main__':
         try_remove("HEADER_END", header_list)
         manual_head_start_end = True
 
+
+    #######################################################################
+    ########################### Dedisperse ################################
+
+    # Initialize arrays and deal with types
+    arr_dtype = get_dtype(header["nbits"])
+    verbose_message(3, f"{header['nbits']} in header -> dtype {arr_dtype}")
+    # If masking then intensities end up as float32 though!
+    if not_zero_or_none(args.mask):
+        out_arr_dtype = mask.running_medavg.dtype
+        verbose_message(3, f"Masking, so all arrays will endup with dtype {out_arr_dtype}")
+        prev_array = np.zeros((maxDT, nchans), dtype=out_arr_dtype)
+        mid_array = np.zeros((gulp - maxDT, nchans), dtype=out_arr_dtype)
+        end_array = np.zeros_like(prev_array)
+        num_bits = get_nbits(out_arr_dtype)
+        header["nbits"] = num_bits
+        verbose_message(0, f"Due to masking, writing output data with nbits={header['nbits']}")
+    else:
+        prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
+        mid_array = np.zeros((gulp - maxDT, nchans), dtype=arr_dtype)
+        end_array = np.zeros_like(prev_array)
+        out_arr_dtype = arr_dtype
+
+
+
+    ### WRITE HEADER
+    # has to be here because need to change the nbits in the header if masking 
     if manual_head_start_end:
         outf.write(sigproc.addto_hdr("HEADER_START", None))
     for paramname in header_list:
@@ -561,23 +601,6 @@ if __name__ == '__main__':
         outf.write(sigproc.addto_hdr(paramname, value))
     if manual_head_start_end:
         outf.write(sigproc.addto_hdr("HEADER_END", None))
-
-    #######################################################################
-    ########################### Dedisperse ################################
-
-    # Initialize arrays
-    arr_dtype = get_dtype(header["nbits"])
-    verbose_message(3, f"{header['nbits']} in header -> dtype {arr_dtype}")
-    # If masking then intensities end up as float32 though!
-    if not_zero_or_none(args.mask):
-        verbose_message(3, f"Masking, so all arrays will endup with dtype {mask.running_medavg.dtype}")
-        prev_array = np.zeros((maxDT, nchans), dtype=mask.running_medavg.dtype)
-        mid_array = np.zeros((gulp - maxDT, nchans), dtype=mask.running_medavg.dtype)
-        end_array = np.zeros_like(prev_array)
-    else:
-        prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
-        mid_array = np.zeros((gulp - maxDT, nchans), dtype=arr_dtype)
-        end_array = np.zeros_like(prev_array)
 
     t1 = time.perf_counter()
     verbose_message(1, f"TIME to intialize: {t1-t0} s")
@@ -604,7 +627,7 @@ if __name__ == '__main__':
     verbose_message(1, f"TIME to dedisperse first chunk: {t2-t1} s")
 
     # write mid_array ONLY
-    outf.write(mid_array.ravel().astype(arr_dtype))
+    outf.write(mid_array.ravel().astype(out_arr_dtype))
     t3 = time.perf_counter()
     verbose_message(0, f"Processed chunk 1 of {nchunks}")
     verbose_message(1, f"TIME to write first chunk: {t3-t2} s")
@@ -630,9 +653,9 @@ if __name__ == '__main__':
                 end_array[: (maxDT - dt), i] = intensities[gulp - (maxDT - dt) :, i]
 
             # write prev_array
-            outf.write(prev_array.ravel().astype(arr_dtype))
+            outf.write(prev_array.ravel().astype(out_arr_dtype))
             # write mid_array
-            outf.write(mid_array.ravel().astype(arr_dtype))
+            outf.write(mid_array.ravel().astype(out_arr_dtype))
             verbose_message(0, f"Processed chunk {k} of {nchunks}")
 
             # set up next chunk
