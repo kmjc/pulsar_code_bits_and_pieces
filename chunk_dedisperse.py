@@ -496,7 +496,7 @@ if __name__ == '__main__':
         )
 
     #######################################################################
-    ######################### Update header ###############################
+    ######################### Optimize gulp  ##############################
 
     # NOT updating tstart
     #    aka tstart is now the reference time for the center of the highest frequency channel since that doesn't get shifted
@@ -543,29 +543,10 @@ if __name__ == '__main__':
         header["nsamples"] -= maxDT + cut_off_extra
         verbose_message(1, f"Updated header, nsamples = {header['nsamples']}")
 
-    # Open file
-    if zero_or_none(out_filename):
-        out_filename = filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
-    outf = open(out_filename, "wb")
-
-    # Write header
-    verbose_message(0, f"Writing header to {out_filename}")
-    # outf.write(sigproc.addto_hdr("HEADER_START", None))
-    header_list = list(header.keys())
-    manual_head_start_end = False
-    if header_list[0] != "HEADER_START" or header_list[-1] != "HEADER_END":
-        verbose_message(
-            3,
-            f"HEADER_START not first and/or HEADER_END not last in header_list"
-            f"removing them from header_list (if present) and writing them manually",
-        )
-        try_remove("HEADER_START", header_list)
-        try_remove("HEADER_END", header_list)
-        manual_head_start_end = True
 
 
     #######################################################################
-    ########################### Dedisperse ################################
+    ##################### More Dedispersion setup #########################
 
     # Initialize arrays and deal with types
     arr_dtype = get_dtype(header["nbits"])
@@ -587,9 +568,29 @@ if __name__ == '__main__':
         out_arr_dtype = arr_dtype
 
 
-
-    ### WRITE HEADER
+    #######################################################################
+    ########################### Write Header ##############################
     # has to be here because need to change the nbits in the header if masking
+    # Open file
+    if zero_or_none(out_filename):
+        out_filename = filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
+    outf = open(out_filename, "wb")
+
+    # Write header
+    verbose_message(0, f"Writing header to {out_filename}")
+    # outf.write(sigproc.addto_hdr("HEADER_START", None))
+    header_list = list(header.keys())
+    manual_head_start_end = False
+    if header_list[0] != "HEADER_START" or header_list[-1] != "HEADER_END":
+        verbose_message(
+            3,
+            f"HEADER_START not first and/or HEADER_END not last in header_list"
+            f"removing them from header_list (if present) and writing them manually",
+        )
+        try_remove("HEADER_START", header_list)
+        try_remove("HEADER_END", header_list)
+        manual_head_start_end = True
+
     if manual_head_start_end:
         outf.write(sigproc.addto_hdr("HEADER_START", None))
     for paramname in header_list:
@@ -602,6 +603,9 @@ if __name__ == '__main__':
     if manual_head_start_end:
         outf.write(sigproc.addto_hdr("HEADER_END", None))
 
+
+    #######################################################################
+    ############################ Dedisperse ###############################
     t1 = time.perf_counter()
     verbose_message(1, f"TIME to intialize: {t1-t0} s")
 
