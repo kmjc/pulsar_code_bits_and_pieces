@@ -1,5 +1,6 @@
 import numpy as np
 from presto_without_presto import rfifind, sigproc
+
 # from presto import rfifind, sigproc
 import copy
 import time
@@ -119,6 +120,7 @@ def write_header(header, outfile):
 ################################################################################
 # MASKING FUNCTIONS:
 
+
 def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
     """Return the mask as a numpy array of size (nint, nchan)
     (1 = masked, 0 = unmasked)
@@ -144,6 +146,7 @@ def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
 
     return mask
 
+
 class Mask:
     def __init__(self, maskfile, invertband=True):
         """invertband=True for sigproc filterbank convention where highest frequency is first"""
@@ -160,9 +163,14 @@ class Mask:
             self.mask_zap_chans = rfimask.mask_zap_chans
         # original rfimask has this as a list of arrays, convert to set if necessary
         if invertband:
-            self.mask_zap_chans_per_int = [set(list(self.nchan - 1 - np.array(list(x)))) for x in rfimask.mask_zap_chans_per_int]
+            self.mask_zap_chans_per_int = [
+                set(list(self.nchan - 1 - np.array(list(x))))
+                for x in rfimask.mask_zap_chans_per_int
+            ]
         else:
-            self.mask_zap_chans_per_int = [set(x) for x in rfimask.mask_zap_chans_per_int]
+            self.mask_zap_chans_per_int = [
+                set(x) for x in rfimask.mask_zap_chans_per_int
+            ]
 
         self.mask = array_from_mask_params(
             self.nint,
@@ -172,7 +180,15 @@ class Mask:
             self.mask_zap_chans_per_int,
         )
 
-def clip(intensities, clip_sigma, running_avg_std=None, chan_running_avg=None, droptot_sig=None, chan_running_std=None):
+
+def clip(
+    intensities,
+    clip_sigma,
+    running_avg_std=None,
+    chan_running_avg=None,
+    droptot_sig=None,
+    chan_running_std=None,
+):
     """
     Attempt to replicate presto's clip_times in clipping.c
     Time-domain clpping of raw data, based on the zero-DM time series.
@@ -220,7 +236,9 @@ def clip(intensities, clip_sigma, running_avg_std=None, chan_running_avg=None, d
     else:
         first_block = False
         if running_avg_std is None or chan_running_avg is None:
-            raise RuntimeError("running_avg_std and chan_running_avg should either both be None (when it's the first block) or neither")
+            raise RuntimeError(
+                "running_avg_std and chan_running_avg should either both be None (when it's the first block) or neither"
+            )
         running_avg, running_std = running_avg_std
 
     # Calculate the zero DM time series
@@ -238,11 +256,13 @@ def clip(intensities, clip_sigma, running_avg_std=None, chan_running_avg=None, d
     chan_avg_temp = np.zeros((numchan))
 
     # Find the "good" points
-    good_pts_idx = np.where((zero_dm_time_series > lo_cutoff) & (zero_dm_time_series < hi_cutoff))[0]
+    good_pts_idx = np.where(
+        (zero_dm_time_series > lo_cutoff) & (zero_dm_time_series < hi_cutoff)
+    )[0]
     numgoodpts = good_pts_idx.size
 
     if numgoodpts < 1:
-        #print("no good points")
+        # print("no good points")
         current_avg = running_avg
         current_std = running_std
         chan_avg_temp = chan_running_avg
@@ -251,7 +271,9 @@ def clip(intensities, clip_sigma, running_avg_std=None, chan_running_avg=None, d
         current_avg = zero_dm_time_series[good_pts_idx].mean()
         current_std = zero_dm_time_series[good_pts_idx].std()
         chan_avg_temp = intensities[good_pts_idx, :].mean(axis=0)
-        chan_std_temp = intensities[good_pts_idx, :].std(axis=0)  # for CHIME dropped-packet clipping
+        chan_std_temp = intensities[good_pts_idx, :].std(
+            axis=0
+        )  # for CHIME dropped-packet clipping
 
     # Update a pseudo running average and stdev
     # (exponential moving average)
@@ -269,7 +291,6 @@ def clip(intensities, clip_sigma, running_avg_std=None, chan_running_avg=None, d
         if current_avg == 0:
             print("Warning: problem with clipping in first block!!!\n\n")
 
-
     # See if any points need clipping
     if not_zero_or_none(clip_sigma):
         trigger = clip_sigma * running_std
@@ -277,15 +298,26 @@ def clip(intensities, clip_sigma, running_avg_std=None, chan_running_avg=None, d
 
         # Replace the bad channel data with running channel average
         if where_clip.size:
-            intensities[where_clip,:] = chan_running_avg  # this edits intensities in place, might want to change
+            intensities[
+                where_clip, :
+            ] = chan_running_avg  # this edits intensities in place, might want to change
 
     # CHIME dropped-packet clipping
     if not_zero_or_none(droptot_sig):
-        where_droptot_clip = np.where(intensities < (chan_running_avg - droptot_sig * chan_running_std))
+        where_droptot_clip = np.where(
+            intensities < (chan_running_avg - droptot_sig * chan_running_std)
+        )
         intensities[where_droptot_clip] = chan_running_avg[where_droptot_clip[1]]
-        return intensities, dict(running_avg_std=[running_avg, running_std], chan_running_avg=chan_running_avg, chan_running_std=chan_running_std)
+        return intensities, dict(
+            running_avg_std=[running_avg, running_std],
+            chan_running_avg=chan_running_avg,
+            chan_running_std=chan_running_std,
+        )
     else:
-        return intensities, dict(running_avg_std=[running_avg, running_std], chan_running_avg=chan_running_avg)
+        return intensities, dict(
+            running_avg_std=[running_avg, running_std],
+            chan_running_avg=chan_running_avg,
+        )
 
 
 ################################################################################
@@ -372,7 +404,7 @@ def shift_and_stack(data, shifts, prev_array, maxDT):
 
     for i in range(1, nchans - 1):
         dt = shifts[i]
-        prev_array[maxDT - dt:, 1] += data[:dt, i]
+        prev_array[maxDT - dt :, 1] += data[:dt, i]
         mid_array[:, i] = data[dt : ilength - (maxDT - dt), i]
         end_array[: (maxDT - dt), i] = data[ilength - (maxDT - dt) :, i]
 
@@ -393,13 +425,15 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
         # to make sure the last bit of data doesn't get cut off
         # ideally want a multiple of ptsperint AND that the last block has >maxDT samples
         all_intspergulp = np.arange((nsamples // ptsperint) + 1)
-        ipg_over_maxDT = all_intspergulp[all_intspergulp >= mingulp/ptsperint]
+        ipg_over_maxDT = all_intspergulp[all_intspergulp >= mingulp / ptsperint]
         # check there are some possible values
         if ipg_over_maxDT.size == 0:
-            raise RuntimeError(f"No possible gulp sizes over mingulp in {all_intspergulp*ptsperint}")
+            raise RuntimeError(
+                f"No possible gulp sizes over mingulp in {all_intspergulp*ptsperint}"
+            )
 
         # number of time samples in final read
-        leftovers = np.array([nsamples % (ptsperint*ipg) for ipg in ipg_over_maxDT])
+        leftovers = np.array([nsamples % (ptsperint * ipg) for ipg in ipg_over_maxDT])
 
         # divide exactly, quite unlikely
         good_ipg = ipg_over_maxDT[leftovers == 0]
@@ -407,35 +441,44 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
             verbose_message(2, f"Found gulps with no leftovers: {good_ipg*ptsperint}")
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
-            return ipg*ptsperint, nsamp_cut_off
+            return ipg * ptsperint, nsamp_cut_off
 
         # leftover > maxDT
         good_ipg = ipg_over_maxDT[leftovers > maxDT]
         if good_ipg.size:
-            verbose_message(2, f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}")
+            verbose_message(
+                2,
+                f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}",
+            )
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
-            return ipg*ptsperint, nsamp_cut_off
+            return ipg * ptsperint, nsamp_cut_off
         else:
-            verbose_message(2, f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off")
-            #verbose_message(2, f"Picking gulp which minimizes leftover")
-            #ipg = ipg_over_maxDT[leftovers == leftovers.min()]
-            #if not isinstance(ipg, int):  # multiple options have the same leftover
+            verbose_message(
+                2,
+                f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off",
+            )
+            # verbose_message(2, f"Picking gulp which minimizes leftover")
+            # ipg = ipg_over_maxDT[leftovers == leftovers.min()]
+            # if not isinstance(ipg, int):  # multiple options have the same leftover
             #    ipg = find_nearest(ipg, desired_gulp / ptsperint)
-            verbose_message(2, f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}")
+            verbose_message(
+                2,
+                f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}",
+            )
             ipg = find_nearest(ipg_over_maxDT, desired_gulp / ptsperint)
             nsamp_cut_off = leftovers[ipg_over_maxDT == ipg][0]
-            return ipg*ptsperint, nsamp_cut_off
+            return ipg * ptsperint, nsamp_cut_off
 
 
 ################################################################################
 ################################################################################
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument()
 
-    if __name__ == '__main__':
+    if __name__ == "__main__":
         parser = argparse.ArgumentParser(
             formatter_class=argparse.RawTextHelpFormatter,
             description="""Incoherently dedisperse a filterbank file (in chunks), outputs another filterbank
@@ -513,11 +556,7 @@ if __name__ == '__main__':
 
     # masking options, this will definitely break for an inverted band
     parser.add_argument(
-        "-m",
-        "--mask",
-        type=str,
-        default="",
-        help="rfifind .mask file to apply"
+        "-m", "--mask", type=str, default="", help="rfifind .mask file to apply"
     )
 
     parser.add_argument(
@@ -530,7 +569,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--clipsig",
         type=float,
-        help="sigma at which to clip the data a la presto (to turn off set to 0)"
+        help="sigma at which to clip the data a la presto (to turn off set to 0)",
     )
     parser.add_argument(
         "--droptotsig",
@@ -563,7 +602,6 @@ if __name__ == '__main__':
     if args.noclip:
         args.clipsig = None
 
-
     verbose_message(0, f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
     nsamples = int(sigproc.samples_per_file(args.filename, header, hdrlen))
@@ -584,8 +622,7 @@ if __name__ == '__main__':
         f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}",
     )
 
-
-## actual code
+    ## actual code
     # get ignorechans
     if not_zero_or_none(args.ignorechan):
         # convert string to list of ints, and invert so index 0 = highest freq channel as per sigproc filterbank convention
@@ -606,8 +643,10 @@ if __name__ == '__main__':
         ptsperint = 2400  # presto default
         zerochans = ignorechans
 
-    verbose_message(0, f"clipping etc will be done in intervals of {ptsperint} as per mask/presto default")
-
+    verbose_message(
+        0,
+        f"clipping etc will be done in intervals of {ptsperint} as per mask/presto default",
+    )
 
     # Select gulp
     #######################################################################
@@ -616,9 +655,10 @@ if __name__ == '__main__':
 
     DM, maxDT, max_delay_s = get_maxDT_DM(args.DM, args.maxDT, tsamp)
     verbose_message(0, f"Brute force incoherent DM is {DM}")
-    verbose_message(1, f"Maximum brute force incoherent DM delay need to shift by is {maxdelay_s} s")
+    verbose_message(
+        1, f"Maximum brute force incoherent DM delay need to shift by is {maxdelay_s} s"
+    )
     verbose_message(0, f"This corresponds to {maxDT} time samples\n")
-
 
     # Find minimum number of intervals need to read in
     if maxDT % ptsperint:
@@ -626,23 +666,28 @@ if __name__ == '__main__':
     else:
         mingulp = maxDT
 
-    verbose_message(0, f"Minimum gulp is {mingulp} time samples (= {mingulp / ptsperint:.1f} intervals)")
+    verbose_message(
+        0,
+        f"Minimum gulp is {mingulp} time samples (= {mingulp / ptsperint:.1f} intervals)",
+    )
 
     gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp)
     verbose_message(0, f"Selected gulp of {gulp}")
     verbose_message(1, f"The last {nsamp_cut_off} samples will be cut off")
 
-
     if gulp % ptsperint:
-        raise ValueError(f"CODE BUG: gulp ({gulp}) does not divide into ptsperint ({ptsperint}), gulp/ptsperint = {gulp/ptsperint}")
+        raise ValueError(
+            f"CODE BUG: gulp ({gulp}) does not divide into ptsperint ({ptsperint}), gulp/ptsperint = {gulp/ptsperint}"
+        )
     else:
         intspergulp = gulp // ptsperint
-
 
     # initialize things that need to survive multiple gulps
     current_int = 0
     current_gulp = 0
-    running_dict = dict(running_avg_std=None, chan_running_avg=None, chan_running_std=None)
+    running_dict = dict(
+        running_avg_std=None, chan_running_avg=None, chan_running_std=None
+    )
     arr_dtype = get_dtype(header["nbits"])
     # precompute DM shifts
     # align it to to center of the highest frequency channel
@@ -658,9 +703,8 @@ if __name__ == '__main__':
             f" something went wrong with DM<->maxDT conversion or in the shift calculation"
         )
 
-
     # Update and write header
-    header['nbits'] = 32
+    header["nbits"] = 32
     if header.get("nsamples", ""):
         verbose_message(
             2,
@@ -676,16 +720,17 @@ if __name__ == '__main__':
     verbose_message(0, f"Writing header to {out_filename}\n")
     write_header(header, outf)
 
-
     t1 = time.perf_counter()
     filfile = open(args.filename, "rb")
     filfile.seek(hdrlen)
 
     # Read in first gulp
     # subtracting off the channel averages so everything needs to be converted to floats
-    intensities = np.fromfile(
-        filfile, count=gulp * nchans, dtype=arr_dtype
-    ).reshape(-1, nchans).astype(np.float32)
+    intensities = (
+        np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
+        .reshape(-1, nchans)
+        .astype(np.float32)
+    )
 
     # Process gulp
     while True:
@@ -696,14 +741,27 @@ if __name__ == '__main__':
         # clip, subtract off chan_running_avg, set any mask_zap_chans_per_int to 0
         for interval in range(intspergulp):
             try:
-                slc = slice(interval*ptsperint, (interval+1)*ptsperint)
-                intensities[slc, :], running_dict = clip(intensities[slc, :], args.clipsig, droptot_sig=args.droptotsig, **running_dict)
+                slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+                intensities[slc, :], running_dict = clip(
+                    intensities[slc, :],
+                    args.clipsig,
+                    droptot_sig=args.droptotsig,
+                    **running_dict,
+                )
             except IndexError:  # in case on leftover partial-interval
-                verbose_message(2, f"Last interval detected: length {intensities.shape[0]} where gulp is {gulp} and maxDT {maxDT}")
-                slc = slice(interval*ptsperint, None)
-                intensities[slc, :], running_dict = clip(intensities[slc, :], args.clipsig, droptot_sig=args.droptotsig, **running_dict)
+                verbose_message(
+                    2,
+                    f"Last interval detected: length {intensities.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
+                )
+                slc = slice(interval * ptsperint, None)
+                intensities[slc, :], running_dict = clip(
+                    intensities[slc, :],
+                    args.clipsig,
+                    droptot_sig=args.droptotsig,
+                    **running_dict,
+                )
 
-            intensities[slc, :] -= running_dict['chan_running_avg']
+            intensities[slc, :] -= running_dict["chan_running_avg"]
             if not_zero_or_none(args.mask):
                 intensities[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
             current_int += 1
@@ -712,9 +770,13 @@ if __name__ == '__main__':
         if current_gulp == 0:
             # For first gulp, need to initialize prev_array and don't write prev_array
             prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
-            prev_array, mid_array, end_array = shift_and_stack(intensities, shifts, prev_array, maxDT)
+            prev_array, mid_array, end_array = shift_and_stack(
+                intensities, shifts, prev_array, maxDT
+            )
         else:
-            prev_array, mid_array, end_array = shift_and_stack(intensities, shifts, prev_array, maxDT)
+            prev_array, mid_array, end_array = shift_and_stack(
+                intensities, shifts, prev_array, maxDT
+            )
             outf.write(prev_array.ravel().astype(arr_dtype))
         outf.write(mid_array.ravel().astype(arr_dtype))
 
@@ -723,13 +785,15 @@ if __name__ == '__main__':
 
         # reset for next loop
         prev_array = end_array
-        intensities = np.fromfile(
-            filfile, count=gulp * nchans, dtype=arr_dtype
-        ).reshape(-1, nchans).astype(np.float32)
+        intensities = (
+            np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
+            .reshape(-1, nchans)
+            .astype(np.float32)
+        )
 
         # Test if on last interval or end of file
         if intensities.shape[0] < gulp:
-            if intensities.size = 0 or intensities.shape[0] < maxDT:
+            if intensities.size == 0 or intensities.shape[0] < maxDT:
                 break
             elif not (intensities.shape[0] % ptsperint):
                 intspergulp = (gulp // ptsperint) + 1
