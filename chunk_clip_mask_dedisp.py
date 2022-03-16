@@ -409,6 +409,7 @@ def shift_and_stack(data, shifts, prev_array, maxDT):
 
 
 def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
+    global verbose_message
     if desired_gulp < mingulp:
         gulp = mingulp
         leftovers = nsamples % gulp
