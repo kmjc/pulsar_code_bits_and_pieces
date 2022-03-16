@@ -711,6 +711,9 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(np.float32)
     )
+    print(intensities.dtype)
+    intensities = intensities.astype(np.float32)
+    print(intensities.dtype)
 
     # Process gulp
     while True:
