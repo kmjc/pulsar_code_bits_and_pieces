@@ -393,13 +393,22 @@ def get_maxDT_DM(DM, maxDT, tsamp):
 
 
 def shift_and_stack(data, shifts, prev_array, maxDT):
+    print("shift_and_stack")
+    print("shifts")
+    print(shifts)
     ilength, nchans = data.shape
+    print("ilength, nchans", ilength, nchans)
     prev_array = copy.copy(prev_array)
+    print("copied prev_array")
     mid_array_shape = (ilength - maxDT, nchans)
+    print("mid_array_shape", mid_array_shape)
     mid_array = np.zeros(mid_array_shape, dtype=prev_array.dtype)
+    print(f"initialized mid_array, size {sys.getsizeof(mid_array)/1000000}MB")
     end_array = np.zeros_like(prev_array)
+    print(f"initialized end_array, size {sys.getsizeof(end_array)/1000000}MB")
 
     for i in range(1, nchans - 1):
+        print(f"dedispersing channel {i}"")
         dt = shifts[i]
         prev_array[maxDT - dt :, 1] += data[:dt, i]
         mid_array[:, i] = data[dt : ilength - (maxDT - dt), i]
@@ -754,12 +763,12 @@ if __name__ == "__main__":
             # For first gulp, need to initialize prev_array and don't write prev_array
             verbose_message(3, "First gulp, initializing prev_array")
             prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
-            verbose_message(3, f"prev_array size {sys.getsizeof(prev_array)}B")
+            verbose_message(3, f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
             )
             verbose_message(3, f"shifted and stacked first gulp")
-            verbose_message(3, f"array sizes: {sys.getsizeof(prev_array)}, {sys.getsizeof(mid_array)}, {sys.getsizeof(end_array)} B")
+            verbose_message(3, f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
         else:
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
