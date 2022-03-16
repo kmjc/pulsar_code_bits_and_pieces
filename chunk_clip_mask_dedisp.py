@@ -712,7 +712,7 @@ if __name__ == "__main__":
         .astype(np.float32)
     )
     verbose_message(2, "Read in first chunk")
-    verbose_message(3, f"Size of chunk: {getsizeof(intensities)/1000/1000} MB")
+    verbose_message(3, f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
 
     # Process gulp
     while True:
