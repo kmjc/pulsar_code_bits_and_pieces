@@ -651,7 +651,6 @@ if __name__ == "__main__":
         f"Minimum gulp is {mingulp} time samples (= {mingulp / ptsperint:.1f} intervals)",
     )
 
-    print(verbosity >= 2)
     gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(verbosity >= 2))
     verbose_message(0, f"Selected gulp of {gulp}")
     verbose_message(1, f"The last {nsamp_cut_off} samples will be cut off")
@@ -712,6 +711,7 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(np.float32)
     )
+    verbose_message(2, "Read in first chunk")
 
     # Process gulp
     while True:
@@ -746,6 +746,7 @@ if __name__ == "__main__":
             if not_zero_or_none(args.mask):
                 intensities[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
             current_int += 1
+        verbose_message(3, f"Clipped and masked gulp {current_gulp}")
 
         # Brute-force dedisperse whole gulp
         if current_gulp == 0:
