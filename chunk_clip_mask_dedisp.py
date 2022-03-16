@@ -503,18 +503,6 @@ if __name__ == "__main__":
         help="""Number of spectra (aka number of time samples) to read in at once
                         NOTE: this is also the length over which the median is calculated for masking""",
     )
-    parser.add_argument(
-        "-g",
-        "--dont_optimize_gulp",
-        action="store_true",
-        help="""Don't optimize gulp. (Generally a good idea to optimize but option exists in case of memory constraints)
-    Optimization
-      - finds the factors of the total number of samples in the file, N
-      - disregards any less than the maximum time delay (maxdt)
-      - selects the value closest to <gulp>
-
-    Note, without optimization, if <gulp> is not a factor of N, you'll be discarding some data and the end""",
-    )
 
     g = parser.add_mutually_exclusive_group(required=True)
     g.add_argument(
@@ -595,9 +583,6 @@ if __name__ == "__main__":
             print(message)
         else:
             pass
-
-    if args.noclip:
-        args.clipsig = None
 
     verbose_message(0, f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
