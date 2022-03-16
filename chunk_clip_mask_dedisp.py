@@ -408,7 +408,7 @@ def shift_and_stack(data, shifts, prev_array, maxDT):
     print(f"initialized end_array, size {sys.getsizeof(end_array)/1000000}MB")
 
     for i in range(1, nchans - 1):
-        print(f"dedispersing channel {i}"")
+        print(f"dedispersing channel {i}")
         dt = shifts[i]
         prev_array[maxDT - dt :, 1] += data[:dt, i]
         mid_array[:, i] = data[dt : ilength - (maxDT - dt), i]
