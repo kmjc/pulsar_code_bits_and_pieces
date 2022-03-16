@@ -752,10 +752,14 @@ if __name__ == "__main__":
         # Brute-force dedisperse whole gulp
         if current_gulp == 0:
             # For first gulp, need to initialize prev_array and don't write prev_array
+            verbose_message(3, "First gulp, initializing prev_array")
             prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
+            verbose_message(3, f"prev_array size {sys.getsizeof(prev_array)}B")
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
             )
+            verbose_message(3, f"shifted and stacked first gulp")
+            verbose_message(3, f"array sizes: {sys.getsizeof(prev_array)}, {sys.getsizeof(mid_array)}, {sys.getsizeof(end_array)} B")
         else:
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
