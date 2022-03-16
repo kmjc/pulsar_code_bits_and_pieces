@@ -409,7 +409,6 @@ def shift_and_stack(data, shifts, prev_array, maxDT):
 
 
 def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
-    global verbose_message, verbosity
     if desired_gulp < mingulp:
         gulp = mingulp
         leftovers = nsamples % gulp
@@ -652,6 +651,7 @@ if __name__ == "__main__":
         f"Minimum gulp is {mingulp} time samples (= {mingulp / ptsperint:.1f} intervals)",
     )
 
+    print(verbosity >= 2)
     gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(verbosity >= 2))
     verbose_message(0, f"Selected gulp of {gulp}")
     verbose_message(1, f"The last {nsamp_cut_off} samples will be cut off")
