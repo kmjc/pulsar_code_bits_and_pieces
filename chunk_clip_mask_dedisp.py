@@ -415,6 +415,14 @@ def shift_and_stack(data, shifts, prev_array, maxDT):
 
     return prev_array, mid_array, end_array
 
+def approx_size_shifted_arrays(data, maxDT):
+    nbytes = get_nbits(data.dtype) // 4
+    ilength, nchans = data.shape
+    prev_sz = nbytes * maxDT * nchans
+    end_sz = prev_sz
+    mid_sz = nbytes * (ilength - maxDT) * nchans
+    return 2*prev_end_sz + mid_sz + end_sz
+
 
 def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
     if desired_gulp < mingulp:
@@ -726,7 +734,7 @@ if __name__ == "__main__":
     )
     verbose_message(2, "Read in first chunk")
     verbose_message(3, f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
-
+    verbose_message(3, f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB")
     # Process gulp
     while True:
         # set ignorechans and any mask_zap_chans to 0
