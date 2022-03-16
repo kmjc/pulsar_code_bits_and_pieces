@@ -572,7 +572,6 @@ if __name__ == "__main__":
     verbosity = args.verbosity
     verbose = verbosity > 2  # for the stdin=verbose things
     out_filename = args.out_filename
-    DM = args.dm
     maxDT = args.maxdt
     dmprec = args.dmprec
     where_channel_ref_freq = "center"
@@ -635,7 +634,7 @@ if __name__ == "__main__":
     # Get the maximum brute force DM delay, and the delays for each channel #
     fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq)
 
-    DM, maxDT, max_delay_s = get_maxDT_DM(args.DM, args.maxDT, tsamp)
+    DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxDT, tsamp)
     verbose_message(0, f"Brute force incoherent DM is {DM}")
     verbose_message(
         1, f"Maximum brute force incoherent DM delay need to shift by is {maxdelay_s} s"
