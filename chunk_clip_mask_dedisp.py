@@ -379,9 +379,6 @@ def round_to_samples(delta_t, sampling_time):
 
 
 def get_maxDT_DM(DM, maxDT, tsamp):
-    if DM == 0 or maxDT == 0:
-        return 0, 0, 0
-
     if not_zero_or_none(DM):
         outDM = DM
         max_delay_s = DM_delay(outDM, fs[0], fs[-1])
