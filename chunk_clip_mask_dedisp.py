@@ -384,12 +384,12 @@ def get_maxDT_DM(DM, maxDT, tsamp):
 
     if not_zero_or_none(DM):
         outDM = DM
-        maxdelay_s = DM_delay(outDM, fs[0], fs[-1])
-        outmaxDT = round_to_samples(maxdelay_s, tsamp)
+        max_delay_s = DM_delay(outDM, fs[0], fs[-1])
+        outmaxDT = round_to_samples(max_delay_s, tsamp)
     elif not_zero_or_none(maxDT):
         outmaxDT = maxDT
-        maxdelay_s = outmaxDT * tsamp
-        outDM = inverse_DM_delay(maxdelay_s, fs[0], fs[-1])
+        max_delay_s = outmaxDT * tsamp
+        outDM = inverse_DM_delay(max_delay_s, fs[0], fs[-1])
     else:
         raise AttributeError(f"must set a value for DM ({DM}) or maxDT ({maxDT})")
     return outDM, outmaxDT, max_delay_s
@@ -636,7 +636,7 @@ if __name__ == "__main__":
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp)
     verbose_message(0, f"Brute force incoherent DM is {DM}")
     verbose_message(
-        1, f"Maximum brute force incoherent DM delay need to shift by is {maxdelay_s} s"
+        1, f"Maximum brute force incoherent DM delay need to shift by is {max_delay_s} s"
     )
     verbose_message(0, f"This corresponds to {maxDT} time samples\n")
 
