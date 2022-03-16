@@ -350,27 +350,35 @@ def inverse_DM_delay(delay_s, freq, *ref_freq):
         return delay_s * freq**2 / K
 
 
-def get_fs(fmin, fmax, nchans, type="center", **kwargs):
+def get_fs(fmin, fmax, nchans, type="center", invertband=True, **kwargs):
     """Get channel frequencies for a band with edges fmin, fmax
     type can be "center", "lower", "upper"
 
     Done via np.linspace, can pass in retstep=True.
 
-    Returns a numpy array startin with the lowest channel
+    Returns a numpy array
+    starting with the lowest-freq channel if invertband = False
+    starting with the highest-freq channel if invertband = True
+    (invertband = True is the default as that's sigproc filterbank convention)
     """
     df = (fmax - fmin) / nchans
     if type == "lower":
-        return np.linspace(fmin, fmax, nchans, endpoint=False, **kwargs)
-    if type == "center":
-        return np.linspace(
+        fs = np.linspace(fmin, fmax, nchans, endpoint=False, **kwargs)
+    elif type == "center":
+        fs = np.linspace(
             fmin + df / 2, fmax - df / 2, nchans, endpoint=True, **kwargs
         )
-    if type == "upper":
-        return np.linspace(fmin + df, fmax, nchans, endpoint=True, **kwargs)
+    elif type == "upper":
+        fs = np.linspace(fmin + df, fmax, nchans, endpoint=True, **kwargs)
     else:
         raise AttributeError(
             f"type {type} not recognised, must be one of 'center', 'lower', 'upper'"
         )
+
+    if invertband:
+        return fs[::-1]
+    else:
+        return fs
 
 
 def round_to_samples(delta_t, sampling_time):
@@ -393,29 +401,16 @@ def get_maxDT_DM(DM, maxDT, tsamp):
 
 
 def shift_and_stack(data, shifts, prev_array, maxDT):
-    print("shift_and_stack")
-    print("shifts")
-    print(shifts)
     ilength, nchans = data.shape
-    print("ilength, nchans", ilength, nchans)
-    prev_array = copy.copy(prev_array)
-    print("copied prev_array")
+    prev_array = copy.copy(prev_array)  # might be uneccessary, haven't checked
     mid_array_shape = (ilength - maxDT, nchans)
-    print("mid_array_shape", mid_array_shape)
     mid_array = np.zeros(mid_array_shape, dtype=prev_array.dtype)
-    print(f"initialized mid_array, size {sys.getsizeof(mid_array)/1000000}MB")
     end_array = np.zeros_like(prev_array)
-    print(f"initialized end_array, size {sys.getsizeof(end_array)/1000000}MB")
 
-    for i in range(1, nchans - 1):
-        print(f"dedispersing channel {i}")
+    for i in range(0, nchans):
         dt = shifts[i]
-        print("shifting by", dt)
-        print("prev_array slices", f"{maxDT - dt}-{prev_array.shape[0]-1} -> {dt}")
-        prev_array[maxDT - dt :, 1] += data[:dt, i]
-        print("mid_array slices", f"{mid_array.shape[0]} -> {dt}-{ilength - (maxDT - dt)}")
+        prev_array[maxDT - dt :, i] += data[:dt, i]
         mid_array[:, i] = data[dt : ilength - (maxDT - dt), i]
-        print("end_array slices", f"{maxDT - dt} -> {ilength - (maxDT - dt)}-{data.shape[0]-1}")
         end_array[: (maxDT - dt), i] = data[ilength - (maxDT - dt) :, i]
 
     return prev_array, mid_array, end_array
@@ -511,8 +506,8 @@ if __name__ == "__main__":
     parser.add_argument(
         "gulp",
         type=int,
-        help="""Number of spectra (aka number of time samples) to read in at once
-                        NOTE: this is also the length over which the median is calculated for masking""",
+        help="""Desired number of spectra (aka number of time samples) to read in at once
+            This is gets optimized but will try to pick a gulp as close to the one passed in as possible""",
     )
 
     g = parser.add_mutually_exclusive_group(required=True)
@@ -642,7 +637,7 @@ if __name__ == "__main__":
     # Select gulp
     #######################################################################
     # Get the maximum brute force DM delay, and the delays for each channel #
-    fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq)
+    fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq, invertband=True)
 
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp)
     verbose_message(0, f"Brute force incoherent DM is {DM}")
@@ -683,10 +678,13 @@ if __name__ == "__main__":
     )
     arr_dtype = get_dtype(header["nbits"])
     # precompute DM shifts
-    # align it to to center of the highest frequency channel
-    shifts = round_to_samples(DM_delay(DM, fs, fs[-1]), tsamp)
-    # then reverse because band inverted!
-    shifts = shifts[::-1]
+    # align it to the highest frequency channel
+    if fs[0] > fs [-1]:
+        fref = fs[0]
+    else:
+        fref = fs[-1]
+    shifts = round_to_samples(DM_delay(DM, fs, fref), tsamp)
+
     # check all positive
     assert (
         np.array(shifts) >= 0
