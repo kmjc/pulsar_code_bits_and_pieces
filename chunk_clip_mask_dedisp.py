@@ -750,6 +750,7 @@ if __name__ == "__main__":
         if current_gulp == 0:
             # For first gulp, need to initialize prev_array and don't write prev_array
             prev_array = np.zeros((maxDT, nchans), dtype=arr_dtype)
+            print(prev_array.dtype, intensities.dtype)
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
             )
