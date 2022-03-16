@@ -408,7 +408,7 @@ def shift_and_stack(data, shifts, prev_array, maxDT):
     return prev_array, mid_array, end_array
 
 
-def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
+def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
     global verbose_message, verbosity
     if desired_gulp < mingulp:
         gulp = mingulp
@@ -436,7 +436,8 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
         # divide exactly, quite unlikely
         good_ipg = ipg_over_maxDT[leftovers == 0]
         if good_ipg.size:
-            verbose_message(2, f"Found gulps with no leftovers: {good_ipg*ptsperint}")
+            if verbose:
+                print(f"Found gulps with no leftovers: {good_ipg*ptsperint}")
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
             return ipg * ptsperint, nsamp_cut_off
@@ -444,26 +445,26 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
         # leftover > maxDT
         good_ipg = ipg_over_maxDT[leftovers > maxDT]
         if good_ipg.size:
-            verbose_message(
-                2,
-                f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}",
-            )
+            if verbose:
+                print(
+                    f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}",
+                )
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
             return ipg * ptsperint, nsamp_cut_off
         else:
-            verbose_message(
-                2,
-                f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off",
-            )
+            if verbose:
+                print(
+                    f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off",
+                )
             # verbose_message(2, f"Picking gulp which minimizes leftover")
             # ipg = ipg_over_maxDT[leftovers == leftovers.min()]
             # if not isinstance(ipg, int):  # multiple options have the same leftover
             #    ipg = find_nearest(ipg, desired_gulp / ptsperint)
-            verbose_message(
-                2,
-                f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}",
-            )
+            if verbose:
+                print(
+                    f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}",
+                )
             ipg = find_nearest(ipg_over_maxDT, desired_gulp / ptsperint)
             nsamp_cut_off = leftovers[ipg_over_maxDT == ipg][0]
             return ipg * ptsperint, nsamp_cut_off
@@ -651,7 +652,7 @@ if __name__ == "__main__":
         f"Minimum gulp is {mingulp} time samples (= {mingulp / ptsperint:.1f} intervals)",
     )
 
-    gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp)
+    gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(verbosity >= 2))
     verbose_message(0, f"Selected gulp of {gulp}")
     verbose_message(1, f"The last {nsamp_cut_off} samples will be cut off")
 
