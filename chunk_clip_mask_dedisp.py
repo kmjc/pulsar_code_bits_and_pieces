@@ -715,7 +715,7 @@ if __name__ == "__main__":
     # Process gulp
     while True:
         # set ignorechans and any mask_zap_chans to 0
-        intensities[:, zerochans] = 0
+        intensities[:, list(zerochans)] = 0
 
         # for each interval:
         # clip, subtract off chan_running_avg, set any mask_zap_chans_per_int to 0
