@@ -639,6 +639,7 @@ if __name__ == "__main__":
     #######################################################################
     # Get the maximum brute force DM delay, and the delays for each channel #
     fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq)
+    print("fs", fs)
 
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp)
     verbose_message(0, f"Brute force incoherent DM is {DM}")
