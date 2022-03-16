@@ -636,6 +636,8 @@ if __name__ == "__main__":
         1, f"Maximum brute force incoherent DM delay need to shift by is {max_delay_s} s"
     )
     verbose_message(0, f"This corresponds to {maxDT} time samples\n")
+    if DM == 0:
+        sys.exit("DM=0, why are you running this?")
 
     # Find minimum number of intervals need to read in
     if maxDT % ptsperint:
