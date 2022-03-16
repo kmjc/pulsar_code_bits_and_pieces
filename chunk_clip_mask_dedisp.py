@@ -639,8 +639,6 @@ if __name__ == "__main__":
     #######################################################################
     # Get the maximum brute force DM delay, and the delays for each channel #
     fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq)
-    fs = fs[::-1]
-    print("fs", fs)
 
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp)
     verbose_message(0, f"Brute force incoherent DM is {DM}")
@@ -683,6 +681,8 @@ if __name__ == "__main__":
     # precompute DM shifts
     # align it to to center of the highest frequency channel
     shifts = round_to_samples(DM_delay(DM, fs, fs[-1]), tsamp)
+    # then reverse because band inverted!
+    shifts = shifts[::-1]
     # check all positive
     assert (
         np.array(shifts) >= 0
