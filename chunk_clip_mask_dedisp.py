@@ -746,7 +746,7 @@ if __name__ == "__main__":
     verbose_message(3, f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB")
     # Process gulp
     while True:
-        tt0 = time.perf_counter()
+        #tt0 = time.perf_counter()
         # set ignorechans and any mask_zap_chans to 0
         intensities[:, list(zerochans)] = 0
 
@@ -778,21 +778,21 @@ if __name__ == "__main__":
             if not_zero_or_none(args.mask):
                 intensities[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
             current_int += 1
-        tt1 = time.perf_counter()
-        verbose_message(3, f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
+        #tt1 = time.perf_counter()
+        #verbose_message(3, f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
 
 
         # Brute-force dedisperse whole gulp
         if current_gulp == 0:
             # For first gulp, need to initialize prev_array and don't write prev_array
-            verbose_message(3, "First gulp, initializing prev_array")
+            #verbose_message(3, "First gulp, initializing prev_array")
             prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
-            verbose_message(3, f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
+            #verbose_message(3, f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
             )
-            verbose_message(3, f"shifted and stacked first gulp")
-            verbose_message(3, f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
+            #verbose_message(3, f"shifted and stacked first gulp")
+            #verbose_message(3, f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
         else:
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
@@ -800,9 +800,9 @@ if __name__ == "__main__":
             outf.write(prev_array.ravel().astype(arr_dtype))
         outf.write(mid_array.ravel().astype(arr_dtype))
 
-        tt2 = time.perf_counter()
-        verbose_message(3, f"Dedispersed in {tt2-tt1} s")
-        verbose_message(1, f"Processed gulp {current_gulp}")
+        #tt2 = time.perf_counter()
+        #verbose_message(3, f"Dedispersed in {tt2-tt1} s")
+        #verbose_message(1, f"Processed gulp {current_gulp}")
         current_gulp += 1
 
         # reset for next loop
