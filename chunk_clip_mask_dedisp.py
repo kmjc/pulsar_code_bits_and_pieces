@@ -803,6 +803,7 @@ if __name__ == "__main__":
         #tt2 = time.perf_counter()
         #verbose_message(3, f"Dedispersed in {tt2-tt1} s")
         #verbose_message(1, f"Processed gulp {current_gulp}")
+        print(f"Processed gulp {current_gulp}")
         current_gulp += 1
 
         # reset for next loop
