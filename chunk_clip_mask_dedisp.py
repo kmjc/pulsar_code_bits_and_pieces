@@ -677,6 +677,7 @@ if __name__ == "__main__":
 
     gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(verbosity >= 2))
     verbose_message(0, f"Selected gulp of {gulp}")
+    verbose_message(0, f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
     verbose_message(1, f"The last {nsamp_cut_off} samples will be cut off")
 
     if gulp % ptsperint:
@@ -745,6 +746,7 @@ if __name__ == "__main__":
     verbose_message(3, f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB")
     # Process gulp
     while True:
+        tt0 = time.perf_counter()
         # set ignorechans and any mask_zap_chans to 0
         intensities[:, list(zerochans)] = 0
 
@@ -776,7 +778,9 @@ if __name__ == "__main__":
             if not_zero_or_none(args.mask):
                 intensities[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
             current_int += 1
-        verbose_message(3, f"Clipped and masked gulp {current_gulp}")
+        tt1 = time.perf_counter()
+        verbose_message(3, f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
+
 
         # Brute-force dedisperse whole gulp
         if current_gulp == 0:
@@ -796,6 +800,8 @@ if __name__ == "__main__":
             outf.write(prev_array.ravel().astype(arr_dtype))
         outf.write(mid_array.ravel().astype(arr_dtype))
 
+        tt2 = time.perf_counter()
+        verbose_message(3, f"Dedispersed in {tt2-tt1} s")
         verbose_message(1, f"Processed gulp {current_gulp}")
         current_gulp += 1
 
