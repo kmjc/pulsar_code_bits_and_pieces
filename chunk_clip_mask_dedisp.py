@@ -388,15 +388,21 @@ def round_to_samples(delta_t, sampling_time):
     return np.round(delta_t / sampling_time).astype(int)
 
 
-def get_maxDT_DM(DM, maxDT, tsamp):
+def get_maxDT_DM(DM, maxDT, tsamp, fs):
+    if fs[0] > fs[-1]:
+        fhi = fs[0]
+        flo = fs[-1]
+    else:
+        fhi = fs[-1]
+        flo = fs[0]
     if not_zero_or_none(DM):
         outDM = DM
-        max_delay_s = DM_delay(outDM, fs[0], fs[-1])
+        max_delay_s = DM_delay(outDM, flo, fhi)
         outmaxDT = round_to_samples(max_delay_s, tsamp)
     elif not_zero_or_none(maxDT):
         outmaxDT = maxDT
         max_delay_s = outmaxDT * tsamp
-        outDM = inverse_DM_delay(max_delay_s, fs[0], fs[-1])
+        outDM = inverse_DM_delay(max_delay_s, flo, fhi)
     else:
         raise AttributeError(f"must set a value for DM ({DM}) or maxDT ({maxDT})")
     return outDM, outmaxDT, max_delay_s
@@ -649,7 +655,7 @@ if __name__ == "__main__":
     # Get the maximum brute force DM delay, and the delays for each channel #
     fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq, invertband=True)
 
-    DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp)
+    DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
     verbose_message(0, f"Brute force incoherent DM is {DM}")
     verbose_message(
         1, f"Maximum brute force incoherent DM delay need to shift by is {max_delay_s} s"
