@@ -429,7 +429,7 @@ def approx_size_shifted_arrays(data, maxDT):
     prev_sz = nbytes * maxDT * nchans
     end_sz = prev_sz
     mid_sz = nbytes * (ilength - maxDT) * nchans
-    return 2*prev_end_sz + mid_sz + end_sz
+    return 2*prev_sz + mid_sz + end_sz
 
 
 def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
