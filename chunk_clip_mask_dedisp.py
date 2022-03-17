@@ -640,7 +640,7 @@ if __name__ == "__main__":
         mask = Mask(args.mask)
         verbose_message(0, f"Mask loaded")
         ptsperint = mask.ptsperint
-        zerochans = mask.mask_zap_chans + ignorechans
+        zerochans = mask.mask_zap_chans | ignorechans
     else:
         ptsperint = 2400  # presto default
         zerochans = ignorechans
