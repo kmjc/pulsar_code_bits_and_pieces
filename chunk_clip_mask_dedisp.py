@@ -97,8 +97,7 @@ def write_header(header, outfile):
     header_list = list(header.keys())
     manual_head_start_end = False
     if header_list[0] != "HEADER_START" or header_list[-1] != "HEADER_END":
-        verbose_message(
-            3,
+        verbose_message3(
             f"HEADER_START not first and/or HEADER_END not last in header_list"
             f"removing them from header_list (if present) and writing them manually",
         )
@@ -112,7 +111,7 @@ def write_header(header, outfile):
         if paramname not in sigproc.header_params:
             # Only add recognized parameters
             continue
-        verbose_message(3, "Writing header param (%s)" % paramname)
+        verbose_message3("Writing header param (%s)" % paramname)
         value = header[paramname]
         outfile.write(sigproc.addto_hdr(paramname, value))
     if manual_head_start_end:
@@ -480,7 +479,7 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
                 print(
                     f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off",
                 )
-            # verbose_message(2, f"Picking gulp which minimizes leftover")
+            # verbose_message2(f"Picking gulp which minimizes leftover")
             # ipg = ipg_over_maxDT[leftovers == leftovers.min()]
             # if not isinstance(ipg, int):  # multiple options have the same leftover
             #    ipg = find_nearest(ipg, desired_gulp / ptsperint)
@@ -547,7 +546,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--dmprec",
         type=int,
-        default=3,
+        default=2,
         help="DM precision (only used when writing filename if <out_filename> not given)",
     )
 
@@ -576,13 +575,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--clipsig",
         type=float,
-        help="sigma at which to clip the data a la presto (to turn off set to 0)",
+        default=6.0,
+        help="sigma at which to clip the data a la presto (to turn off set to 0). Default: 6.0",
     )
     parser.add_argument(
         "--droptotsig",
         type=float,
         help="""CHIME filterbanks don't handle dropped packets well, this looks for where data is below running_avg - <dropsig> * std
-                (set to 0 to turn this off)""",
+                (set to 0 to turn this off). Default: 4.5""",
         default=4.5,
     )
 
@@ -591,23 +591,32 @@ if __name__ == "__main__":
     t0 = time.perf_counter()
 
     # being too lazy to refactor
-    verbosity = args.verbosity
-    verbose = verbosity > 2  # for the stdin=verbose things
     out_filename = args.out_filename
     dmprec = args.dmprec
     where_channel_ref_freq = "center"
 
-    def verbose_message(verbosity_level, message):
-        global verbosity
-        if verbosity_level <= verbosity:
-            print(message)
-        else:
-            pass
+    # didn't want the verbose_message if testing in loops
+    def print_message(message):
+        print(message)
+    def dontprint_message(message):
+        pass
 
-    verbose_message(0, f"Working on file: {args.filename}")
+    verbose_message0 = print_message
+    verbose_message1 = dontprint_message
+    verbose_message2 = dontprint_message
+    verbose_message3 = dontprint_message
+    if args.verbosity > 0:
+        verbose_message1 = print_message
+    if args.verbosity > 1:
+        verbose_message2 = print_message
+    if args.verbosity > 2:
+        verbose_message3 = print_message
+
+
+    verbose_message0(f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
     nsamples = int(sigproc.samples_per_file(args.filename, header, hdrlen))
-    verbose_message(2, header)
+    verbose_message2(header)
 
     if header["nifs"] != 1:
         raise ValueError(f"Code not written to deal with unsummed polarization data")
@@ -619,8 +628,7 @@ if __name__ == "__main__":
     # calculate fmin and fmax FROM HEADER
     fmax = header["fch1"] - header["foff"] / 2
     fmin = fmax + nchans * header["foff"]
-    verbose_message(
-        0,
+    verbose_message0(
         f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}",
     )
 
@@ -636,17 +644,16 @@ if __name__ == "__main__":
 
     # Load the mask
     if not_zero_or_none(args.mask):
-        verbose_message(0, f"Loading mask from {args.mask}")
+        verbose_message0(f"Loading mask from {args.mask}")
         mask = Mask(args.mask)
-        verbose_message(0, f"Mask loaded")
+        verbose_message0(f"Mask loaded")
         ptsperint = mask.ptsperint
         zerochans = mask.mask_zap_chans | ignorechans
     else:
         ptsperint = 2400  # presto default
         zerochans = ignorechans
 
-    verbose_message(
-        0,
+    verbose_message0(
         f"clipping etc will be done in intervals of {ptsperint} as per mask/presto default",
     )
 
@@ -656,11 +663,11 @@ if __name__ == "__main__":
     fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq, invertband=True)
 
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
-    verbose_message(0, f"Brute force incoherent DM is {DM}")
-    verbose_message(
-        1, f"Maximum brute force incoherent DM delay need to shift by is {max_delay_s} s"
+    verbose_message0(f"Brute force incoherent DM is {DM}")
+    verbose_message1(
+        f"Maximum brute force incoherent DM delay need to shift by is {max_delay_s} s"
     )
-    verbose_message(0, f"This corresponds to {maxDT} time samples\n")
+    verbose_message0(f"This corresponds to {maxDT} time samples\n")
     if DM == 0:
         sys.exit("DM=0, why are you running this?")
 
@@ -670,15 +677,14 @@ if __name__ == "__main__":
     else:
         mingulp = maxDT
 
-    verbose_message(
-        0,
+    verbose_message0(
         f"Minimum gulp is {mingulp} time samples (= {mingulp / ptsperint:.1f} intervals)",
     )
 
-    gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(verbosity >= 2))
-    verbose_message(0, f"Selected gulp of {gulp}")
-    verbose_message(0, f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
-    verbose_message(1, f"The last {nsamp_cut_off} samples will be cut off")
+    gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(args.verbosity >= 2))
+    verbose_message0(f"Selected gulp of {gulp}")
+    verbose_message0(f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
+    verbose_message1(f"The last {nsamp_cut_off} samples will be cut off")
 
     if gulp % ptsperint:
         raise ValueError(
@@ -716,18 +722,17 @@ if __name__ == "__main__":
     # Update and write header
     header["nbits"] = 32
     if header.get("nsamples", ""):
-        verbose_message(
-            2,
+        verbose_message2(
             f"Updating header, nsamples ({header['nsamples']}) will be decreased by {maxDT + nsamp_cut_off}",
         )
         header["nsamples"] -= maxDT + nsamp_cut_off
-        verbose_message(1, f"Updated header, nsamples = {header['nsamples']}")
+        verbose_message1(f"Updated header, nsamples = {header['nsamples']}")
 
     if zero_or_none(out_filename):
         out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
     outf = open(out_filename, "wb")
 
-    verbose_message(0, f"Writing header to {out_filename}\n")
+    verbose_message0(f"Writing header to {out_filename}\n")
     write_header(header, outf)
 
     t1 = time.perf_counter()
@@ -741,9 +746,9 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(np.float32)
     )
-    verbose_message(2, "Read in first chunk")
-    verbose_message(3, f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
-    verbose_message(3, f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB")
+    verbose_message2("Read in first chunk")
+    verbose_message3(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
+    verbose_message3(f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB")
     # Process gulp
     while True:
         #tt0 = time.perf_counter()
@@ -762,8 +767,7 @@ if __name__ == "__main__":
                     **running_dict,
                 )
             except IndexError:  # in case on leftover partial-interval
-                verbose_message(
-                    2,
+                verbose_message2(
                     f"Last interval detected: length {intensities.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
                 )
                 slc = slice(interval * ptsperint, None)
@@ -779,20 +783,20 @@ if __name__ == "__main__":
                 intensities[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
             current_int += 1
         #tt1 = time.perf_counter()
-        #verbose_message(3, f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
+        #verbose_message3(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
 
 
         # Brute-force dedisperse whole gulp
         if current_gulp == 0:
             # For first gulp, need to initialize prev_array and don't write prev_array
-            #verbose_message(3, "First gulp, initializing prev_array")
+            #verbose_message3("First gulp, initializing prev_array")
             prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
-            #verbose_message(3, f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
+            #verbose_message3(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
             )
-            #verbose_message(3, f"shifted and stacked first gulp")
-            #verbose_message(3, f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
+            #verbose_message3(f"shifted and stacked first gulp")
+            #verbose_message3(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
         else:
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
@@ -801,8 +805,8 @@ if __name__ == "__main__":
         outf.write(mid_array.ravel().astype(arr_dtype))
 
         #tt2 = time.perf_counter()
-        #verbose_message(3, f"Dedispersed in {tt2-tt1} s")
-        #verbose_message(1, f"Processed gulp {current_gulp}")
+        #verbose_message3(f"Dedispersed in {tt2-tt1} s")
+        #verbose_message1(f"Processed gulp {current_gulp}")
         print(f"Processed gulp {current_gulp}")
         current_gulp += 1
 
@@ -826,9 +830,9 @@ if __name__ == "__main__":
 
     t2 = time.perf_counter()
 
-    verbose_message(0, "\nDone")
-    verbose_message(1, f"TIME initialize: {t1-t0} s")
-    verbose_message(1, f"TIME clip, mask, dedisperse all gulps: {t2-t1} s")
-    verbose_message(0, f"TIME total: {t2-t0} s")
+    verbose_message0("\nDone")
+    verbose_message1(f"TIME initialize: {t1-t0} s")
+    verbose_message1(f"TIME clip, mask, dedisperse all gulps: {t2-t1} s")
+    verbose_message0(f"TIME total: {t2-t0} s")
 
     sys.exit()
