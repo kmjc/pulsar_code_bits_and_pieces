@@ -90,7 +90,9 @@ def get_nbits(dtype):
     else:
         raise RuntimeError(f"dtype={dtype} not supported")
 
-
+# OK so if it's a filterbank it SHOULD have HEADER_START and HEADER_END
+# I think I was testing it on one that wasn't properly written, so I had to
+# add them in
 def write_header(header, outfile):
     header_list = list(header.keys())
     manual_head_start_end = False
@@ -520,7 +522,7 @@ if __name__ == "__main__":
 
     g = parser.add_mutually_exclusive_group(required=True)
     g.add_argument(
-        "-d", "--dm", type=float, default=0, help="DM (cm-3pc) to dedisperse to"
+        "-d", "--dm", type=float, default=0, help="DM (cm-3pc) to dedisperse to, must be positive"
     )
     g.add_argument(
         "-t",
