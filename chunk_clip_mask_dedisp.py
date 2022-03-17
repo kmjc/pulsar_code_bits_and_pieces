@@ -163,6 +163,8 @@ class Mask:
             self.mask_zap_chans = set(list(self.nchan - 1 - np.array(list(rfimask.mask_zap_chans))))
         else:
             self.mask_zap_chans = rfimask.mask_zap_chans
+        print(rfimask.mask_zap_chans)
+        print(self.mask_zap_chans)
         # original rfimask has this as a list of arrays, convert to set if necessary
         if invertband:
             self.mask_zap_chans_per_int = [
