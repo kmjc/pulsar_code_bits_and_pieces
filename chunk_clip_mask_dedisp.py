@@ -118,6 +118,21 @@ def write_header(header, outfile):
         outfile.write(sigproc.addto_hdr("HEADER_END", None))
 
 
+def get_fmin_fmax_invert(header):
+    """Calculate band edges and whether the band is inverted from a filterbank header
+    Returns fmin, fmax, inverted"""
+
+    if header['foff'] < 0:
+        fmax = header["fch1"] - header["foff"] / 2
+        fmin = fmax + nchans * header["foff"]
+        invert = True
+    else:
+        fmin = header["fch1"] - header["foff"] / 2
+        fmax = fmin + nchans * header["foff"]
+        invert = False
+
+    return fmin, fmax, invert
+
 ################################################################################
 # MASKING FUNCTIONS:
 
@@ -626,8 +641,8 @@ if __name__ == "__main__":
     nchans = header["nchans"]
 
     # calculate fmin and fmax FROM HEADER
-    fmax = header["fch1"] - header["foff"] / 2
-    fmin = fmax + nchans * header["foff"]
+    fmin, fmax, invertband = get_fmin_fmax_invert(header)
+
     verbose_message0(
         f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}",
     )
@@ -660,7 +675,7 @@ if __name__ == "__main__":
     # Select gulp
     #######################################################################
     # Get the maximum brute force DM delay, and the delays for each channel #
-    fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq, invertband=True)
+    fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq, invertband=invertband)
 
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
     verbose_message0(f"Brute force incoherent DM is {DM}")
