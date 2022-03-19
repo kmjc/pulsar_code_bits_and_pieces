@@ -611,21 +611,29 @@ if __name__ == "__main__":
     where_channel_ref_freq = "center"
 
     # didn't want the verbose_message if testing in loops
-    def print_message(message):
+    def verbose_message0(message):
         print(message)
-    def dontprint_message(message):
-        pass
 
-    verbose_message0 = print_message
-    verbose_message1 = dontprint_message
-    verbose_message2 = dontprint_message
-    verbose_message3 = dontprint_message
     if args.verbosity > 0:
-        verbose_message1 = print_message
+        def verbose_message1(message):
+            print(message)
+    else:
+        def verbose_message1(message):
+            pass
+
     if args.verbosity > 1:
-        verbose_message2 = print_message
+        def verbose_message2(message):
+            print(message)
+    else:
+        def verbose_message2(message):
+            pass
+
     if args.verbosity > 2:
-        verbose_message3 = print_message
+        def verbose_message3(message):
+            print(message)
+    else:
+        def verbose_message3(message):
+            pass
 
 
     verbose_message0(f"Working on file: {args.filename}")
