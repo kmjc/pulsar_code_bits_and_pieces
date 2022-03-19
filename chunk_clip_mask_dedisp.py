@@ -124,11 +124,11 @@ def get_fmin_fmax_invert(header):
 
     if header['foff'] < 0:
         fmax = header["fch1"] - header["foff"] / 2
-        fmin = fmax + nchans * header["foff"]
+        fmin = fmax + header['nchans'] * header["foff"]
         invert = True
     else:
         fmin = header["fch1"] - header["foff"] / 2
-        fmax = fmin + nchans * header["foff"]
+        fmax = fmin + header['nchans'] * header["foff"]
         invert = False
 
     return fmin, fmax, invert
