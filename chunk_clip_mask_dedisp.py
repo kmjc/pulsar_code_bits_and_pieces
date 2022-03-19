@@ -723,6 +723,8 @@ if __name__ == "__main__":
         running_avg_std=None, chan_running_avg=None, chan_running_std=None
     )
     arr_dtype = get_dtype(header["nbits"])
+    arr_outdtype = np.float32  # as subtracting average in clipping/masking
+
     # precompute DM shifts
     # align it to the highest frequency channel
     if fs[0] > fs [-1]:
@@ -767,7 +769,7 @@ if __name__ == "__main__":
     intensities = (
         np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
         .reshape(-1, nchans)
-        .astype(np.float32)
+        .astype(arr_outdtype)
     )
     verbose_message2("Read in first chunk")
     verbose_message3(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
@@ -824,8 +826,8 @@ if __name__ == "__main__":
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
             )
-            outf.write(prev_array.ravel().astype(arr_dtype))
-        outf.write(mid_array.ravel().astype(arr_dtype))
+            outf.write(prev_array.ravel().astype(arr_outdtype))
+        outf.write(mid_array.ravel().astype(arr_outdtype))
 
         #tt2 = time.perf_counter()
         #verbose_message3(f"Dedispersed in {tt2-tt1} s")
@@ -838,7 +840,7 @@ if __name__ == "__main__":
         intensities = (
             np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
             .reshape(-1, nchans)
-            .astype(np.float32)
+            .astype(arr_outdtype)
         )
 
         # Test if on last interval or end of file
