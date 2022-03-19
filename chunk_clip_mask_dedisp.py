@@ -815,7 +815,7 @@ if __name__ == "__main__":
 
     # Process first gulp separately
     intensities[:, list(zerochans)] = 0
-    preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, mask=mask, current_int):
+    preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, mask=mask, current_int)
     #verbose_message3("First gulp, initializing prev_array")
     prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
     #verbose_message3(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
@@ -843,7 +843,7 @@ if __name__ == "__main__":
         while True:
             #tt0 = time.perf_counter()
             intensities[:, list(zerochans)] = 0
-            preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, mask=mask, current_int):
+            preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, mask=mask, current_int)
             #tt1 = time.perf_counter()
             #verbose_message3(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
 
