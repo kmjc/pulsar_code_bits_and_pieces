@@ -688,15 +688,17 @@ if __name__ == "__main__":
             pass
 
     # define gulp preprocessing based on args
-    if args.clipsig or args.droptotsig:
+    if args.clipsig or args.droptotsig or args.mask:
         if not_zero_or_none(args.mask):
+            "Preprocess is: clipping/computing running averages, subtracting baseline, masking"
             def preprocess(*args, **kwargs):
                 clip_mask_subbase_gulp(*args, **kwargs)
         else:
+            "Preprocess is: clipping/computing running averages, subtracting baseline, NOT masking"
             def preprocess(*args, **kwargs):
                 clip_subbase_gulp(*args, **kwargs)
     else:
-        verbose_message0("Not clipping, masking, or subtracting baseline")
+        verbose_message0("Preprocess is: NOT clipping/computing running averages, NOT subtracting baseline, NOT masking")
         def preprocess(*args, **kwargs):
             pass
 
