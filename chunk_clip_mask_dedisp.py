@@ -335,7 +335,7 @@ def clip(
             chan_running_avg=chan_running_avg,
         )
 
-def clip_mask_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptotsig, gulp, maxDT, mask, current_int):
+def clip_mask_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptotsig, gulp, maxDT, current_int, mask):
     """Clip, mask and subtract the running_avg from a gulp"""
     for interval in range(nint):
         try:
@@ -359,9 +359,33 @@ def clip_mask_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptot
             )
 
         data[slc, :] -= running_dict["chan_running_avg"]
+        data[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
+        current_int += 1
 
-        if not_zero_or_none(mask):
-            data[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
+def clip_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptotsig, gulp, maxDT, current_int, *args):
+    """Same as clip_mask_subbase_gulp but no mask"""
+    for interval in range(nint):
+        try:
+            slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+            data[slc, :], running_dict = clip(
+                data[slc, :],
+                clipsig,
+                droptot_sig=droptotsig,
+                **running_dict,
+            )
+        except IndexError:  # in case on leftover partial-interval
+            verbose_message2(
+                f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
+            )
+            slc = slice(interval * ptsperint, None)
+            data[slc, :], running_dict = clip(
+                data[slc, :],
+                clipsig,
+                droptot_sig=droptotsig,
+                **running_dict,
+            )
+
+        data[slc, :] -= running_dict["chan_running_avg"]
         current_int += 1
 
 ################################################################################
@@ -665,8 +689,12 @@ if __name__ == "__main__":
 
     # define gulp preprocessing based on args
     if args.clipsig or args.droptotsig:
-        def preprocess(*args, **kwargs):
-            clip_mask_subbase_gulp(*args, **kwargs)
+        if not_zero_or_none(args.mask):
+            def preprocess(*args, **kwargs):
+                clip_mask_subbase_gulp(*args, **kwargs)
+        else:
+            def preprocess(*args, **kwargs):
+                clip_subbase_gulp(*args, **kwargs)
     else:
         verbose_message0("Not clipping, masking, or subtracting baseline")
         def preprocess(*args, **kwargs):
@@ -815,7 +843,7 @@ if __name__ == "__main__":
 
     # Process first gulp separately
     intensities[:, list(zerochans)] = 0
-    preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, mask=mask, current_int)
+    preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, current_int, mask)
     #verbose_message3("First gulp, initializing prev_array")
     prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
     #verbose_message3(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
@@ -843,7 +871,7 @@ if __name__ == "__main__":
         while True:
             #tt0 = time.perf_counter()
             intensities[:, list(zerochans)] = 0
-            preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, mask=mask, current_int)
+            preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, current_int, mask)
             #tt1 = time.perf_counter()
             #verbose_message3(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
 
