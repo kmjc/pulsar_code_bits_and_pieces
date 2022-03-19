@@ -335,6 +335,34 @@ def clip(
             chan_running_avg=chan_running_avg,
         )
 
+def clip_mask_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptotsig, gulp, maxDT, mask, current_int):
+    """Clip, mask and subtract the running_avg from a gulp"""
+    for interval in range(nint):
+        try:
+            slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+            data[slc, :], running_dict = clip(
+                data[slc, :],
+                clipsig,
+                droptot_sig=droptotsig,
+                **running_dict,
+            )
+        except IndexError:  # in case on leftover partial-interval
+            verbose_message2(
+                f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
+            )
+            slc = slice(interval * ptsperint, None)
+            data[slc, :], running_dict = clip(
+                data[slc, :],
+                clipsig,
+                droptot_sig=droptotsig,
+                **running_dict,
+            )
+
+        data[slc, :] -= running_dict["chan_running_avg"]
+
+        if not_zero_or_none(mask):
+            data[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
+        current_int += 1
 
 ################################################################################
 # DM FUNCTIONS:
@@ -635,6 +663,14 @@ if __name__ == "__main__":
         def verbose_message3(message):
             pass
 
+    # define gulp preprocessing based on args
+    if args.clipsig or args.droptotsig:
+        def preprocess(*args, **kwargs):
+            clip_mask_subbase_gulp(*args, **kwargs)
+    else:
+        verbose_message0("Not clipping, masking, or subtracting baseline")
+        def preprocess(*args, **kwargs):
+            pass
 
     verbose_message0(f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
@@ -673,6 +709,7 @@ if __name__ == "__main__":
         ptsperint = mask.ptsperint
         zerochans = mask.mask_zap_chans | ignorechans
     else:
+        mask = None
         ptsperint = 2400  # presto default
         zerochans = ignorechans
 
@@ -774,81 +811,68 @@ if __name__ == "__main__":
     verbose_message2("Read in first chunk")
     verbose_message3(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
     verbose_message3(f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB")
-    # Process gulp
-    while True:
-        #tt0 = time.perf_counter()
-        # set ignorechans and any mask_zap_chans to 0
-        intensities[:, list(zerochans)] = 0
-
-        # for each interval:
-        # clip, subtract off chan_running_avg, set any mask_zap_chans_per_int to 0
-        for interval in range(intspergulp):
-            try:
-                slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
-                intensities[slc, :], running_dict = clip(
-                    intensities[slc, :],
-                    args.clipsig,
-                    droptot_sig=args.droptotsig,
-                    **running_dict,
-                )
-            except IndexError:  # in case on leftover partial-interval
-                verbose_message2(
-                    f"Last interval detected: length {intensities.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
-                )
-                slc = slice(interval * ptsperint, None)
-                intensities[slc, :], running_dict = clip(
-                    intensities[slc, :],
-                    args.clipsig,
-                    droptot_sig=args.droptotsig,
-                    **running_dict,
-                )
-
-            intensities[slc, :] -= running_dict["chan_running_avg"]
-            if not_zero_or_none(args.mask):
-                intensities[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
-            current_int += 1
-        #tt1 = time.perf_counter()
-        #verbose_message3(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
 
 
-        # Brute-force dedisperse whole gulp
-        if current_gulp == 0:
-            # For first gulp, need to initialize prev_array and don't write prev_array
-            #verbose_message3("First gulp, initializing prev_array")
-            prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
-            #verbose_message3(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
-            prev_array, mid_array, end_array = shift_and_stack(
-                intensities, shifts, prev_array, maxDT
-            )
-            #verbose_message3(f"shifted and stacked first gulp")
-            #verbose_message3(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
-        else:
+    # Process first gulp separately
+    intensities[:, list(zerochans)] = 0
+    preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, mask=mask, current_int):
+    #verbose_message3("First gulp, initializing prev_array")
+    prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
+    #verbose_message3(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
+    prev_array, mid_array, end_array = shift_and_stack(
+        intensities, shifts, prev_array, maxDT
+    )
+    #verbose_message3(f"shifted and stacked first gulp")
+    #verbose_message3(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
+    outf.write(mid_array.ravel().astype(arr_outdtype))
+
+    # reset for next loop
+    prev_array = end_array
+    intensities = (
+        np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
+        .reshape(-1, nchans)
+        .astype(arr_outdtype)
+    )
+
+    # test if need to do next loop, or if on last gulp
+    if intensities.shape[0] > maxDT:
+        if intensities.shape[0] < gulp: #  on last gulp
+            if (intensities.shape[0] % ptsperint):  # last int is weirdly sized
+                intspergulp = (gulp // ptsperint) + 1
+
+        while True:
+            #tt0 = time.perf_counter()
+            intensities[:, list(zerochans)] = 0
+            preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, mask=mask, current_int):
+            #tt1 = time.perf_counter()
+            #verbose_message3(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
+
+            # Brute-force dedisperse whole gulp
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
             )
             outf.write(prev_array.ravel().astype(arr_outdtype))
-        outf.write(mid_array.ravel().astype(arr_outdtype))
+            outf.write(mid_array.ravel().astype(arr_outdtype))
+            #tt2 = time.perf_counter()
+            #verbose_message3(f"Dedispersed in {tt2-tt1} s")
+            #verbose_message1(f"Processed gulp {current_gulp}")
+            print(f"Processed gulp {current_gulp}")
+            current_gulp += 1
 
-        #tt2 = time.perf_counter()
-        #verbose_message3(f"Dedispersed in {tt2-tt1} s")
-        #verbose_message1(f"Processed gulp {current_gulp}")
-        print(f"Processed gulp {current_gulp}")
-        current_gulp += 1
+            # reset for next loop
+            prev_array = end_array
+            intensities = (
+                np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
+                .reshape(-1, nchans)
+                .astype(arr_outdtype)
+            )
 
-        # reset for next loop
-        prev_array = end_array
-        intensities = (
-            np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
-            .reshape(-1, nchans)
-            .astype(arr_outdtype)
-        )
-
-        # Test if on last interval or end of file
-        if intensities.shape[0] < gulp:
-            if intensities.size == 0 or intensities.shape[0] < maxDT:
-                break
-            elif not (intensities.shape[0] % ptsperint):
-                intspergulp = (gulp // ptsperint) + 1
+            # Test if on last interval or end of file
+            if intensities.shape[0] < gulp:
+                if intensities.size == 0 or intensities.shape[0] < maxDT:
+                    break
+                elif (intensities.shape[0] % ptsperint):
+                    intspergulp = (gulp // ptsperint) + 1
 
     outf.close()
     filfile.close()
