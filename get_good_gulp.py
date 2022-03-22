@@ -216,8 +216,8 @@ for gulp in factors_over_maxDT:
         fd1 = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
         numRowsA = (fd1.subDT(fd1.fs)).sum()
         numRowsB = (fd1.subDT(fd1.fs[::2], fd1.fs[2] - fd1.fs[0])).sum()
-        byte_size_A = (gulp + 2*maxdt)*numRowsA*nbytes
-        byte_size_B = (gulp + 2*maxdt)*numRowsB*nbytes
+        byte_size_A = (gulp + 2*maxDT)*numRowsA*nbytes
+        byte_size_B = (gulp + 2*maxDT)*numRowsB*nbytes
 
         byte_size_data = byte_size_A + byte_size_B + byte_size_intensities + byte_size_prev_arr
 
