@@ -169,6 +169,7 @@ verbose_message(2, f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp}
 
 
 if args.fdmt:
+    from fdmt.cpu_fdmt import FDMT
     fs = np.linspace(fmin, fmax, nchans, endpoint=True)
 else:
     fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq)
@@ -201,14 +202,29 @@ verbose_message(1, "(Based on very minimal testing on a small observation!) it c
 
 print("")
 print(f"{'gulp':<20} {'nchunks':<10} {'approx size':<14} {'x1.25':<10} {'x1.5':<10} {'x2':<10}")
-overhead = 464  # no idea what determines this or what makes it vary
 nbytes = header['nbits'] // 8
 if nbytes < 4:
     verbose_message(0, f"WARNING {nbytes} bytes used for size estimation BUT if using a mask everyhing gets converted to floats - times by ~{int(4/nbytes)}")
 prev = []
 for gulp in factors_over_maxDT:
     nchunks = int(nsamples / gulp)
-    byte_size_data = (2*gulp*nchans + maxDT*nchans)*nbytes + overhead
+
+    if args.fdmt:
+        byte_size_intensities = gulp*nchans*nbytes
+        byte_size_prev_arr = maxDT*maxDT*nbytes
+
+        fd1 = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
+        numRowsA = (fd1.subDT(fd1.fs)).sum()
+        numRowsB = (fd1.subDT(fd1.fs[::2], fd1.fs[2] - fd1.fs[0])).sum()
+        byte_size_A = (nsamp + 2*maxdt)*numRowsA*nbytes
+        byte_size_B = (nsamp + 2*maxdt)*numRowsB*nbytes
+
+        byte_size_data = byte_size_A + byte_size_B + byte_size_intensities + byte_size_prev_arr
+
+    else:
+        byte_size_data = (2*gulp*nchans + maxDT*nchans)*nbytes 
+
+
 
     if args.fudge * byte_size_data > args.max:
         if args.last_only:
