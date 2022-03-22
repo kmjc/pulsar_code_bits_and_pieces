@@ -11,9 +11,9 @@ import sys
 import math
 import warnings
 
-ARCSECTORAD = float('4.8481368110953599358991410235794797595635330237270e-6')
+from presto_without_presto.psr_constants import ARCSECTORAD
 
-telescope_ids = {"Fake": 0, "Arecibo": 1, "ARECIBO 305m": 1, 
+telescope_ids = {"Fake": 0, "Arecibo": 1, "ARECIBO 305m": 1,
                  "Ooty": 2, "Nancay": 3, "Parkes": 4, "Jodrell": 5,
                  "GBT": 6, "GMRT": 7, "Effelsberg": 8, "ATA": 9,
                  "SRT": 10, "LOFAR": 11, "VLA": 12, "CHIME": 20,
@@ -30,33 +30,33 @@ header_params = {
     "HEADER_START": 'flag',
     "telescope_id": 'i',
     "machine_id": 'i',
-    "data_type": 'i', 
+    "data_type": 'i',
     "rawdatafile": 'str',
-    "source_name": 'str', 
-    "barycentric": 'i', 
-    "pulsarcentric": 'i', 
-    "az_start": 'd',  
-    "za_start": 'd',  
-    "src_raj": 'd',  
-    "src_dej": 'd',  
-    "tstart": 'd',  
-    "tsamp": 'd',  
-    "nbits": 'i', 
-    "signed": 'b', 
-    "nsamples": 'i', 
+    "source_name": 'str',
+    "barycentric": 'i',
+    "pulsarcentric": 'i',
+    "az_start": 'd',
+    "za_start": 'd',
+    "src_raj": 'd',
+    "src_dej": 'd',
+    "tstart": 'd',
+    "tsamp": 'd',
+    "nbits": 'i',
+    "signed": 'b',
+    "nsamples": 'i',
     "nbeams": "i",
     "ibeam": "i",
-    "fch1": 'd',  
+    "fch1": 'd',
     "foff": 'd',
     "FREQUENCY_START": 'flag',
-    "fchannel": 'd',  
+    "fchannel": 'd',
     "FREQUENCY_END": 'flag',
-    "nchans": 'i', 
-    "nifs": 'i', 
-    "refdm": 'd',  
-    "period": 'd',  
+    "nchans": 'i',
+    "nifs": 'i',
+    "refdm": 'd',
+    "period": 'd',
     "npuls": 'q',
-    "nbins": 'i', 
+    "nbins": 'i',
     "HEADER_END": 'flag'}
 
 def dec2radians(src_dej):
@@ -215,7 +215,7 @@ if __name__ == "__main__":
 
         # Break out of the loop if the header is over
         if param=="HEADER_END":  break
-            
+
     params = list(filhdr.keys())
     params.remove("HEADER_START")
     params.remove("HEADER_END")
