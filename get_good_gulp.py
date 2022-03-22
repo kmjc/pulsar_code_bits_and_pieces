@@ -123,6 +123,8 @@ parser.add_argument('-l', '--last_only', action='store_true', help="only print l
 
 parser.add_argument('-v', '--verbosity', action='count', default=0)
 
+parser.add_argument('--fdmt', action='store_true', help="Get good gulp size for fdmt instead")
+
 args = parser.parse_args()
 
 # being too lazy to refactor
@@ -165,7 +167,11 @@ verbose_message(2, f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp}
 #######################################################################
 ###### Get the maximum DM delay, and the delays for each channel ######
 
-fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq)
+
+if args.fdmt:
+    fs = np.linspace(fmin, fmax, nchans, endpoint=True)
+else:
+    fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq)
 
 # If given use DM, else use maxDT
 if not_zero_or_none(DM):
