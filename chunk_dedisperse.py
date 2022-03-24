@@ -90,6 +90,7 @@ def get_nbits(dtype):
     else:
         raise RuntimeError(f"dtype={dtype} not supported")
 
+
 # OK so if it's a filterbank it SHOULD have HEADER_START and HEADER_END
 # I think I was testing it on one that wasn't properly written, so I had to
 # add them in
@@ -122,16 +123,17 @@ def get_fmin_fmax_invert(header):
     """Calculate band edges and whether the band is inverted from a filterbank header
     Returns fmin, fmax, inverted"""
 
-    if header['foff'] < 0:
+    if header["foff"] < 0:
         fmax = header["fch1"] - header["foff"] / 2
-        fmin = fmax + header['nchans'] * header["foff"]
+        fmin = fmax + header["nchans"] * header["foff"]
         invert = True
     else:
         fmin = header["fch1"] - header["foff"] / 2
-        fmax = fmin + header['nchans'] * header["foff"]
+        fmax = fmin + header["nchans"] * header["foff"]
         invert = False
 
     return fmin, fmax, invert
+
 
 ################################################################################
 # MASKING FUNCTIONS:
@@ -174,7 +176,9 @@ class Mask:
         # original rfimask has this as an array, convert to set if necessary
         self.mask_zap_ints = set(rfimask.mask_zap_ints)
         if invertband:
-            self.mask_zap_chans = set(list(self.nchan - 1 - np.array(list(rfimask.mask_zap_chans))))
+            self.mask_zap_chans = set(
+                list(self.nchan - 1 - np.array(list(rfimask.mask_zap_chans)))
+            )
         else:
             self.mask_zap_chans = rfimask.mask_zap_chans
         # original rfimask has this as a list of arrays, convert to set if necessary
@@ -335,7 +339,19 @@ def clip(
             chan_running_avg=chan_running_avg,
         )
 
-def clip_mask_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptotsig, gulp, maxDT, current_int, mask):
+
+def clip_mask_subbase_gulp(
+    nint,
+    ptsperint,
+    data,
+    running_dict,
+    clipsig,
+    droptotsig,
+    gulp,
+    maxDT,
+    current_int,
+    mask,
+):
     """Clip, mask and subtract the running_avg from a gulp"""
     for interval in range(nint):
         try:
@@ -362,7 +378,19 @@ def clip_mask_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptot
         data[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
         current_int += 1
 
-def clip_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptotsig, gulp, maxDT, current_int, *args):
+
+def clip_subbase_gulp(
+    nint,
+    ptsperint,
+    data,
+    running_dict,
+    clipsig,
+    droptotsig,
+    gulp,
+    maxDT,
+    current_int,
+    *args,
+):
     """Same as clip_mask_subbase_gulp but no mask"""
     for interval in range(nint):
         try:
@@ -387,6 +415,7 @@ def clip_subbase_gulp(nint, ptsperint, data, running_dict, clipsig, droptotsig, 
 
         data[slc, :] -= running_dict["chan_running_avg"]
         current_int += 1
+
 
 ################################################################################
 # DM FUNCTIONS:
@@ -433,9 +462,7 @@ def get_fs(fmin, fmax, nchans, type="center", invertband=True, **kwargs):
     if type == "lower":
         fs = np.linspace(fmin, fmax, nchans, endpoint=False, **kwargs)
     elif type == "center":
-        fs = np.linspace(
-            fmin + df / 2, fmax - df / 2, nchans, endpoint=True, **kwargs
-        )
+        fs = np.linspace(fmin + df / 2, fmax - df / 2, nchans, endpoint=True, **kwargs)
     elif type == "upper":
         fs = np.linspace(fmin + df, fmax, nchans, endpoint=True, **kwargs)
     else:
@@ -489,13 +516,14 @@ def shift_and_stack(data, shifts, prev_array, maxDT):
 
     return prev_array, mid_array, end_array
 
+
 def approx_size_shifted_arrays(data, maxDT):
     nbytes = get_nbits(data.dtype) // 4
     ilength, nchans = data.shape
     prev_sz = nbytes * maxDT * nchans
     end_sz = prev_sz
     mid_sz = nbytes * (ilength - maxDT) * nchans
-    return 2*prev_sz + mid_sz + end_sz
+    return 2 * prev_sz + mid_sz + end_sz
 
 
 def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
@@ -594,7 +622,11 @@ if __name__ == "__main__":
 
     g = parser.add_mutually_exclusive_group(required=True)
     g.add_argument(
-        "-d", "--dm", type=float, default=0, help="DM (cm-3pc) to dedisperse to, must be positive"
+        "-d",
+        "--dm",
+        type=float,
+        default=0,
+        help="DM (cm-3pc) to dedisperse to, must be positive",
     )
     g.add_argument(
         "-t",
@@ -667,23 +699,32 @@ if __name__ == "__main__":
         print(message)
 
     if args.verbosity > 0:
+
         def verbose_message1(message):
             print(message)
+
     else:
+
         def verbose_message1(message):
             pass
 
     if args.verbosity > 1:
+
         def verbose_message2(message):
             print(message)
+
     else:
+
         def verbose_message2(message):
             pass
 
     if args.verbosity > 2:
+
         def verbose_message3(message):
             print(message)
+
     else:
+
         def verbose_message3(message):
             pass
 
@@ -691,14 +732,21 @@ if __name__ == "__main__":
     if args.clipsig or args.droptotsig or args.mask:
         if not_zero_or_none(args.mask):
             "Preprocess is: clipping/computing running averages, subtracting baseline, masking"
+
             def preprocess(*args, **kwargs):
                 clip_mask_subbase_gulp(*args, **kwargs)
+
         else:
             "Preprocess is: clipping/computing running averages, subtracting baseline, NOT masking"
+
             def preprocess(*args, **kwargs):
                 clip_subbase_gulp(*args, **kwargs)
+
     else:
-        verbose_message0("Preprocess is: NOT clipping/computing running averages, NOT subtracting baseline, NOT masking")
+        verbose_message0(
+            "Preprocess is: NOT clipping/computing running averages, NOT subtracting baseline, NOT masking"
+        )
+
         def preprocess(*args, **kwargs):
             pass
 
@@ -771,7 +819,9 @@ if __name__ == "__main__":
         f"Minimum gulp is {mingulp} time samples (= {mingulp / ptsperint:.1f} intervals)",
     )
 
-    gulp, nsamp_cut_off = get_gulp(nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(args.verbosity >= 2))
+    gulp, nsamp_cut_off = get_gulp(
+        nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(args.verbosity >= 2)
+    )
     verbose_message0(f"Selected gulp of {gulp}")
     verbose_message0(f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
     verbose_message1(f"The last {nsamp_cut_off} samples will be cut off")
@@ -794,7 +844,7 @@ if __name__ == "__main__":
 
     # precompute DM shifts
     # align it to the highest frequency channel
-    if fs[0] > fs [-1]:
+    if fs[0] > fs[-1]:
         fref = fs[0]
     else:
         fref = fs[-1]
@@ -840,20 +890,32 @@ if __name__ == "__main__":
     )
     verbose_message2("Read in first chunk")
     verbose_message3(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
-    verbose_message3(f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB")
-
+    verbose_message3(
+        f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB"
+    )
 
     # Process first gulp separately
     intensities[:, list(zerochans)] = 0
-    preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, current_int, mask)
-    #verbose_message3("First gulp, initializing prev_array")
+    preprocess(
+        intspergulp,
+        ptsperint,
+        intensities,
+        running_dict,
+        args.clipsig,
+        args.droptotsig,
+        gulp,
+        maxDT,
+        current_int,
+        mask,
+    )
+    # verbose_message3("First gulp, initializing prev_array")
     prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
-    #verbose_message3(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
+    # verbose_message3(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
     prev_array, mid_array, end_array = shift_and_stack(
         intensities, shifts, prev_array, maxDT
     )
-    #verbose_message3(f"shifted and stacked first gulp")
-    #verbose_message3(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
+    # verbose_message3(f"shifted and stacked first gulp")
+    # verbose_message3(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
     outf.write(mid_array.ravel().astype(arr_outdtype))
 
     # reset for next loop
@@ -866,16 +928,27 @@ if __name__ == "__main__":
 
     # test if need to do next loop, or if on last gulp
     if intensities.shape[0] > maxDT:
-        if intensities.shape[0] < gulp: #  on last gulp
-            if (intensities.shape[0] % ptsperint):  # last int is weirdly sized
+        if intensities.shape[0] < gulp:  #  on last gulp
+            if intensities.shape[0] % ptsperint:  # last int is weirdly sized
                 intspergulp = (gulp // ptsperint) + 1
 
         while True:
-            #tt0 = time.perf_counter()
+            # tt0 = time.perf_counter()
             intensities[:, list(zerochans)] = 0
-            preprocess(intspergulp, ptsperint, intensities, running_dict, args.clipsig, args.droptotsig, gulp, maxDT, current_int, mask)
-            #tt1 = time.perf_counter()
-            #verbose_message3(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
+            preprocess(
+                intspergulp,
+                ptsperint,
+                intensities,
+                running_dict,
+                args.clipsig,
+                args.droptotsig,
+                gulp,
+                maxDT,
+                current_int,
+                mask,
+            )
+            # tt1 = time.perf_counter()
+            # verbose_message3(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
 
             # Brute-force dedisperse whole gulp
             prev_array, mid_array, end_array = shift_and_stack(
@@ -883,9 +956,9 @@ if __name__ == "__main__":
             )
             outf.write(prev_array.ravel().astype(arr_outdtype))
             outf.write(mid_array.ravel().astype(arr_outdtype))
-            #tt2 = time.perf_counter()
-            #verbose_message3(f"Dedispersed in {tt2-tt1} s")
-            #verbose_message1(f"Processed gulp {current_gulp}")
+            # tt2 = time.perf_counter()
+            # verbose_message3(f"Dedispersed in {tt2-tt1} s")
+            # verbose_message1(f"Processed gulp {current_gulp}")
             print(f"Processed gulp {current_gulp}")
             current_gulp += 1
 
@@ -901,7 +974,7 @@ if __name__ == "__main__":
             if intensities.shape[0] < gulp:
                 if intensities.size == 0 or intensities.shape[0] < maxDT:
                     break
-                elif (intensities.shape[0] % ptsperint):
+                elif intensities.shape[0] % ptsperint:
                     intspergulp = (gulp // ptsperint) + 1
 
     outf.close()
