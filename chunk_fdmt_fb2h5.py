@@ -155,11 +155,15 @@ if __name__ == "__main__":
     if DM == 0:
         sys.exit("DM=0, why are you running this?")
 
-    if nsamples % args.gulp and (nsamples % args.gulp) < maxDT:
-        raise RuntimeWarning(
-            f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end.\n"
-            f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}"
-        )
+    ngulps = nsamples // args.gulp
+    if nsamples % args.gulp:
+        if (nsamples % args.gulp) < maxDT:
+            raise RuntimeWarning(
+                f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end.\n"
+                f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}"
+            )
+        else:
+            ngulps += 1
 
     if args.gulp <= maxDT:
         raise RuntimeError(
@@ -237,10 +241,9 @@ if __name__ == "__main__":
 
     verbose_message0("Reading in first gulp")
     # Do first gulp separately
-    g = 0
     intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
     fd.reset_ABQ()
-    verbose_message1(f"Starting gulp {g}")
+    verbose_message1(f"Starting gulp 0")
     verbose_message2(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
     out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
@@ -251,22 +254,21 @@ if __name__ == "__main__":
         f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB"
     )
     t1 = time.perf_counter()
-    verbose_message1(f"Writing gulp {g}")
+    verbose_message1(f"Writing gulp 0")
     # write mid_arr
     fout.create_dataset(
         "data", data=out[:, maxDT:-maxDT], maxshape=(maxDT, None)
     )  # compression="gzip", chunks=True
     t2 = time.perf_counter()
-    verbose_message1(f"Completed gulp {g} in {t1-t0} s, wrote in {t2-t1} s")
+    verbose_message1(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s")
 
     # setup for next iteration
-    g += 1
     prev_arr = np.zeros((maxDT, maxDT), dtype=intensities.dtype)
     prev_arr += out[:, -maxDT:]
     intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
 
     if intensities.size:
-        while True:
+        for g in np.arange(1, ngulps):
             fd.reset_ABQ()
             out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
             prev_arr += out[:, :maxDT]
@@ -284,9 +286,5 @@ if __name__ == "__main__":
             prev_arr[:, :] = 0
             prev_arr += out[:, -maxDT:]
             intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
-            g += 1
-
-            if intensities.shape[1] <= maxDT:
-                break
 
     fout.close()
