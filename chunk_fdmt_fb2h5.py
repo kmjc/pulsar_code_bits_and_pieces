@@ -20,7 +20,6 @@ from chunk_dedisperse import (
     not_zero_or_none,
 )
 
-from guppy import hpy; h=hpy()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -90,8 +89,6 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
-    print("Just parsed args")
-    print(h.heap())
 
     # Set up verbose messages
         # didn't want the verbose_message if testing inside loops
@@ -166,13 +163,9 @@ if __name__ == "__main__":
             f"Try running get_good_gulp.py -t {maxDT} {args.filename}"
         )
 
-    print("defined stuff, got header")
-    print(h.heap())
     # initialize FDMT class object
     fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
-    print("Initialized fdmt")
-    print(h.heap())
-
+    verbose_message0("FDMT initialized")
 
     # top-half of the band only option
     if args.tophalf:
@@ -233,22 +226,15 @@ if __name__ == "__main__":
     filfile = open(args.filename, "rb")
     filfile.seek(hdrlen)
 
-    print("Before first read")
-    print(h.heap())
+    verbose_message0("Reading in first gulp")
     # Do first gulp separately
     g = 0
     intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
-    print("after first read")
-    print(h.heap())
     fd.reset_ABQ()
-    print("reset ABQ")
-    print(h.heap())
     verbose_message1(f"Starting gulp {g}")
     verbose_message2(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
     out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-    print("after first transform")
-    print(h.heap())
     verbose_message2(f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB")
     verbose_message2(f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB")
     t1 = time.perf_counter()
