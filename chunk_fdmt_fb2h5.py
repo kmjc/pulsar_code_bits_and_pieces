@@ -138,8 +138,16 @@ if __name__ == "__main__":
     fmin, fmax, invertband = get_fmin_fmax_invert(header)
 
     verbose_message0(
+        f"Read from file:\n"
         f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}",
     )
+
+    if args.tophalf:
+        fmin = fmin + (fmax - fmin)/2
+        nchans = nchans // 2
+        verbose_message0(f"Only using top half of the band, setting fmin to {fmin}, setting nchans to {nchans}")
+
+
 
     fs = np.linspace(
         fmin, fmax, nchans, endpoint=True
@@ -149,7 +157,7 @@ if __name__ == "__main__":
 
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
 
-    verbose_message0(f"FDMT incoherent DM is {DM}")
+    verbose_message0(f"\nFDMT incoherent DM is {DM}")
     verbose_message1(f"Maximum delay need to shift by is {max_delay_s} s")
     verbose_message0(f"This corresponds to {maxDT} time samples\n")
     if DM == 0:
@@ -175,7 +183,7 @@ if __name__ == "__main__":
     fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
     verbose_message0("FDMT initialized")
 
-    # top-half of the band only option
+    # Define slices to return intensities in read_gulp
     if args.tophalf:
         read_inv_slc = slice(nchans // 2 - 1, None, -1)
         read_slc = slice(nchans // 2, None, None)
