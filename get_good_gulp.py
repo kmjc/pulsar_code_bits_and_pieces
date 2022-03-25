@@ -342,9 +342,14 @@ if args.last_only:
 elif args.thin:
     for nchunk in np.unique(within_size_lim["nchunks"])[::-1]:
         same_nchunk = within_size_lim[within_size_lim["nchunks"] == nchunk]
-        mingulp_idx = np.where(same_nchunk["gulp"] == same_nchunk["gulp"].min())[0]
-        maxgulp_idx = np.where(same_nchunk["gulp"] == same_nchunk["gulp"].max())[0]
-        for id in [mingulp_idx, maxgulp_idx]:
+        if same_nchunk.shape[0] == 1:
+            ids = [0]
+        else:
+            ids = [
+                np.where(same_nchunk["gulp"] == same_nchunk["gulp"].min())[0],
+                np.where(same_nchunk["gulp"] == same_nchunk["gulp"].max())[0]
+            ]
+        for id in ids:
             gulp, nchunks, leftover, byte_size_data = same_nchunk[id][0]
             print(
                 f"{gulp:<20} {nchunks:<10} {sizeof_fmt(byte_size_data, dp=prec):<14} "
