@@ -343,7 +343,7 @@ elif args.thin:
     for nchunk in np.unique(within_size_lim["nchunks"])[::-1]:
         same_nchunk = within_size_lim[within_size_lim["nchunks"] == nchunk]
         if same_nchunk.shape[0] == 1:
-            gulp, nchunks, leftover, byte_size_data = same_nchunk[id][0]
+            gulp, nchunks, leftover, byte_size_data = same_nchunk[0]
             print(
                 f"{gulp:<20} {nchunks:<10} {sizeof_fmt(byte_size_data, dp=prec):<14} "
                 f"{sizeof_fmt(1.25*byte_size_data, dp=prec):<10} "
