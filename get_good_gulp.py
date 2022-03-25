@@ -174,6 +174,7 @@ parser.add_argument(
 
 parser.add_argument(
     "--factor",
+    type=int,
     help="if program is taking too long, can use to only evaluate gulps which are multiples of this number",
     default=None,
 )
@@ -270,11 +271,9 @@ if args.fdmt:
 print(f"Number of samples: {nsamples}")
 # compute max number of samples based on size alone to thin the options
 max_gulp_based_on_size_alone = int(args.max / args.fudge / nchans / nbytes)
-print(maxDT + 1, type(maxDT + 1), max_gulp_based_on_size_alone, type(max_gulp_based_on_size_alone))
 gulps_over_maxDT = np.arange(
     maxDT + 1, max_gulp_based_on_size_alone
 )  # haven't tested whether it throws a hissy fit if gulp=maxDT, so being safe
-print(gulps_over_maxDT.dtype)
 
 if not_zero_or_none(args.factor):
     gulps_over_maxDT = np.array([g for g in gulps_over_maxDT if not g % args.factor])
