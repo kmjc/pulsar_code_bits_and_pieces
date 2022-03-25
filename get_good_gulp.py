@@ -202,6 +202,12 @@ verbose_message(1, f"nsamples: {nsamples}")
 # calculate/get parameters from header
 tsamp = header["tsamp"]
 nchans = header["nchans"]
+nbytes = header["nbits"] // 8
+if nbytes < 4:
+    verbose_message(
+        0,
+        f"WARNING {nbytes} bytes used for size estimation BUT if using a mask everyhing gets converted to floats - times by {int(4/nbytes)}",
+    )
 
 
 # calculate fmin and fmax FROM HEADER
@@ -243,8 +249,10 @@ print(
     f"Minimum gulp size is {maxDT}"
 )  # I think mid_array being 0 size won't break anything? Don't know how the write handles that
 
+
 if args.fdmt:
     fd1 = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
+
 
 # OLD: based on factors of nsamples
 # factors = np.array(factorize(nsamples))
@@ -254,9 +262,12 @@ if args.fdmt:
 
 # NEW: what actually want is for all gulps to be > maxDT
 print(f"Number of samples: {nsamples}")
+# compute max number of samples based on size alone to thin the options
+max_gulp_based_on_size_alone = int(args.max / args.fudge / nchans / nbytes)
 gulps_over_maxDT = np.arange(
-    maxDT + 1, nsamples
+    maxDT + 1, max_gulp_based_on_size_alone
 )  # haven't tested whether it throws a hissy fit if gulp=maxDT, so being safe
+
 leftovers = nsamples % gulps_over_maxDT
 no_leftovers = gulps_over_maxDT[leftovers == 0]
 no_data_lost = gulps_over_maxDT[leftovers > maxDT]
@@ -265,6 +276,7 @@ possible_gulps.extend(list(no_leftovers))
 possible_gulps.sort()
 left = [nsamples % g for g in possible_gulps]
 
+verbose_message(0, f"{len(possible_gulps)} possible gulps before actual size cut")
 
 verbose_message(
     1,
@@ -276,13 +288,6 @@ print("")
 print(
     f"{'gulp':<20} {'nchunks':<10} {'approx size':<14} {'x1.25':<10} {'x1.5':<10} {'x2':<10}"
 )
-nbytes = header["nbits"] // 8
-if nbytes < 4:
-    verbose_message(
-        0,
-        f"WARNING {nbytes} bytes used for size estimation BUT if using a mask everyhing gets converted to floats - times by {int(4/nbytes)}",
-    )
-# prev = []
 
 dt = [("gulp", int), ("nchunks", int), ("leftover", int), ("byte_size_data", float)]
 data = []
