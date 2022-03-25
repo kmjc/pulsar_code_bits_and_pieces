@@ -145,7 +145,7 @@ if __name__ == "__main__":
     if args.tophalf:
         fmin = fmin + (fmax - fmin)/2
         nchans = nchans // 2
-        verbose_message0(f"Only using top half of the band, setting fmin to {fmin}, setting nchans to {nchans}")
+        verbose_message0(f"Only using top half of the band, set fmin to {fmin} and nchans to {nchans}")
 
 
 
