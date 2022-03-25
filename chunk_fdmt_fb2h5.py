@@ -220,7 +220,7 @@ if __name__ == "__main__":
     else:
         # choosing to save it as the actual max DM in the h5 output, not the DM corresponding to maxDT
         outfilename = (
-            args.filename[:-3]
+            args.filename[:-4]
             + f"_fdmtDM{inverse_DM_delay((maxDT-1)*tsamp, fmin, fmax):.3f}.h5"
         )
 
