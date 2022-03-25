@@ -172,6 +172,12 @@ parser.add_argument(
     help="only use with --fdmt. Run on only top half of the band",
 )
 
+parser.add_argument(
+    "--factor",
+    help="if program is taking too long, can use to only evaluate gulps which are multiples of this number",
+    default=None,
+)
+
 args = parser.parse_args()
 
 # being too lazy to refactor
@@ -267,6 +273,9 @@ max_gulp_based_on_size_alone = int(args.max / args.fudge / nchans / nbytes)
 gulps_over_maxDT = np.arange(
     maxDT + 1, max_gulp_based_on_size_alone
 )  # haven't tested whether it throws a hissy fit if gulp=maxDT, so being safe
+
+if not_zero_or_none(args.factor):
+    gulps_over_maxDT = np.array([g for g in gulps_over_maxDT if not g % args.factor])
 
 leftovers = nsamples % gulps_over_maxDT
 no_leftovers = gulps_over_maxDT[leftovers == 0]
