@@ -281,9 +281,9 @@ if not_zero_or_none(args.factor):
 leftovers = nsamples % gulps_over_maxDT
 no_leftovers = gulps_over_maxDT[leftovers == 0]
 no_data_lost = gulps_over_maxDT[leftovers > maxDT]
-possible_gulps = list(no_data_lost)
-possible_gulps.extend(list(no_leftovers))
-possible_gulps.sort()
+possible_gulps = set(no_data_lost) | set(no_leftovers)
+possible_gulps = sorted(list(possible_gulps))
+
 left = [nsamples % g for g in possible_gulps]
 
 verbose_message(0, f"{len(possible_gulps)} possible gulps before actual size cut")
