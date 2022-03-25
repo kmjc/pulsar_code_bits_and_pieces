@@ -11,7 +11,7 @@ import time
 
 from presto_without_presto import sigproc
 
-from chunk_clip_mask_dedisp import (
+from chunk_dedisperse import (
     get_fmin_fmax_invert,
     get_dtype,
     inverse_DM_delay,
