@@ -120,7 +120,8 @@ def write_header(header, outfile):
 
 
 def get_fmin_fmax_invert(header):
-    """Calculate band edges and whether the band is inverted from a filterbank header
+    """Calculate band edges and whether the band is inverted from a filterbank header.
+    The presto sense of inverted, aka for a normal sigproc file where foff<0 inverted=True
     Returns fmin, fmax, inverted"""
 
     if header["foff"] < 0:

@@ -221,6 +221,7 @@ if nbytes < 4:
 fmax = header["fch1"] - header["foff"] / 2
 fmin = fmax + nchans * header["foff"]
 if args.fdmt and args.tophalf:
+    verbose_message(0, f"Using top half of the band only")
     fmin = fmin + (fmax - fmin) / 2
     nchans = nchans // 2
 verbose_message(2, f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp}")
