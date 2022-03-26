@@ -139,25 +139,23 @@ if __name__ == "__main__":
 
     verbose_message0(
         f"Read from file:\n"
-        f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}",
+        f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}\n",
     )
 
+    # define fs, for CD/maxDT calculation
+    # FDMT computes based on shift between fmin and fmax
     if args.tophalf:
-        fmin = fmin + (fmax - fmin)/2
-        nchans = nchans // 2
-        verbose_message0(f"Only using top half of the band, set fmin to {fmin} and nchans to {nchans}")
-
-
-
-    fs = np.linspace(
-        fmin, fmax, nchans, endpoint=True
-    )  # FDMT computes based on shift between fmin and fmax
-    if invertband:
-        fs = fs[::-1]
-
+        verbose_message0("Only using top half of the band")
+        fs = np.linspace(
+            fmin + (fmax - fmin)/2, fmax, nchans // 2, endpoint=True
+        )
+    else:
+        fs = np.linspace(
+            fmin, fmax, nchans, endpoint=True
+        )
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
 
-    verbose_message0(f"\nFDMT incoherent DM is {DM}")
+    verbose_message0(f"FDMT incoherent DM is {DM}")
     verbose_message1(f"Maximum delay need to shift by is {max_delay_s} s")
     verbose_message0(f"This corresponds to {maxDT} time samples\n")
     if DM == 0:
@@ -168,7 +166,7 @@ if __name__ == "__main__":
         if (nsamples % args.gulp) < maxDT:
             raise RuntimeWarning(
                 f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end.\n"
-                f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}"
+                f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n"
             )
         else:
             ngulps += 1
@@ -176,12 +174,15 @@ if __name__ == "__main__":
     if args.gulp <= maxDT:
         raise RuntimeError(
             f"gulp ({args.gulp}) must be larger than maxDT ({maxDT})\n"
-            f"Try running get_good_gulp.py -t {maxDT} {args.filename}"
+            f"Try running get_good_gulp.py -t {maxDT} {args.filename}\n"
         )
 
     # initialize FDMT class object
-    fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
-    verbose_message0("FDMT initialized")
+    if args.tophalf:
+        fd = FDMT(fmin=fmin + (fmax - fmin)/2, fmax=fmax, nchan=nchans//2, maxDT=maxDT)
+    else:
+        fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
+    verbose_message0(f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n")
 
     # Define slices to return intensities in read_gulp
     if args.tophalf:
@@ -225,7 +226,7 @@ if __name__ == "__main__":
         )
 
     if os.path.exists(outfilename):
-        verbose_message0(f"{outfilename} already exists, deleting")
+        verbose_message0(f"{outfilename} already exists, deleting\n")
         os.remove(outfilename)
     fout = h5py.File(outfilename, "a")
     # following https://stackoverflow.com/questions/48212394/how-to-store-a-dictionary-with-strings-and-numbers-in-a-hdf5-file
@@ -239,7 +240,7 @@ if __name__ == "__main__":
     DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, fmin, fmax)
     DMs += args.atdm
     verbose_message0(
-        f"DMs in h5 are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}"
+        f"DMs in h5 are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}\n"
     )
     fout.create_dataset("DMs", data=DMs)
 
@@ -268,7 +269,7 @@ if __name__ == "__main__":
         "data", data=out[:, maxDT:-maxDT], maxshape=(maxDT, None)
     )  # compression="gzip", chunks=True
     t2 = time.perf_counter()
-    verbose_message1(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s")
+    verbose_message1(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
 
     # setup for next iteration
     prev_arr = np.zeros((maxDT, maxDT), dtype=intensities.dtype)
