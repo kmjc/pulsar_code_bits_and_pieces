@@ -192,7 +192,7 @@ class infodata(object):
             self.analyzer = init_dict['analyzer']
 
     @classmethod
-    def fromfil(cls, filenm):
+    def from_file(cls, filenm):
         init_dict = {}
         init_dict['breaks'] = 0
         for line in open(filenm, encoding="latin-1"):
