@@ -72,7 +72,198 @@ class infodata(object):
             if line.startswith(" Data analyzed by"):
                 self.analyzer = line.split("=")[-1].strip()
                 continue
-            
+
+    def to_file(self, inffn, notes=None):
+        if not inffn.endswith(".inf"):
+            raise ValueError("PRESTO info files must end with '.inf'. "
+                             "Got: %s" % inffn)
+        with open(inffn, 'w') as ff:
+            if hasattr(self, 'basenm'):
+                ff.write(" Data file name without suffix          =  %s\n" %
+                         self.basenm)
+            if hasattr(self, 'telescope'):
+                ff.write(" Telescope used                         =  %s\n" %
+                         self.telescope)
+            if hasattr(self, 'instrument'):
+                ff.write(" Instrument used                        =  %s\n" %
+                         self.instrument)
+            if hasattr(self, 'object'):
+                ff.write(" Object being observed                  =  %s\n" %
+                         self.object)
+            if hasattr(self, 'RA'):
+                ff.write(" J2000 Right Ascension (hh:mm:ss.ssss)  =  %s\n" %
+                         self.RA)
+            if hasattr(self, 'DEC'):
+                ff.write(" J2000 Declination     (dd:mm:ss.ssss)  =  %s\n" %
+                         self.DEC)
+            if hasattr(self, 'observer'):
+                ff.write(" Data observed by                       =  %s\n" %
+                         self.observer)
+            if hasattr(self, 'epoch'):
+                ff.write(" Epoch of observation (MJD)             =  %05.15f\n" %
+                         self.epoch)
+            if hasattr(self, 'bary'):
+                ff.write(" Barycentered?           (1=yes, 0=no)  =  %d\n" %
+                         self.bary)
+            if hasattr(self, 'N'):
+                ff.write(" Number of bins in the time series      =  %-11.0f\n" %
+                         self.N)
+            if hasattr(self, 'dt'):
+                ff.write(" Width of each time series bin (sec)    =  %.15g\n" %
+                         self.dt)
+            if hasattr(self, 'breaks') and self.breaks:
+                ff.write(" Any breaks in the data? (1 yes, 0 no)  =  1\n")
+                if hasattr(self, 'onoff'):
+                    for ii, (on, off) in enumerate(self.onoff, 1):
+                        ff.write(" On/Off bin pair #%3d                   =  %-11.0f, %-11.0f\n" %
+                                 (ii, on, off))
+            else:
+                ff.write(" Any breaks in the data? (1 yes, 0 no)  =  0\n")
+            if hasattr(self, 'DM'):
+                ff.write(" Dispersion measure (cm-3 pc)           =  %.12g\n" %
+                         self.DM)
+            if hasattr(self, 'lofreq'):
+                ff.write(" Central freq of low channel (Mhz)      =  %.12g\n" %
+                         self.lofreq)
+            if hasattr(self, 'BW'):
+                ff.write(" Total bandwidth (Mhz)                  =  %.12g\n" %
+                         self.BW)
+            if hasattr(self, 'numchan'):
+                ff.write(" Number of channels                     =  %d\n" %
+                         self.numchan)
+            if hasattr(self, 'chan_width'):
+                ff.write(" Channel bandwidth (Mhz)                =  %.12g\n" %
+                         self.chan_width)
+            if hasattr(self, 'analyzer'):
+                ff.write(" Data analyzed by                       =  %s\n" %
+                         self.analyzer)
+            if hasattr(self, 'deorbited'):
+                ff.write(" Orbit removed?          (1=yes, 0=no)  =  %d\n" %
+                         self.deorbited)
+            ff.write(" Any additional notes:\n")
+            if notes is not None:
+                ff.write("    %s\n" % notes.strip())
+
+
+# added tweaked version so can make it from a dict
+class infodata(object):
+    def __init__(self, init_dict):
+        if init_dict.get('basenm', 0):
+            self.basenm = init_dict['basenm']
+        if init_dict.get('telescope', 0):
+            self.telescope = init_dict['telescope']
+        if init_dict.get('instrument', 0):
+            self.instrument = init_dict['instrument']
+        if init_dict.get('object', 0):
+            self.object = init_dict['object']
+        if init_dict.get('RA', 0):
+            self.RA = init_dict['RA']
+        if init_dict.get('DEC', 0):
+            self.DEC = init_dict['DEC']
+        if init_dict.get('observer', 0):
+            self.observer = init_dict['observer']
+        if init_dict.get('epoch', 0):
+            self.epoch = init_dict['epoch']
+        if init_dict.get('bary', 0):
+            self.bary = init_dict['bary']
+        if init_dict.get('N', 0):
+            self.N = init_dict['N']
+        if init_dict.get('dt', 0):
+            self.dt = init_dict['dt']
+        if init_dict.get('breaks', 0):
+            self.breaks = init_dict['breaks']
+        if init_dict.get('onoff', 0):
+            self.onoff = init_dict['onoff']
+        if init_dict.get('waveband', 0):
+            self.waveband = init_dict['waveband']
+        if init_dict.get('beam_diam', 0):
+            self.beam_diam = init_dict['beam_diam']
+        if init_dict.get('DM', 0):
+            self.DM = init_dict['DM']
+        if init_dict.get('lofreq', 0):
+            self.lofreq = init_dict['lofreq']
+        if init_dict.get('BW', 0):
+            self.BW = init_dict['BW']
+        if init_dict.get('numchan', 0):
+            self.numchan = init_dict['numchan']
+        if init_dict.get('chan_width', 0):
+            self.chan_width = init_dict['chan_width']
+        if init_dict.get('analyzer', 0):
+            self.analyzer = init_dict['analyzer']
+
+    @classmethod
+    def fromfil(cls, filenm):
+        init_dict = {}
+        init_dict['breaks'] = 0
+        for line in open(filenm, encoding="latin-1"):
+            if line.startswith(" Data file name"):
+                init_dict['basenm'] = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" Telescope"):
+                init_dict['telescope'] = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" Instrument"):
+                init_dict['instrument'] = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" Object being observed"):
+                init_dict['object'] = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" J2000 Right Ascension"):
+                init_dict['RA'] = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" J2000 Declination"):
+                init_dict['DEC'] = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" Data observed by"):
+                init_dict['observer'] = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" Epoch"):
+                init_dict['epoch'] = float(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Barycentered?"):
+                init_dict['bary'] = int(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Number of bins"):
+                init_dict['N'] = int(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Width of each time series bin"):
+                init_dict['dt'] = float(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Any breaks in the data?"):
+                init_dict['breaks'] = int(line.split("=")[-1].strip())
+                if init_dict['breaks']:
+                    init_dict['onoff'] = []
+                continue
+            if line.startswith(" On/Off bin pair"):
+                vals = line.split("=")[-1].strip().split(",")
+                init_dict['onoff'].append((int(vals[0]), int(vals[1])))
+                continue
+            if line.startswith(" Type of observation"):
+                init_dict['waveband'] = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" Beam diameter"):
+                init_dict['beam_diam'] = float(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Dispersion measure"):
+                init_dict['DM'] = float(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Central freq of low channel"):
+                init_dict['lofreq'] = float(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Total bandwidth"):
+                init_dict['BW'] = float(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Number of channels"):
+                init_dict['numchan'] = int(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Channel bandwidth"):
+                init_dict['chan_width'] = float(line.split("=")[-1].strip())
+                continue
+            if line.startswith(" Data analyzed by"):
+                init_dict['analyzer'] = line.split("=")[-1].strip()
+                continue
+        return cls(init_dict)
+
     def to_file(self, inffn, notes=None):
         if not inffn.endswith(".inf"):
             raise ValueError("PRESTO info files must end with '.inf'. "
