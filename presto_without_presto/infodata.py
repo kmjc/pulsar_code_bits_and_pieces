@@ -49,9 +49,13 @@ class infodata(object):
                 self.onoff.append((int(vals[0]), int(vals[1])))
                 continue
             if line.startswith(" Type of observation"):
+                print("found type")
+                print(line)
                 self.waveband = line.split("=")[-1].strip()
                 continue
             if line.startswith(" Beam diameter"):
+                print("found beam diameter")
+                print(line)
                 self.beam_diam = float(line.split("=")[-1].strip())
                 continue
             if line.startswith(" Dispersion measure"):
