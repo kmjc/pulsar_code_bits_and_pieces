@@ -146,7 +146,7 @@ class infodata(object):
 
 
 # added tweaked version so can make it from a dict
-class infodata(object):
+class infodata2(object):
     def __init__(self, init_dict):
         if init_dict.get('basenm', 0):
             self.basenm = init_dict['basenm']
