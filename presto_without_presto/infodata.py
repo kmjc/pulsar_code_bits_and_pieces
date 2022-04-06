@@ -49,13 +49,9 @@ class infodata(object):
                 self.onoff.append((int(vals[0]), int(vals[1])))
                 continue
             if line.startswith(" Type of observation"):
-                print("found type")
-                print(line)
                 self.waveband = line.split("=")[-1].strip()
                 continue
             if line.startswith(" Beam diameter"):
-                print("found beam diameter")
-                print(line)
                 self.beam_diam = float(line.split("=")[-1].strip())
                 continue
             if line.startswith(" Dispersion measure"):
@@ -75,6 +71,9 @@ class infodata(object):
                 continue
             if line.startswith(" Data analyzed by"):
                 self.analyzer = line.split("=")[-1].strip()
+                continue
+            if line.startswith(" Orbit removed?"):
+                self.deorbited = int(line.split("=")[-1].strip())
                 continue
 
     def to_file(self, inffn, notes=None):
@@ -123,6 +122,13 @@ class infodata(object):
                                  (ii, on, off))
             else:
                 ff.write(" Any breaks in the data? (1 yes, 0 no)  =  0\n")
+            # These two were left out, I assume because there's some variation? e.g. beam_diam might not always be in arcsec
+            if hasattr(self, 'waveband'):
+                ff.write(" Type of observation (EM band)          =  %s\n" %
+                         self.waveband)
+            if hasattr(self, 'beam_diam'):
+                ff.write(" Beam diameter (arcsec)                 =  %d\n" %
+                         self.beam_diam)
             if hasattr(self, 'DM'):
                 ff.write(" Dispersion measure (cm-3 pc)           =  %.12g\n" %
                          self.DM)
@@ -194,6 +200,8 @@ class infodata2(object):
             self.chan_width = init_dict['chan_width']
         if init_dict.get('analyzer', 0):
             self.analyzer = init_dict['analyzer']
+        if init_dict.get('deorbited', 0):
+            self.deorbited = init_dict['deorbited']
 
     @classmethod
     def from_file(cls, filenm):
@@ -266,6 +274,9 @@ class infodata2(object):
             if line.startswith(" Data analyzed by"):
                 init_dict['analyzer'] = line.split("=")[-1].strip()
                 continue
+            if line.startswith(" Orbit removed?"):
+                init_dict['deorbited'] = int(line.split("=")[-1].strip())
+                continue
         return cls(init_dict)
 
     def to_file(self, inffn, notes=None):
@@ -314,6 +325,13 @@ class infodata2(object):
                                  (ii, on, off))
             else:
                 ff.write(" Any breaks in the data? (1 yes, 0 no)  =  0\n")
+            # These two were left out, I assume because there's some variation? e.g. beam_diam might not always be in arcsec
+            if hasattr(self, 'waveband'):
+                ff.write(" Type of observation (EM band)          =  %s\n" %
+                         self.waveband)
+            if hasattr(self, 'beam_diam'):
+                ff.write(" Beam diameter (arcsec)                 =  %d\n" %
+                         self.beam_diam)
             if hasattr(self, 'DM'):
                 ff.write(" Dispersion measure (cm-3 pc)           =  %.12g\n" %
                          self.DM)
