@@ -48,7 +48,7 @@ else:
 f = h5py.File(fname, 'r')
 
 # Extract header info
-header_dict = {}
+hdict = {}
 for key in f['header'].keys():
     hdict[key] = f['header'][key][()]
 
