@@ -75,7 +75,7 @@ infdict = dict(
     BW=abs(hdict['nchans'] * hdict['foff']),
     numchan=hdict['nchans'],
     chan_width=abs(hdict['foff']),
-    analyzer=os.getlogin(),
+    analyzer=os.environ.get( "USER" ),
 )
 
 if padding:
