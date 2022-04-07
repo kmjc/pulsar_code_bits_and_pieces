@@ -53,7 +53,7 @@ for key in f['header'].keys():
     hdict[key] = f['header'][key][()]
 
 # calculate lofreq
-if foff < 0:  # normal sigproc format
+if hdict['foff'] < 0:  # normal sigproc format
     lofreq = hdict['fch1'] + (hdict['nchans']-1)*hdict['foff']
 else:
     lofreq = hdict['fch1']
