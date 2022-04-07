@@ -28,7 +28,7 @@ parser = argparse.ArgumentParser(
 parser.add_argument("fname", type=str, help="h5 filename containing data (with shape (nDMs, time)), header and DMs")
 parser.add_argument("--pad", action='store_true', help="Whether to pad the data to a highly factorable length (for FFT-ing)")
 parser.add_argument("--dmprec", type=int, default=2, help="DM precision (for filenames)")
-parser.add_argument("-v", "--verbosity", action="count", default=0, help="Verbose output"
+parser.add_argument("-v", "--verbosity", action="count", default=0, help="Verbose output")
 
 args = parser.parse_args()
 fname = args.fname
