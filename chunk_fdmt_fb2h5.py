@@ -237,7 +237,11 @@ if __name__ == "__main__":
     # HERE compute and store DMs
     # check it's arange(maxDT) and not arange(1, maxDT + 1)
     # Hao said that's correct
-    DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, fmin, fmax)
+    if args.tophalf:
+        flo = fmin + (fmax - fmin)/2
+    else:
+        flo = fmin
+    DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, flo, fmax)
     DMs += args.atdm
     verbose_message0(
         f"DMs in h5 are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}\n"
