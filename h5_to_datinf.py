@@ -34,14 +34,21 @@ args = parser.parse_args()
 fname = args.fname
 padding = args.pad
 dmprec = args.dmprec
-verbose = args.verbosity > 0
 
 
-if verbose:
+
+if args.verbosity > 0:
     def verbose_message(message):
         print(message)
 else:
     def verbose_message(message):
+        pass
+
+if args.verbosity > 1:
+    def verbose_message1(message):
+        print(message)
+else:
+    def verbose_message1(message):
         pass
 
 
@@ -103,10 +110,13 @@ for i in range(dms.shape[0]):
     verbose_message(f"Wrote {outbasename}.inf")
 
     if padding:
+        verbose_message1('padding')
         outdata = np.zeros((N), dtype=np.float32)
         outdata[:origN] = data[i, :]
+        verbose_message1('data read')
         # pad data with median of middle 80%
         outdata[origN:] = np.median(data[i, int(0.1*origN):int(0.9*origN)])
+        verbose_message1('padded values set to median')
     else:
         outdata = data[i, :]
 
