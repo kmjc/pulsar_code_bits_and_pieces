@@ -119,6 +119,7 @@ for i in range(dms.shape[0]):
         verbose_message1('padded values set to median')
     else:
         outdata = data[i, :]
+        verbose_message1('data read')
 
     with open(f"{outbasename}.dat", "wb") as fout:
         fout.write(outdata)
