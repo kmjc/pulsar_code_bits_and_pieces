@@ -6,18 +6,8 @@ import argparse
 from presto_without_presto.psr_utils import choose_N
 from presto_without_presto.sigproc import (ids_to_telescope, ids_to_machine)
 from presto_without_presto.infodata import infodata2
+from sigproc_utils import radec2string
 
-
-def radec2string(radec):
-    """Convert the SIGPROC-style HHMMSS.SSSS right ascension
-    to a presto-inf-style HH:MM:SS.SSSS string
-
-    or similarly for declination, DDMMSS.SSSS -> DD.MM.SS.SS"""
-    hh = int(radec // 10000)
-    mm = int((radec - 10000*hh) // 100)
-    ss = int((radec - 10000*hh -100*mm) // 1)
-    ssss = int(((radec - 10000*hh -100*mm - ss) * 10000) // 1)
-    return f"{hh}:{mm}:{ss}.{ssss}"
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
