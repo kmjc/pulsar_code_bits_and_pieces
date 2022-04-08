@@ -1,4 +1,4 @@
-
+from presto_without_presto import sigproc
 
 def radec2string(radec):
     """Convert the SIGPROC-style HHMMSS.SSSS right ascension
