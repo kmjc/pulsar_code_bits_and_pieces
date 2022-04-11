@@ -235,11 +235,6 @@ if __name__ == "__main__":
     if os.path.exists(outfilename):
         verbose_message0(f"{outfilename} already exists, deleting\n")
         os.remove(outfilename)
-    fout = h5py.File(outfilename, "a")
-    # following https://stackoverflow.com/questions/48212394/how-to-store-a-dictionary-with-strings-and-numbers-in-a-hdf5-file
-    for key, item in header.items():
-        if "HEADER" not in str(key):
-            fout[f"header/{key}"] = item
 
     # HERE compute and store DMs
     # check it's arange(maxDT) and not arange(1, maxDT + 1)
