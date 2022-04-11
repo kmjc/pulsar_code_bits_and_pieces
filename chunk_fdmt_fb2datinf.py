@@ -255,8 +255,8 @@ if __name__ == "__main__":
         f"DMs in h5 are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}\n"
     )
 
-    # open all output dat files
-    fouts = [open(f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.dat", "wb") for aDM in DMs]
+    # name all output dat files
+    dat_names = [f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.dat" for aDM in DMs]
 
 
     # read in data
@@ -280,8 +280,9 @@ if __name__ == "__main__":
     t1 = time.perf_counter()
     verbose_message1(f"Writing gulp 0")
     # write mid_arr
-    for i in range(len(maxDT)):
-        fouts[i].write(out[i, maxDT:-maxDT])
+    for dat in dat_names:
+        with open(dat, "wb") as fout:
+            fout.write(out[i, maxDT:-maxDT])
 
     t2 = time.perf_counter()
     verbose_message1(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
@@ -291,8 +292,6 @@ if __name__ == "__main__":
     prev_arr += out[:, -maxDT:]
     intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
 
-    fout_indices = range(len(maxDT))
-
     if ngulps > 1:
         for g in np.arange(1, ngulps):
             intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
@@ -301,17 +300,18 @@ if __name__ == "__main__":
             prev_arr += out[:, :maxDT]
 
             # write prev_arr and mid_arr
-            for i in fout_indices:
-                fouts[i].write(prev_arr[i,:])
-                fouts[i].write(out[i, maxDT:-maxDT])
+            for dat in dat_names:
+                with open(dat, "ab") as fout:
+                    fout.write(prev_arr[i,:])
+                    fout.write(out[i, maxDT:-maxDT])
             verbose_message1(f"Completed gulp {g}")
 
             # reset for next gulp
             # setting it to 0 and using += stops prev_arr changing when out does
             prev_arr[:, :] = 0
             prev_arr += out[:, -maxDT:]
-
-    verbose_message0("FDMT complete")
+    t3 = time.perf_counter()
+    verbose_message0(f"FDMT completed in {t3-t0} s")
 
 
     # find length of data written
@@ -323,7 +323,7 @@ if __name__ == "__main__":
 
     PAD_MEDIAN_NSAMP = 4096
     if args.pad:
-        verbose_message0("Padding dat files")
+        verbose_message0("\nPadding dat files")
         # find good N
         N = choose_N(origNdat)
         # get medians of last PAD_MEDIAN_NSAMP samples if possible
@@ -334,16 +334,18 @@ if __name__ == "__main__":
             verbose_message0(f"Padding using median over last {PAD_MEDIAN_NSAMP} samples")
             meds = np.median(out[:, -(PAD_MEDIAN_NSAMP+maxDT):-maxDT])
 
-        for i in fout_indices:
-            padding = np.zeros((N - origNdat,), dtype=intensities.dtype) + meds[i]
-            fouts[i].write(padding)
-            fouts[i].close()
+        for dat in dat_names:
+            with open(dat, "ab") as fout:
+                padding = np.zeros((N - origNdat,), dtype=intensities.dtype) + meds[i]
+                fout.write(padding)
+        t4 = time.perf_counter()
+        verbose_message0(f"Padding completed in {t4-t3} s")
     else:
         N = origNdat
-        for i in fout_indices:
-            fouts[i].close()
+        t4 = time.perf_counter()
 
-    verbose_message0(f"{len(fout_indices)} dat files written")
+
+    verbose_message0(f"{len(fout_indicesices)} dat files written")
 
 
     # write all the inf files:
