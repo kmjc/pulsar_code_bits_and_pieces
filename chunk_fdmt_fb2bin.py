@@ -13,7 +13,6 @@ import yaml
 from presto_without_presto import sigproc
 from presto_without_presto.psr_utils import choose_N
 from presto_without_presto.sigproc import (ids_to_telescope, ids_to_machine)
-from presto_without_presto.infodata import infodata2
 from sigproc_utils import (radec2string, get_fmin_fmax_invert, get_dtype)
 
 from chunk_dedisperse import (
