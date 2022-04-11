@@ -359,7 +359,7 @@ if __name__ == "__main__":
         dt=header['tsamp'],
         lofreq=lofreq,
         BW=abs(header['nchans'] * header['foff']),
-        N=N,
+        N=int(N),  # otherwise it's a numpy int which does not play nice with yaml
         numchan=header['nchans'],
         chan_width=abs(header['foff']),
         analyzer=os.environ.get( "USER" ),
@@ -376,9 +376,9 @@ if __name__ == "__main__":
     yaml_dict = dict(
         ngulps=ngulps,
         gulp=args.gulp,
-        maxDT=maxDT,
+        maxDT=int(maxDT),  # otherwise numpy int
         inf_dict=inf_dict,
-        DMs=list(DMs),
+        DMs=[float(aDM) for aDM in DMs],  # otherwise numpy floats
         inf_names=[f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
     )
 
