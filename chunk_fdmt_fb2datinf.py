@@ -5,7 +5,6 @@
 import sys, os
 import numpy as np
 from fdmt.cpu_fdmt import FDMT
-import h5py
 import argparse
 import time
 import copy
