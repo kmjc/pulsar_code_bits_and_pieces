@@ -177,6 +177,9 @@ if __name__ == "__main__":
             )
         else:
             ngulps += 1
+            verbose_message0(f"\nWill process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}")
+    else:
+        verbose_message0(f"\nWill process the file in {ngulps} gulps of {args.gulp}")
 
     if args.gulp <= maxDT:
         raise RuntimeError(
