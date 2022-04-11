@@ -384,6 +384,6 @@ if __name__ == "__main__":
 
     with open(f"{args.filename[:-4]}.fdmt.yaml", "w") as fyaml:
          yaml.dump(yaml_dict, fyaml)
-    verbose_message0(f"yaml written to {args.filename[:-4]}.fdmt.yaml}")
+    verbose_message0(f"yaml written to {args.filename[:-4]}.fdmt.yaml")
 
     verbose_message0(f"\nDone")
