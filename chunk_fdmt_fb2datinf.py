@@ -251,7 +251,7 @@ if __name__ == "__main__":
 
     # name all output dat files
     dat_names = [f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.dat" for aDM in DMs]
-
+    dat_indices = range(len(dat_names))
 
     # read in data
     filfile = open(args.filename, "rb")
@@ -274,8 +274,8 @@ if __name__ == "__main__":
     t1 = time.perf_counter()
     verbose_message1(f"Writing gulp 0")
     # write mid_arr
-    for dat in dat_names:
-        with open(dat, "wb") as fout:
+    for i in dat_indices:
+        with open(dat_names[i], "wb") as fout:
             fout.write(out[i, maxDT:-maxDT])
 
     t2 = time.perf_counter()
@@ -294,8 +294,8 @@ if __name__ == "__main__":
             prev_arr += out[:, :maxDT]
 
             # write prev_arr and mid_arr
-            for dat in dat_names:
-                with open(dat, "ab") as fout:
+            for i in dat_indices:
+                with open(dat_names[i], "ab") as fout:
                     fout.write(prev_arr[i,:])
                     fout.write(out[i, maxDT:-maxDT])
             verbose_message1(f"Completed gulp {g}")
@@ -328,8 +328,8 @@ if __name__ == "__main__":
             verbose_message0(f"Padding using median over last {PAD_MEDIAN_NSAMP} samples")
             meds = np.median(out[:, -(PAD_MEDIAN_NSAMP+maxDT):-maxDT])
 
-        for dat in dat_names:
-            with open(dat, "ab") as fout:
+        for i in dat_indices:
+            with open(dat_names[i], "ab") as fout:
                 padding = np.zeros((N - origNdat,), dtype=intensities.dtype) + meds[i]
                 fout.write(padding)
         t4 = time.perf_counter()
