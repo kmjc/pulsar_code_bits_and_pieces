@@ -50,12 +50,10 @@ has_breaks = yam.get("breaks", 0)
 # loop through file for each DM and write one dat file at a time
 print("BENCHMARKING: loop through file for each dat")
 t0 = time.perf_counter()
-ts = []
 
 fdmtfile = open(args.filename, "rb")
 first_gulp_offset = maxDT*(gulp-maxDT)
 for i in range(20):
-    tstart = time.perf_counter()
     datfile = open(dat_names[i], "wb")
     # first chunk is  gulp-maxDT
     offset = i * (gulp-maxDT)
@@ -94,26 +92,22 @@ for i in range(20):
 #        datfile.write(dmdata)
 
     datfile.close()
-    ts.append(time.perf_counter() - tstart)
+    print(f"DM {i} done")
 
 
 fdmtfile.close()
 t1 = time.perf_counter()
 print(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for 20 dats")
-tsarr = np.array(ts)
-print(f"Time per dat:\nmin: {tsarr.min()}, max: {tsarr.max()}, mean: {tsarr.mean()}")
-print(f"Extrapolate to 5000 dat files => {tsarr.mean()} x 5000 => {tsarr.mean() * 5000 /60/60} hrs")
+print(f"Extrapolate to 5000 dat files => {t1-t0} x 5000 / 20 => {(t1-t0)* 5000/20 /60/60} hrs")
 
 
 
 # do same but read in whole chunk rather than read-seek-ing
 print("\nBENCHMARKING: loop through file for each dat, but read in whole gulp at once")
 t2 = time.perf_counter()
-ts = []
 
 fdmtfile = open(args.filename, "rb")
 for i in range(20):
-    tstart = time.perf_counter()
     datfile = open(dat_names[i], "wb")
     # first chunk is  gulp-maxDT
     dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, gulp-maxDT))
@@ -124,56 +118,37 @@ for i in range(20):
         datfile.write(dmdata[i,:])
 
     datfile.close()
-    ts.append(time.perf_counter() - tstart)
+    print(f"DM {i} done")
 
 fdmtfile.close()
 
 t3 = time.perf_counter()
 print(f"BENCHMARKING: loop through file for each dat, but read in whole gulp at once - {t3 - t2} seconds for 20 dats")
-tsarr = np.array(ts)
-print(f"Time per dat:\nmin: {tsarr.min()}, max: {tsarr.max()}, mean: {tsarr.mean()}")
-print(f"Extrapolate to 5000 dat files => {tsarr.mean()} x 5000 => {tsarr.mean() * 5000 /60/60} hrs")
+print(f"Extrapolate to 5000 dat files => {t3 - t2} x 5000/20 => {(t3 - t2) * 5000/20 /60/60} hrs")
 
 
 
 print("\nBENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp")
 t4 = time.perf_counter()
-topens = []
-twrites = []
 
 fdmtfile = open(args.filename, "rb")
 # first chunk is  gulp-maxDT
-tstart = time.perf_counter()
 dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, gulp-maxDT))
-tmid = time.perf_counter()
 for i in range(20):
     with open(dat_names[i], "wb") as datfile:
         datfile.write(dmdata[i,:])
-tend = time.perf_counter()
-topens.append(tmid - tstart)
-twrites.append(tend - tmid)
 
 
 for g in range(1, ngulps):
-    tstart = time.perf_counter()
     dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, gulp))
-    tmid = time.perf_counter()
     for i in range(20):
         with open(dat_names[i], "ab") as datfile:
             datfile.write(dmdata[i,:])
-    tend = time.perf_counter()
-    topens.append(tmid - tstart)
-    twrites.append(tend - tmid)
 
 fdmtfile.close()
 
 t5 = time.perf_counter()
 print(f"BENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp - {t5 - t4} seconds for 20 dats")
-topensarr = np.array(topens)
-twritesarr = np.array(twrites)
-print(f"reading dmdata:\nmin: {topensarr.min()}, max: {topensarr.max()}, mean: {topensarr.mean()}, total: {topensarr.sum()}")
-print(f"writing 20 dats:\nmin: {twritesarr.min()}, max: {twritesarr.max()}, mean: {twritesarr.mean()}, total: {twritesarr.sum()}")
-print(f"Extrapolate to 5000 dat files => {topensarr.sum()} + {twritesarr.sum()}*5000/20 => {(topensarr.sum() + twritesarr.sum()*5000/20) /60/60} hrs")
 
 
 print(f"\nBENCHMARKING: keep 20 files open at once, loop through filterbank")
