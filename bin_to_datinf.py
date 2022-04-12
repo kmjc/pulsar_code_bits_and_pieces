@@ -99,7 +99,7 @@ for i in range(20):
 
 fdmtfile.close()
 t1 = time.perf_counter()
-print(f"BENCHMARKING: loop through file for each dat - {t1 - t2} seconds for 20 dats")
+print(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for 20 dats")
 tsarr = np.array(ts)
 print(f"Time per dat:\nmin: {tsarr.min()}, max: {tsarr.max()}, mean: {tsarr.mean()}")
 print(f"Extrapolate to 5000 dat files => {tsarr.mean()} x 5000 => {tsarr.mean() * 5000 /60/60} hrs")
