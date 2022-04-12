@@ -103,29 +103,7 @@ print(f"Extrapolate to 5000 dat files => {t1-t0} x 5000 / 20 => {(t1-t0)* 5000/2
 
 
 # do same but read in whole chunk rather than read-seek-ing
-print("\nBENCHMARKING: loop through file for each dat, but read in whole gulp at once")
-t2 = time.perf_counter()
-
-fdmtfile = open(args.filename, "rb")
-for i in range(20):
-    datfile = open(dat_names[i], "wb")
-    # first chunk is  gulp-maxDT
-    dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, gulp-maxDT))
-    datfile.write(dmdata[i,:])
-
-    for g in range(1, ngulps):
-        dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, gulp))
-        datfile.write(dmdata[i,:])
-
-    datfile.close()
-    print(f"DM {i} done")
-
-fdmtfile.close()
-
-t3 = time.perf_counter()
-print(f"BENCHMARKING: loop through file for each dat, but read in whole gulp at once - {t3 - t2} seconds for 20 dats")
-print(f"Extrapolate to 5000 dat files => {t3 - t2} x 5000/20 => {(t3 - t2) * 5000/20 /60/60} hrs")
-
+# DEFINITELY SLOWER!
 
 
 print("\nBENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp")
@@ -152,7 +130,8 @@ fdmtfile.close()
 t5 = time.perf_counter()
 print(f"BENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp - {t5 - t4} seconds for 20 dats")
 
-
+"""
+# should do this with seeks
 print(f"\nBENCHMARKING: keep 20 files open at once, loop through filterbank")
 t6 = time.perf_counter
 datfiles = [open(dat_names[i], "wb") for i in range(20)]
@@ -177,7 +156,7 @@ t7 = time.perf_counter()
 print(f"BENCHMARKING: keep 20 files open at once, loop through filterbank - {t7-t6} seconds for 20 dats")
 print(f"Extraplate to 5000 dat files => {t7-t6} * 5000 / 20 => {(t7-t6)*5000/20/60/60} hrs")
 print("NB this one might get more efficient if keep more files open at once")
-
+"""
 
 #t8 = time.perf_counter()
 # write .inf files
