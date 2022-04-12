@@ -145,6 +145,8 @@ for g in range(1, ngulps):
         with open(dat_names[i], "ab") as datfile:
             datfile.write(dmdata[i,:])
 
+    print(f" gulp {g} done")
+
 fdmtfile.close()
 
 t5 = time.perf_counter()
@@ -165,6 +167,7 @@ for g in range(1, ngulps):
     dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, gulp))
     for i in range(20):
         datfile[i].write(dmdata[i,:])
+    print(f"gulp {g} done")
 
 for i in range(20):
     datfiles[i].close()
@@ -176,17 +179,17 @@ print(f"Extraplate to 5000 dat files => {t7-t6} * 5000 / 20 => {(t7-t6)*5000/20/
 print("NB this one might get more efficient if keep more files open at once")
 
 
-t8 = time.perf_counter()
+#t8 = time.perf_counter()
 # write .inf files
-verbose_message0("\nWriting inf files")
-for i in range(maxDT):
-    specific_dict = copy.copy(yam['inf_dict'])
-    specific_infdict['DM'] = yam['DMs'][i]
-    inf = infodata2(specific_infdict)
-    inf.to_file(yam['inf_names'][i], notes="fdmt")
-    verbose_message0(f"Wrote {yam['inf_names'][i]}")
+#verbose_message0("\nWriting inf files")
+#for i in range(maxDT):
+#    specific_dict = copy.copy(yam['inf_dict'])
+#    specific_infdict['DM'] = yam['DMs'][i]
+#    inf = infodata2(specific_infdict)
+#    inf.to_file(yam['inf_names'][i], notes="fdmt")
+#    verbose_message0(f"Wrote {yam['inf_names'][i]}")
 
-t9 = time.perf_counter()
-print(f"\nWrote all .inf files in {t9-t8} s")
+#t9 = time.perf_counter()
+#print(f"\nWrote all .inf files in {t9-t8} s")
 
 sys.exit()
