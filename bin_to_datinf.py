@@ -53,7 +53,7 @@ t0 = time.perf_counter()
 
 fdmtfile = open(args.filename, "rb")
 first_gulp_offset = maxDT*(gulp-maxDT)
-for i in range(20):
+for i in range(10):
     datfile = open(dat_names[i], "wb")
     # first chunk is  gulp-maxDT
     offset = i * (gulp-maxDT)
@@ -97,8 +97,8 @@ for i in range(20):
 
 fdmtfile.close()
 t1 = time.perf_counter()
-print(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for 20 dats")
-print(f"Extrapolate to 5000 dat files => {t1-t0} x 5000 / 20 => {(t1-t0)* 5000/20 /60/60} hrs")
+print(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for 10 dats")
+print(f"Extrapolate to 5000 dat files => {t1-t0} x 5000 / 10 => {(t1-t0)* 5000/10 /60/60} hrs")
 
 
 
@@ -112,14 +112,14 @@ t4 = time.perf_counter()
 fdmtfile = open(args.filename, "rb")
 # first chunk is  gulp-maxDT
 dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, gulp-maxDT))
-for i in range(20):
+for i in range(10):
     with open(dat_names[i], "wb") as datfile:
         datfile.write(dmdata[i,:])
 
 
 for g in range(1, ngulps):
     dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, gulp))
-    for i in range(20):
+    for i in range(10):
         with open(dat_names[i], "ab") as datfile:
             datfile.write(dmdata[i,:])
 
@@ -128,33 +128,33 @@ for g in range(1, ngulps):
 fdmtfile.close()
 
 t5 = time.perf_counter()
-print(f"BENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp - {t5 - t4} seconds for 20 dats")
+print(f"BENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp - {t5 - t4} seconds for 10 dats")
 
 """
 # should do this with seeks
-print(f"\nBENCHMARKING: keep 20 files open at once, loop through filterbank")
+print(f"\nBENCHMARKING: keep 10 files open at once, loop through filterbank")
 t6 = time.perf_counter
-datfiles = [open(dat_names[i], "wb") for i in range(20)]
+datfiles = [open(dat_names[i], "wb") for i in range(10)]
 fdmtfile = open(args.filename, "rb")
 
 # first chunk
 dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, gulp-maxDT))
-for i in range(20):
+for i in range(10):
     datfile[i].write(dmdate[i,:])
 
 for g in range(1, ngulps):
     dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, gulp))
-    for i in range(20):
+    for i in range(10):
         datfile[i].write(dmdata[i,:])
     print(f"gulp {g} done")
 
-for i in range(20):
+for i in range(10):
     datfiles[i].close()
 fdmtfile.close()
 
 t7 = time.perf_counter()
-print(f"BENCHMARKING: keep 20 files open at once, loop through filterbank - {t7-t6} seconds for 20 dats")
-print(f"Extraplate to 5000 dat files => {t7-t6} * 5000 / 20 => {(t7-t6)*5000/20/60/60} hrs")
+print(f"BENCHMARKING: keep 10 files open at once, loop through filterbank - {t7-t6} seconds for 10 dats")
+print(f"Extraplate to 5000 dat files => {t7-t6} * 5000 / 10 => {(t7-t6)*5000/10/60/60} hrs")
 print("NB this one might get more efficient if keep more files open at once")
 """
 
