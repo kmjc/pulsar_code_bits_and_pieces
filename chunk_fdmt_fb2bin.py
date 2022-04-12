@@ -30,7 +30,9 @@ if __name__ == "__main__":
         FDMT incoherently dedispersion a filterbank.
         (You probably want to pre-mask and remove the baseline from the filterbank)
 
-        Outputs presto-style .dat and .inf files
+        Outputs a binary file storing the chunked transform (a stream of float32s),
+        and a yaml with the data necessary to process this and write an inf file.
+        Process with bin_to_datinf.py
 
         Uses the Manchester-Taylor 1/2.4E-4 convention for dedispersion
         """,
@@ -176,6 +178,7 @@ if __name__ == "__main__":
                 f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n"
             )
         else:
+            weird_last_gulp = True
             ngulps += 1
             verbose_message0(f"\nWill process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}")
     else:
@@ -380,6 +383,10 @@ if __name__ == "__main__":
         DMs=[float(aDM) for aDM in DMs],  # otherwise numpy floats
         inf_names=[f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
     )
+
+    if weird_last_gulp:
+        yaml_dict['gulp'] = args.gulp - 1
+        yaml_dict['last_gulp'] = int(nsamples % args.gulp)
 
     with open(f"{args.filename[:-4]}.fdmt.yaml", "w") as fyaml:
          yaml.dump(yaml_dict, fyaml)
