@@ -87,7 +87,7 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--max_size", type=float, help="Set maximum size for each file"
+        "--max_size", type=float, help="Set maximum size for each file (in bytes)"
     )
 
     parser.add_argument(
@@ -280,8 +280,8 @@ if __name__ == "__main__":
             fouts_names.append(fout_name)
             fouts.append(open(fout_name, "wb"))
             dm_slices.append(slice(start, end))
-            verbose_message2(f"Outfiles:\n{fouts}")
-            verbose_message2(f"DM slices:\n{dm_slices}")
+        verbose_message2(f"Outfiles:\n{fouts_names}")
+        verbose_message2(f"DM slices:\n{dm_slices}")
     else:
         fouts = [open(f"{args.filename[:-4]}.fdmt", "wb")]
         fouts_indices = [0]
