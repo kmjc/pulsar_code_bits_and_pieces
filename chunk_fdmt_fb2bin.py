@@ -9,6 +9,7 @@ import argparse
 import time
 import copy
 import yaml
+import math
 
 from presto_without_presto import sigproc
 from presto_without_presto.psr_utils import choose_N
@@ -70,10 +71,6 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-o", "--outfilename", type=str, default=None, help="Output .h5 file"
-    )
-
-    parser.add_argument(
         "--tophalf", action="store_true", help="Only run on the top half of the band"
     )
 
@@ -82,7 +79,15 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--pad", action='store_true', help="Pad the .dat files to a highly factorable length"
+        "--pad", action='store_true', help="Compute numbers needed to pad the .dat files to a highly factorable length"
+    )
+
+    parser.add_argument(
+        "--split_file", action='store_true', help="Split the output file into manageable smaller files. Must set --max_size"
+    )
+
+    parser.add_argument(
+        "--max_size", type=float, help="Set maximum size for each file"
     )
 
     parser.add_argument(
@@ -96,6 +101,9 @@ if __name__ == "__main__":
     )
 
     args = parser.parse_args()
+
+    if args.split_file and args.max_size is None:
+        parser.error("--split_file requires --max_size")
 
     # Set up verbose messages
     # didn't want the verbose_message if testing inside loops
@@ -131,6 +139,9 @@ if __name__ == "__main__":
 
         def verbose_message3(message):
             pass
+
+    ############################################################################
+    # A LOT of setup
 
     verbose_message0(f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
@@ -170,6 +181,7 @@ if __name__ == "__main__":
     if DM == 0:
         sys.exit("DM=0, why are you running this?")
 
+    # checks and other stuff based on gulp size
     ngulps = nsamples // args.gulp
     if nsamples % args.gulp:
         if (nsamples % args.gulp) < maxDT:
@@ -226,22 +238,6 @@ if __name__ == "__main__":
             )
             return data[:, read_slc].T
 
-    # initialize outfile
-    if not_zero_or_none(args.outfilename):
-        outfilename = args.outfilename
-        if outfilename[-3] != ".h5":
-            outfilename += ".h5"
-    else:
-        # choosing to save it as the actual max DM in the h5 output, not the DM corresponding to maxDT
-        outfilename = (
-            args.filename[:-4]
-            + f"_fdmtDM{inverse_DM_delay((maxDT-1)*tsamp, fmin, fmax):.3f}.h5"
-        )
-
-    if os.path.exists(outfilename):
-        verbose_message0(f"{outfilename} already exists, deleting\n")
-        os.remove(outfilename)
-
     # HERE compute and store DMs
     # check it's arange(maxDT) and not arange(1, maxDT + 1)
     # Hao said that's correct
@@ -255,9 +251,47 @@ if __name__ == "__main__":
         f"DMs in h5 are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}\n"
     )
 
-    # open output file
-    fout = open(f"{args.filename[:-4]}.fdmt", "wb")
+    # find length of data to be  written
+    if (nsamples % args.gulp) < maxDT:
+        origNdat = int(nsamples // args.gulp) * args.gulp - maxDT
+    else:
+        origNdat = nsamples - maxDT
+
+    # set up output file/s
+    if args.split_file:
+        tot_filesize = origNdat * maxDT * (header["nbits"] // 8)
+        dms_per_file = math.floor(maxDT / tot_filesize * args.max_size)
+        nfiles = math.ceil(maxDT / dms_per_file)
+        verbose_message0(f"Splitting the output into {nfiles} files of {dms_per_file} DMs")
+        if nfiles > 1000:
+            raise RuntimeWarning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
+
+        fouts = []  # contains open file objects
+        fouts_indices = list(range(nfiles))
+        fouts_names = []  # contains names of files
+        dm_slices = []  # contains dm_slices, so for file with fouts_indices i DMs[dm_slices[i]] will give you the DMs it contains
+        for ii in fouts_indices:
+            start = ii * dms_per_file
+            if ii == fouts_indices[-1]:
+                end = maxDT
+            else:
+                end = (ii + 1) * dms_per_file
+            fout_name = f"{args.filename[:-4]}_{start}-{end-1}.fdmt"
+            fouts_names.append(fout_name)
+            fouts.append(open(fout_name, "wb"))
+            dm_slices.append(slice(start, end))
+            verbose_message2(f"Outfiles:\n{fouts}")
+            verbose_message2(f"DM slices:\n{dm_slices}")
+    else:
+        fouts = [open(f"{args.filename[:-4]}.fdmt", "wb")]
+        fouts_indices = [0]
+        dm_slices = [slice(None)]
+
     dm_indices = range(len(DMs))
+
+
+    ############################################################################
+    # Do FDMT
 
     # read in data
     filfile = open(args.filename, "rb")
@@ -280,7 +314,8 @@ if __name__ == "__main__":
     t1 = time.perf_counter()
     verbose_message1(f"Writing gulp 0")
     # write mid_arr
-    fout.write(out[:, maxDT:-maxDT].ravel())
+    for ii in fouts_indices:
+        fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
 
     t2 = time.perf_counter()
     verbose_message1(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
@@ -298,54 +333,27 @@ if __name__ == "__main__":
             prev_arr += out[:, :maxDT]
 
             # write prev_arr and mid_arr
-            fout.write(prev_arr[:,:].ravel())
-            fout.write(out[:, maxDT:-maxDT].ravel())
-            verbose_message1(f"Completed gulp {g}")
+            for ii in fouts_indices:
+                fouts[ii].write(prev_arr[dm_slices[ii],:].ravel())
+                fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
+            verbose_message2(f"Completed gulp {g}")
 
             # reset for next gulp
             # setting it to 0 and using += stops prev_arr changing when out does
             prev_arr[:, :] = 0
             prev_arr += out[:, -maxDT:]
+
+    for ii in fouts_indices:
+        fouts[ii].close()
+        verbose_message0(f"FDMT data written to {fouts_names[ii]}")
     t3 = time.perf_counter()
-    verbose_message0(f"FDMT completed in {t3-t0} s")
+    verbose_message0(f"FDMT completed in {(t3-t0)/60/60} hrs")
 
 
-    # find length of data written
-    if (nsamples % args.gulp) < maxDT:
-        origNdat = int(nsamples // args.gulp) * args.gulp - maxDT
-    else:
-        origNdat = nsamples - maxDT
 
-
-    PAD_MEDIAN_NSAMP = 4096
-    if args.pad:
-        verbose_message0("\nPadding dat files")
-        # find good N
-        N = choose_N(origNdat)
-        # get medians of last PAD_MEDIAN_NSAMP samples if possible
-        if out.shape[1] - maxDT < PAD_MEDIAN_NSAMP:
-            verbose_message0(f"Warning padding using median over last {out.shape[1] - maxDT} samples rather than {PAD_MEDIAN_NSAMP}")
-            meds = np.median(out[:,:-maxDT])
-        else:
-            verbose_message0(f"Padding using median over last {PAD_MEDIAN_NSAMP} samples")
-            meds = np.median(out[:, -(PAD_MEDIAN_NSAMP+maxDT):-maxDT])
-
-        pad_arr = np.zeros((maxDT, N - origNdat), dtype=intensities.dtype)
-        for i in dm_indices:
-            pad_arr[i,:] += meds[i]
-
-        fout.write(padding.ravel())
-        t4 = time.perf_counter()
-        verbose_message0(f"Padding completed in {t4-t3} s")
-    else:
-        N = origNdat
-        t4 = time.perf_counter()
-
-    fout.close()
-    verbose_message0(f"FDMT data written to {args.filename[:-4]}.fdmt")
-
-
-    # write useful information to a yaml file
+    ############################################################################
+    # Write useful information to a yaml file
+    # Construct a dictionary containing all the information necessary to make an inf file
     verbose_message0(f"\nWriting yaml:")
     lofreq = fmin + abs(header['foff'])/2
     inf_dict = dict(
@@ -367,29 +375,60 @@ if __name__ == "__main__":
         analyzer=os.environ.get( "USER" ),
     )
 
-
+    # add padding-dependent inf_dict variables
+    PAD_MEDIAN_NSAMP = 4096
     if args.pad:
+        verbose_message0("\nRecording padding parameters for assembling dat files")
+        # find good N
+        N = choose_N(origNdat)
+        # get medians of last PAD_MEDIAN_NSAMP samples if possible
+        if out.shape[1] - maxDT < PAD_MEDIAN_NSAMP:
+            verbose_message0(f"Warning padding using median over last {out.shape[1] - maxDT} samples rather than {PAD_MEDIAN_NSAMP}")
+            meds = np.median(out[:,:-maxDT])
+        else:
+            verbose_message0(f"Padding using median over last {PAD_MEDIAN_NSAMP} samples")
+            meds = np.median(out[:, -(PAD_MEDIAN_NSAMP+maxDT):-maxDT])
+
         inf_dict['breaks'] = 1
         inf_dict['onoff'] = [(0, origNdat - 1), (N - 1, N - 1)]
+
     else:
+        N = origNdat
         inf_dict['breaks'] = 0
 
-    # above all go into the inf file. Below is stuff needed to process the fdmt file
+    inf_dict['N'] = int(N)
+
+
+    # Construct a dictionary with extra information needed to assemble the dat and inf files
+    # General stuff that goes into every file:
     yaml_dict = dict(
         ngulps=ngulps,
         gulp=args.gulp,
-        maxDT=int(maxDT),  # otherwise numpy int
         inf_dict=inf_dict,
-        DMs=[float(aDM) for aDM in DMs],  # otherwise numpy floats
-        inf_names=[f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
+        maxDT=int(maxDT),  # otherwise numpy int
     )
 
     if weird_last_gulp:
         yaml_dict['gulp'] = args.gulp - 1
         yaml_dict['last_gulp'] = int(nsamples % args.gulp)
 
-    with open(f"{args.filename[:-4]}.fdmt.yaml", "w") as fyaml:
-         yaml.dump(yaml_dict, fyaml)
-    verbose_message0(f"yaml written to {args.filename[:-4]}.fdmt.yaml")
+
+    # loop through each split file and write a yaml for each
+    inf_names = [f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
+    for ii in fouts_indices:
+        specific_yaml_dict = copy.copy(yaml_dict)
+
+        slc = dm_slices[ii]
+        specific_yaml_dict["medians"] = [float(md) for md in meds[slc]]
+        specific_yaml_dict["inf_names"] = inf_names[slc]
+        specific_yaml_dict["DMs"] = [float(aDM) for aDM in DMs[slc]]
+
+        # write yaml
+        with open(f"{fouts_names[i]}.yaml", "w") as fyaml:
+            yaml.dump(specific_yaml_dict, fyaml)
+        verbose_message0(f"yaml written to {fouts_names[ii]}.yaml")
+
+    t4 = time.perf_counter()
+    verbose_message0(f"yamls written in {t4 - t3} seconds")
 
     verbose_message0(f"\nDone")
