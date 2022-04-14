@@ -5,6 +5,7 @@ import copy
 import numpy as np
 import time
 import sys
+import logging
 
 
 
@@ -13,10 +14,27 @@ parser = argparse.ArgumentParser(
     description="Go from output of chunk_fdmt_fb2bin.py to presto-style .dat and .inf files"
 )
 parser.add_argument("filename", type=str, help=".fdmt file to process. Must have a corresponding .fdmt.yaml file")
+parser.add_argument(
+    "--log", type=str, help="name of file to write log to", default="bin_to_datinf.log"
+)
+
+parser.add_argument(
+    '-v', '--verbose',
+    help="Increase logging level to debug",
+    action="store_const", dest="loglevel", const=logging.DEBUG,
+    default=logging.INFO,
+)
+
+
 args = parser.parse_args()
 
-def verbose_message0(message):
-    print(message)
+logging.basicConfig(
+    filename=args.log,
+    filemode='w'
+    format='%(asctime)s - %(message)s',
+    datefmt='%d-%b-%y %H:%M:%S',
+    level=args.loglevel,
+    )
 
 with open(f"{args.filename}.yaml", "r") as fin:
     yam = yaml.safe_load(fin)
@@ -46,9 +64,9 @@ if last_gulp:
     ngulps -= 1
 has_breaks = yam.get("breaks", 0)
 
-
+"""
 # loop through file for each DM and write one dat file at a time
-print("BENCHMARKING: loop through file for each dat")
+logging.debug("BENCHMARKING: loop through file for each dat")
 t0 = time.perf_counter()
 
 fdmtfile = open(args.filename, "rb")
@@ -92,13 +110,13 @@ for i in range(10):
 #        datfile.write(dmdata)
 
     datfile.close()
-    print(f"DM {i} done")
+    logging.debug(f"DM {i} done")
 
 
 fdmtfile.close()
 t1 = time.perf_counter()
-print(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for 10 dats")
-print(f"Extrapolate to 5000 dat files => {t1-t0} x 5000 / 10 => {(t1-t0)* 5000/10 /60/60} hrs")
+logging.debug(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for 10 dats")
+logging.debug(f"Extrapolate to 5000 dat files => {t1-t0} x 5000 / 10 => {(t1-t0)* 5000/10 /60/60} hrs")
 
 
 
@@ -106,69 +124,78 @@ print(f"Extrapolate to 5000 dat files => {t1-t0} x 5000 / 10 => {(t1-t0)* 5000/1
 # DEFINITELY SLOWER!
 
 
-print("\nBENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp")
+logging.debug("\nBENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp")
 t4 = time.perf_counter()
 
 fdmtfile = open(args.filename, "rb")
 # first chunk is  gulp-maxDT
-dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, gulp-maxDT))
+dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, -1))
 for i in range(10):
     with open(dat_names[i], "wb") as datfile:
         datfile.write(dmdata[i,:])
 
 
 for g in range(1, ngulps):
-    dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, gulp))
+    dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, -1))
     for i in range(10):
         with open(dat_names[i], "ab") as datfile:
             datfile.write(dmdata[i,:])
 
-    print(f" gulp {g} done")
+    logging.debug(f" gulp {g} done")
 
 fdmtfile.close()
 
 t5 = time.perf_counter()
-print(f"BENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp - {t5 - t4} seconds for 10 dats")
+logging.debug(f"BENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp - {t5 - t4} seconds for 10 dats")
 
 """
 # should do this with seeks
-print(f"\nBENCHMARKING: keep 10 files open at once, loop through filterbank")
+logging.debug(f"\nBENCHMARKING: keep 10 files open at once, loop through filterbank")
 t6 = time.perf_counter
-datfiles = [open(dat_names[i], "wb") for i in range(10)]
+ndms = 10
+startdm = 10
+dm_indices = range(startdm, startdm+ndms)
+datfiles = [open(dat_names[i], "wb") for i in dm_indices]
 fdmtfile = open(args.filename, "rb")
 
 # first chunk
-dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, gulp-maxDT))
-for i in range(10):
+offset = startdm * (gulp-maxDT)
+fdmtfile.seek(offset*nbytes)
+dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*ndms, dtype=dt).reshape((ndms, -1))
+for i in range(ndms):
     datfile[i].write(dmdate[i,:])
 
-for g in range(1, ngulps):
-    dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, gulp))
-    for i in range(10):
-        datfile[i].write(dmdata[i,:])
-    print(f"gulp {g} done")
+first_gulp_offset = maxDT*(gulp-maxDT)
 
-for i in range(10):
+for g in range(1, ngulps):
+    offset = (first_gulp_offset + (g-1)*maxDT*gulp + startdm*gulp)
+    fdmtfile.seek(offset*nbytes)
+    dmdata = np.fromfile(fdmtfile, count=gulp*ndms, dtype=dt).reshape((ndms, -1))
+    for i in range(ndms):
+        datfile[i].write(dmdata[i,:])
+    logging.debug(f"gulp {g} done")
+
+for i in range(ndms):
     datfiles[i].close()
 fdmtfile.close()
 
 t7 = time.perf_counter()
-print(f"BENCHMARKING: keep 10 files open at once, loop through filterbank - {t7-t6} seconds for 10 dats")
-print(f"Extraplate to 5000 dat files => {t7-t6} * 5000 / 10 => {(t7-t6)*5000/10/60/60} hrs")
-print("NB this one might get more efficient if keep more files open at once")
-"""
+logging.debug(f"BENCHMARKING: keep 10 files open at once, loop through filterbank - {t7-t6} seconds for 10 dats")
+logging.debug(f"Extraplate to 5000 dat files => {t7-t6} * 5000 / 10 => {(t7-t6)*5000/10/60/60} hrs")
+logging.debug("NB this one might get more efficient if keep more files open at once")
+
 
 #t8 = time.perf_counter()
 # write .inf files
-#verbose_message0("\nWriting inf files")
+#logging.info("\nWriting inf files")
 #for i in range(maxDT):
 #    specific_dict = copy.copy(yam['inf_dict'])
 #    specific_infdict['DM'] = yam['DMs'][i]
 #    inf = infodata2(specific_infdict)
 #    inf.to_file(yam['inf_names'][i], notes="fdmt")
-#    verbose_message0(f"Wrote {yam['inf_names'][i]}")
+#    logging.info(f"Wrote {yam['inf_names'][i]}")
 
 #t9 = time.perf_counter()
-#print(f"\nWrote all .inf files in {t9-t8} s")
+#logging.debug(f"\nWrote all .inf files in {t9-t8} s")
 
 sys.exit()

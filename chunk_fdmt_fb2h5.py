@@ -8,6 +8,7 @@ from fdmt.cpu_fdmt import FDMT
 import h5py
 import argparse
 import time
+import logging
 
 from presto_without_presto import sigproc
 
@@ -77,56 +78,32 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "-v",
-        "--verbosity",
-        action="count",
-        default=0,
-        help="""-v = some information
-    -vv = more information
-    -vvv = the most information""",
+        "--log", type=str, help="name of file to write log to", default="chunk_fdmt_fb2h5.log"
     )
+
+    parser.add_argument(
+        '-v', '--verbose',
+        help="Increase logging level to debug",
+        action="store_const", dest="loglevel", const=logging.DEBUG,
+        default=logging.INFO,
+    )
+
 
     args = parser.parse_args()
 
-    # Set up verbose messages
-    # didn't want the verbose_message if testing inside loops
-    def verbose_message0(message):
-        print(message)
+    logging.basicConfig(
+        filename=args.log,
+        filemode='w'
+        format='%(asctime)s - %(message)s',
+        datefmt='%d-%b-%y %H:%M:%S',
+        level=args.loglevel,
+        )
 
-    if args.verbosity > 0:
 
-        def verbose_message1(message):
-            print(message)
-
-    else:
-
-        def verbose_message1(message):
-            pass
-
-    if args.verbosity > 1:
-
-        def verbose_message2(message):
-            print(message)
-
-    else:
-
-        def verbose_message2(message):
-            pass
-
-    if args.verbosity > 2:
-
-        def verbose_message3(message):
-            print(message)
-
-    else:
-
-        def verbose_message3(message):
-            pass
-
-    verbose_message0(f"Working on file: {args.filename}")
+    logging.info(f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
     nsamples = int(sigproc.samples_per_file(args.filename, header, hdrlen))
-    verbose_message2(header)
+    logging.debug(header)
 
     if header["nifs"] != 1:
         raise ValueError(f"Code not written to deal with unsummed polarization data")
@@ -137,7 +114,7 @@ if __name__ == "__main__":
     arr_dtype = get_dtype(header["nbits"])
     fmin, fmax, invertband = get_fmin_fmax_invert(header)
 
-    verbose_message0(
+    logging.info(
         f"Read from file:\n"
         f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}\n",
     )
@@ -145,7 +122,7 @@ if __name__ == "__main__":
     # define fs, for CD/maxDT calculation
     # FDMT computes based on shift between fmin and fmax
     if args.tophalf:
-        verbose_message0("Only using top half of the band")
+        logging.info("Only using top half of the band")
         fs = np.linspace(
             fmin + (fmax - fmin)/2, fmax, nchans // 2, endpoint=True
         )
@@ -155,9 +132,9 @@ if __name__ == "__main__":
         )
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
 
-    verbose_message0(f"FDMT incoherent DM is {DM}")
-    verbose_message1(f"Maximum delay need to shift by is {max_delay_s} s")
-    verbose_message0(f"This corresponds to {maxDT} time samples\n")
+    logging.info(f"FDMT incoherent DM is {DM}")
+    logging.info(f"Maximum delay need to shift by is {max_delay_s} s")
+    logging.info(f"This corresponds to {maxDT} time samples\n")
     if DM == 0:
         sys.exit("DM=0, why are you running this?")
 
@@ -182,7 +159,7 @@ if __name__ == "__main__":
         fd = FDMT(fmin=fmin + (fmax - fmin)/2, fmax=fmax, nchan=nchans//2, maxDT=maxDT)
     else:
         fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
-    verbose_message0(f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n")
+    logging.info(f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n")
 
     # Define slices to return intensities in read_gulp
     if args.tophalf:
@@ -226,7 +203,7 @@ if __name__ == "__main__":
         )
 
     if os.path.exists(outfilename):
-        verbose_message0(f"{outfilename} already exists, deleting\n")
+        logging.info(f"{outfilename} already exists, deleting\n")
         os.remove(outfilename)
     fout = h5py.File(outfilename, "a")
     # following https://stackoverflow.com/questions/48212394/how-to-store-a-dictionary-with-strings-and-numbers-in-a-hdf5-file
@@ -243,7 +220,7 @@ if __name__ == "__main__":
         flo = fmin
     DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, flo, fmax)
     DMs += args.atdm
-    verbose_message0(
+    logging.info(
         f"DMs in h5 are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}\n"
     )
     fout.create_dataset("DMs", data=DMs)
@@ -252,28 +229,28 @@ if __name__ == "__main__":
     filfile = open(args.filename, "rb")
     filfile.seek(hdrlen)
 
-    verbose_message0("Reading in first gulp")
+    logging.info("Reading in first gulp")
     # Do first gulp separately
     intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
     fd.reset_ABQ()
-    verbose_message1(f"Starting gulp 0")
-    verbose_message2(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
+    logging.info(f"Starting gulp 0")
+    logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
     out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-    verbose_message2(
+    logging.debug(
         f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB"
     )
-    verbose_message2(
+    logging.debug(
         f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB"
     )
     t1 = time.perf_counter()
-    verbose_message1(f"Writing gulp 0")
+    logging.info(f"Writing gulp 0")
     # write mid_arr
     fout.create_dataset(
         "data", data=out[:, maxDT:-maxDT], maxshape=(maxDT, None)
     )  # compression="gzip", chunks=True
     t2 = time.perf_counter()
-    verbose_message1(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
+    logging.info(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
 
     # setup for next iteration
     prev_arr = np.zeros((maxDT, maxDT), dtype=intensities.dtype)
@@ -292,7 +269,7 @@ if __name__ == "__main__":
             fout["data"].resize((fout["data"].shape[1] + psz + msz), axis=1)
             fout["data"][:, -(psz + msz) : -msz] = prev_arr
             fout["data"][:, -msz:] = out[:, maxDT:-maxDT]
-            verbose_message1(f"Completed gulp {g}")
+            logging.debug(f"Completed gulp {g}")
 
             # reset for next gulp
             # setting it to 0 and using += stops prev_arr changing when out does
