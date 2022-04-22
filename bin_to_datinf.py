@@ -1,4 +1,4 @@
-from presto_without_presto.infodata import infodata2
+gulp-maxDTfrom presto_without_presto.infodata import infodata2
 import yaml
 import argparse
 import copy
@@ -51,12 +51,14 @@ dat_names = [f"{infnm[-4]}.dat" for infnm in yam['inf_names']]
 
 # gulp = number of time intervals
 # so starting position of dm i is
-# which_gulp_on * gulp * maxDT + i * gulp
+# which_gulp_on * gulp * ndms + i * gulp
 
 dt = np.float32
 nbytes = 4  # data should be 32 bit floats
 gulp = yam['gulp']
 maxDT = yam['maxDT']
+ndms = len(yam['DMs'])
+dm_indices = range(dms)  # if want to grab a specific DM just change dm_indices
 ngulps = yam['ngulps']
 
 last_gulp = yam.get("last_gulp", 0)
@@ -64,14 +66,14 @@ if last_gulp:
     ngulps -= 1
 has_breaks = yam.get("breaks", 0)
 
-"""
+
 # loop through file for each DM and write one dat file at a time
 logging.debug("BENCHMARKING: loop through file for each dat")
 t0 = time.perf_counter()
 
 fdmtfile = open(args.filename, "rb")
-first_gulp_offset = maxDT*(gulp-maxDT)
-for i in range(10):
+first_gulp_offset = ndms*(gulp-maxDT)
+for i in dm_indices:
     datfile = open(dat_names[i], "wb")
     # first chunk is  gulp-maxDT
     offset = i * (gulp-maxDT)
@@ -85,29 +87,27 @@ for i in range(10):
     for g in range(1, ngulps):
         dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
         datfile.write(dmdata)
-        fdmtfile.seek((maxDT - 1)*gulp*nbytes, 1)
+        fdmtfile.seek((ndms - 1)*gulp*nbytes, 1)
 
     # last gulp is weird size
 
-# skipping last gulp and padding for now. NB if not writing dats as do fdmt should just write the medians to the yaml and apply them here
+# skipping last gulp and padding for now.
+# rewrote so indices should be correct now, and takes median from yaml
 
 #    if last_gulp:
-#        last_gulp_offset = gulp*maxDT*ngulps + i*last_gulp
+#        last_gulp_offset = ndms * (gulp - maxDT) + ndms * gulp * (ngulps - 1) + i*last_gulp
 #        fdmtfile.seek(last_gulp_offset*nbytes)
 #        dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
 #        datfile.write(dmdata)
-#        padding_offset = gulp*maxDT*ngulps + maxDT*last_gulp
-#    else:
-#        padding_offset = 0
 
     # file has been padded
 #    if has_breaks:
 #        onoff = yam['inf_dict']['onoff']
-#        padding = onoff[1][0] - onoff[0][1]
-#        padding_offset += i * padding
-#        fdmtfile.seek(padding_offset*nbytes)
-#        dmdata = np.fromfile(fdmtfile, count=padding, dtype=dt)
-#        datfile.write(dmdata)
+#        padby = onoff[1][0] - onoff[0][1]
+#        med = yam['medians'][i]
+#        logging.debug(f"Padding DM {i} by {padby} with {med}")
+#        padding = np.zeros((padby), dtype=dt) + med
+#        datfile.write(padding)
 
     datfile.close()
     logging.debug(f"DM {i} done")
@@ -115,87 +115,74 @@ for i in range(10):
 
 fdmtfile.close()
 t1 = time.perf_counter()
-logging.debug(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for 10 dats")
-logging.debug(f"Extrapolate to 5000 dat files => {t1-t0} x 5000 / 10 => {(t1-t0)* 5000/10 /60/60} hrs")
+logging.debug(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for {len(dm_indices)} dats")
 
 
 
-# do same but read in whole chunk rather than read-seek-ing
-# DEFINITELY SLOWER!
 
 
-logging.debug("\nBENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp")
-t4 = time.perf_counter()
+# open all dats, loop through file writing to each
+logging.debug("\nBENCHMARKING: keep all dats open, loop through file")
+t2 = time.perf_counter()
+
+datfiles = [open(dat_name, "wb") for dat_name in dat_names]
 
 fdmtfile = open(args.filename, "rb")
-# first chunk is  gulp-maxDT
-dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*maxDT, dtype=dt).reshape((maxDT, -1))
-for i in range(10):
-    with open(dat_names[i], "wb") as datfile:
-        datfile.write(dmdata[i,:])
 
+# first gulp, (gulp - maxDT) time samples
+for i in dm_indices:
+    dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT), dtype=dt)
+    datfiles[i].write(dmdata)
 
+# other gulps, (gulp) time samples
 for g in range(1, ngulps):
-    dmdata = np.fromfile(fdmtfile, count=gulp*maxDT, dtype=dt).reshape((maxDT, -1))
-    for i in range(10):
-        with open(dat_names[i], "ab") as datfile:
-            datfile.write(dmdata[i,:])
+    for i in dm_indices:
+    dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
+    datfiles[i].write(dmdata)
 
-    logging.debug(f" gulp {g} done")
+
+
+# skipping last gulp and padding for now.
+# rewrote so indices should be correct now, and takes median from yaml
+
+    # last gulp is weird size
+    if last_gulp:
+        for i in dm_indices:
+            dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
+            datfiles[i].write(dmdata)
+
+    # file has been padded
+    if has_breaks:
+        onoff = yam['inf_dict']['onoff']
+        padby = onoff[1][0] - onoff[0][1]
+        for i in dm_indices:
+            med = yam['medians'][i]
+            logging.debug(f"Padding DM {i} by {padby} with {med}")
+            padding = np.zeros((padby), dtype=dt) + med
+            datfiles[i].write(padding)
 
 fdmtfile.close()
 
-t5 = time.perf_counter()
-logging.debug(f"BENCHMARKING: loop through file once, read whole gulp, open-write-close all dats every gulp - {t5 - t4} seconds for 10 dats")
-
-"""
-# should do this with seeks
-logging.debug(f"\nBENCHMARKING: keep 10 files open at once, loop through filterbank")
-t6 = time.perf_counter
-ndms = 10
-startdm = 10
-dm_indices = range(startdm, startdm+ndms)
-datfiles = [open(dat_names[i], "wb") for i in dm_indices]
-fdmtfile = open(args.filename, "rb")
-
-# first chunk
-offset = startdm * (gulp-maxDT)
-fdmtfile.seek(offset*nbytes)
-dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT)*ndms, dtype=dt).reshape((ndms, -1))
-for i in range(ndms):
-    datfile[i].write(dmdate[i,:])
-
-first_gulp_offset = maxDT*(gulp-maxDT)
-
-for g in range(1, ngulps):
-    offset = (first_gulp_offset + (g-1)*maxDT*gulp + startdm*gulp)
-    fdmtfile.seek(offset*nbytes)
-    dmdata = np.fromfile(fdmtfile, count=gulp*ndms, dtype=dt).reshape((ndms, -1))
-    for i in range(ndms):
-        datfile[i].write(dmdata[i,:])
-    logging.debug(f"gulp {g} done")
-
-for i in range(ndms):
-    datfiles[i].close()
-fdmtfile.close()
-
-t7 = time.perf_counter()
-logging.debug(f"BENCHMARKING: keep 10 files open at once, loop through filterbank - {t7-t6} seconds for 10 dats")
-logging.debug(f"Extraplate to 5000 dat files => {t7-t6} * 5000 / 10 => {(t7-t6)*5000/10/60/60} hrs")
-logging.debug("NB this one might get more efficient if keep more files open at once")
+for datfile in datfiles:
+    datfile.close()
 
 
-#t8 = time.perf_counter()
+t3 = time.perf_counter()
+logging.debug(f"BENCHMARKING: keep all dats open, loop through file - {t3 - t2} seconds for {len(dm_indices)} dats")
+
+
+
+t8 = time.perf_counter()
 # write .inf files
-#logging.info("\nWriting inf files")
-#for i in range(maxDT):
-#    specific_dict = copy.copy(yam['inf_dict'])
-#    specific_infdict['DM'] = yam['DMs'][i]
-#    inf = infodata2(specific_infdict)
-#    inf.to_file(yam['inf_names'][i], notes="fdmt")
-#    logging.info(f"Wrote {yam['inf_names'][i]}")
+logging.info("\nWriting inf files")
+for i in dm_indices:
+    specific_dict = copy.copy(yam['inf_dict'])
+    specific_infdict['DM'] = yam['DMs'][i]
+    inf = infodata2(specific_infdict)
+    inf.to_file(yam['inf_names'][i], notes="fdmt")
+    logging.info(f"Wrote {yam['inf_names'][i]}")
 
-#t9 = time.perf_counter()
-#logging.debug(f"\nWrote all .inf files in {t9-t8} s")
+t9 = time.perf_counter()
+logging.debug(f"\nWrote all .inf files in {t9-t8} s")
 
 sys.exit()
