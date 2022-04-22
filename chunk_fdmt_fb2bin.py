@@ -261,6 +261,7 @@ if args.split_file:
 else:
     fouts = [open(f"{args.filename[:-4]}.fdmt", "wb")]
     fouts_indices = [0]
+    fout_names = [f"{args.filename[:-4]}.fdmt"]
     dm_slices = [slice(None)]
 
 dm_indices = range(len(DMs))
