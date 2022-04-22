@@ -38,6 +38,8 @@ logging.basicConfig(
 
 with open(f"{args.filename}.yaml", "r") as fin:
     yam = yaml.safe_load(fin)
+logging.debug(f"yaml file loaded")
+logging.debug(f"{yam}")
 
 # write dat files
 dat_names = [f"{infnm[-4]}.dat" for infnm in yam['inf_names']]
