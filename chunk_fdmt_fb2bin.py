@@ -394,7 +394,7 @@ if weird_last_gulp:
     yaml_dict['last_gulp'] = int(nsamples % args.gulp)
 
 logging.debug("\nDict values to go into every yaml file:")
-logging.debug(f"{yaml_dict})
+logging.debug(f"{yaml_dict}")
 
 # loop through each split file and write a yaml for each
 inf_names = [f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
