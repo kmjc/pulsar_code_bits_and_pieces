@@ -372,7 +372,6 @@ inf_dict = dict(
     dt=header['tsamp'],
     lofreq=lofreq,
     BW=abs(header['nchans'] * header['foff']),
-    N=int(N),  # otherwise it's a numpy int which does not play nice with yaml
     numchan=header['nchans'],
     chan_width=abs(header['foff']),
     analyzer=os.environ.get( "USER" ),
@@ -401,7 +400,7 @@ else:
     logging.debug(f"Not padding data, will stay as {N} time samples")
     inf_dict['breaks'] = 0
 
-inf_dict['N'] = int(N)
+inf_dict['N'] = int(N)  # otherwise it's a numpy int which does not play nice with yaml
 
 
 # Construct a dictionary with extra information needed to assemble the dat and inf files
