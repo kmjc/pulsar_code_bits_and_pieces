@@ -145,8 +145,8 @@ for i in dm_indices:
 # other gulps, (gulp) time samples
 for g in range(1, ngulps):
     for i in dm_indices:
-    dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
-    datfiles[i].write(dmdata)
+        dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
+        datfiles[i].write(dmdata)
 
 
 
