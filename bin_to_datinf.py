@@ -38,11 +38,13 @@ logging.basicConfig(
 
 with open(f"{args.filename}.yaml", "r") as fin:
     yam = yaml.safe_load(fin)
-logging.debug(f"yaml file loaded")
-logging.debug(f"{yam}")
+logging.debug(f"yaml file loaded:")
+for key in yam.keys():
+    logging.debug(f"{key:}")
+    logging.debug(f"{yam[key]}")
 
 # write dat files
-dat_names = [f"{infnm[-4]}.dat" for infnm in yam['inf_names']]
+dat_names = [f"{infnm[:-4]}.dat" for infnm in yam['inf_names']]
 logging.debug(f"List of dat files to write to:")
 logging.debug(f"{dat_names}")
 # quicker to loop through and write one by one or write same chunk for all?
@@ -186,7 +188,7 @@ t8 = time.perf_counter()
 # write .inf files
 logging.info("\nWriting inf files")
 for i in dm_indices:
-    specific_dict = copy.copy(yam['inf_dict'])
+    specific_infdict = copy.copy(yam['inf_dict'])
     specific_infdict['DM'] = yam['DMs'][i]
     inf = infodata2(specific_infdict)
     inf.to_file(yam['inf_names'][i], notes="fdmt")
