@@ -401,7 +401,8 @@ for ii in fouts_indices:
     specific_yaml_dict = copy.copy(yaml_dict)
 
     slc = dm_slices[ii]
-    specific_yaml_dict["medians"] = [float(md) for md in meds[slc]]
+    if args.pad:
+        specific_yaml_dict["medians"] = [float(md) for md in meds[slc]]
     specific_yaml_dict["inf_names"] = inf_names[slc]
     specific_yaml_dict["DMs"] = [float(aDM) for aDM in DMs[slc]]
 
