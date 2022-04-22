@@ -407,7 +407,7 @@ for ii in fouts_indices:
     specific_yaml_dict["DMs"] = [float(aDM) for aDM in DMs[slc]]
 
     # write yaml
-    with open(f"{fouts_names[i]}.yaml", "w") as fyaml:
+    with open(f"{fouts_names[ii]}.yaml", "w") as fyaml:
         yaml.dump(specific_yaml_dict, fyaml)
     logging.info(f"yaml written to {fouts_names[ii]}.yaml")
 
