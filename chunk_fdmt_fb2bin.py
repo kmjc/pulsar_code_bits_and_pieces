@@ -324,6 +324,7 @@ if ngulps > 1:
 for ii in fouts_indices:
     fouts[ii].close()
     logging.info(f"FDMT data written to {fouts_names[ii]}")
+filfile.close()
 t3 = time.perf_counter()
 logging.info(f"FDMT completed in {(t3-t0)/60/60} hrs")
 
