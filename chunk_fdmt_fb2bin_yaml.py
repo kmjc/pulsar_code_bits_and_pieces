@@ -172,9 +172,9 @@ if nsamples % args.gulp:
     else:
         weird_last_gulp = True
         ngulps += 1
-        logging.info(f"\nWill process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}")
+        logging.info(f"Will process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}")
 else:
-    logging.info(f"\nWill process the file in {ngulps} gulps of {args.gulp}")
+    logging.info(f"Will process the file in {ngulps} gulps of {args.gulp}")
 
 if args.gulp <= maxDT:
     raise RuntimeError(
@@ -333,7 +333,7 @@ if not args.yaml_only:
         logging.info(f"FDMT data written to {fouts_names[ii]}")
     filfile.close()
     t3 = time.perf_counter()
-    logging.info(f"FDMT completed in {(t3-t0)/60/60} hrs")
+    logging.info(f"FDMT completed in {(t3-t0)/60/60} hrs\n")
 
 else:
     logging.info("Yaml-only")
@@ -347,9 +347,9 @@ else:
         out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
         filfile.close()
         t3 = time.perf_counter()
-        logging.info(f"FDMT of last gulp completed in {t3-t0} s")
+        logging.info(f"FDMT of last gulp completed in {t3-t0} s\n")
     else:
-        logging.info("Skipping FDMT")
+        logging.info("Skipping FDMT\n")
 
 
 
@@ -357,7 +357,7 @@ else:
 ############################################################################
 # Write useful information to a yaml file
 # Construct a dictionary containing all the information necessary to make an inf file
-logging.info(f"\nWriting yaml:")
+logging.info(f"Writing yaml:")
 lofreq = fmin + abs(header['foff'])/2
 inf_dict = dict(
     basenm=args.filename[:-4],
@@ -381,7 +381,7 @@ inf_dict = dict(
 # add padding-dependent inf_dict variables
 PAD_MEDIAN_NSAMP = 4096
 if args.pad:
-    logging.info("\nRecording padding parameters for assembling dat files")
+    logging.info("Recording padding parameters for assembling dat files")
     # find good N
     N = choose_N(origNdat)
     logging.debug(f"In next stage of process, data will be padded from {origNdat} to {N} samples")
@@ -398,7 +398,7 @@ if args.pad:
 
 else:
     N = origNdat
-    logging.debug(f"\nNot padding data, will stay as {N} time samples")
+    logging.debug(f"Not padding data, will stay as {N} time samples")
     inf_dict['breaks'] = 0
 
 inf_dict['N'] = int(N)
@@ -417,7 +417,7 @@ if weird_last_gulp:
     yaml_dict['gulp'] = args.gulp - 1
     yaml_dict['last_gulp'] = int(nsamples % args.gulp)
 
-logging.debug("\nDict values to go into every yaml file:")
+logging.debug("Dict values to go into every yaml file:")
 logging.debug(f"{yaml_dict}")
 
 # loop through each split file and write a yaml for each
@@ -438,4 +438,4 @@ for ii in fouts_indices:
 t4 = time.perf_counter()
 logging.info(f"yamls written in {t4 - t3} seconds")
 
-logging.info(f"\nDone")
+logging.info(f"Done")
