@@ -349,6 +349,7 @@ else:
         t3 = time.perf_counter()
         logging.info(f"FDMT of last gulp completed in {t3-t0} s\n")
     else:
+        t3 = time.perf_counter()
         logging.info("Skipping FDMT\n")
 
 
