@@ -80,7 +80,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--pad", action='store_true', help="Compute numbers needed to pad the .dat files to a highly factorable length"
+    "--pad", action='store_true', help="Compute numbers needed to pad the .dat files to a highly factorable length (untested)"
 )
 
 parser.add_argument(
@@ -361,9 +361,9 @@ if args.pad:
     N = choose_N(origNdat)
     logging.debug(f"In next stage of process, data will be padded from {origNdat} to {N} samples")
     # get medians of last PAD_MEDIAN_NSAMP samples if possible
-    if out.shape[1] - maxDT < PAD_MEDIAN_NSAMP:
-        logging.warning(f"Padding using median over last {out.shape[1] - maxDT} samples rather than {PAD_MEDIAN_NSAMP}")
-        meds = np.median(out[:,:-maxDT])
+    if out.shape[1] - 2*maxDT < PAD_MEDIAN_NSAMP:
+        logging.warning(f"Padding using median over last {out.shape[1] - 2*maxDT} samples rather than {PAD_MEDIAN_NSAMP}")
+        meds = np.median(out[:,maxDT:-maxDT])
     else:
         logging.info(f"Padding using median over last {PAD_MEDIAN_NSAMP} samples")
         meds = np.median(out[:, -(PAD_MEDIAN_NSAMP+maxDT):-maxDT])
