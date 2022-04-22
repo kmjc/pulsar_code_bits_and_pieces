@@ -232,6 +232,7 @@ if (nsamples % args.gulp) < maxDT:
     origNdat = int(nsamples // args.gulp) * args.gulp - maxDT
 else:
     origNdat = nsamples - maxDT
+logging.debug(f"Length of data to be written is {origNdat} samples")
 
 # set up output file/s
 if args.split_file:
@@ -358,6 +359,7 @@ if args.pad:
     logging.info("\nRecording padding parameters for assembling dat files")
     # find good N
     N = choose_N(origNdat)
+    logging.debug(f"In next stage of process, data will be padded from {origNdat} to {N} samples")
     # get medians of last PAD_MEDIAN_NSAMP samples if possible
     if out.shape[1] - maxDT < PAD_MEDIAN_NSAMP:
         logging.warning(f"Padding using median over last {out.shape[1] - maxDT} samples rather than {PAD_MEDIAN_NSAMP}")
@@ -371,6 +373,7 @@ if args.pad:
 
 else:
     N = origNdat
+    logging.debug(f"\nNot padding data, will stay as {N} time samples")
     inf_dict['breaks'] = 0
 
 inf_dict['N'] = int(N)
@@ -389,6 +392,8 @@ if weird_last_gulp:
     yaml_dict['gulp'] = args.gulp - 1
     yaml_dict['last_gulp'] = int(nsamples % args.gulp)
 
+logging.debug("\nDict values to go into every yaml file:")
+logging.debug(f"{yaml_dict})
 
 # loop through each split file and write a yaml for each
 inf_names = [f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
