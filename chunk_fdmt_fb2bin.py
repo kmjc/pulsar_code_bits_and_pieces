@@ -163,8 +163,8 @@ if DM == 0:
 ngulps = nsamples // args.gulp
 if nsamples % args.gulp:
     if (nsamples % args.gulp) < maxDT:
-        log.warning(f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end")
-        log.warning(f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n")
+        logging.warning(f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end")
+        logging.warning(f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n")
     else:
         weird_last_gulp = True
         ngulps += 1
@@ -197,6 +197,7 @@ else:
 # also need to transpose anyway for FDMT so it's (nchans, gulp)
 # (NB FDMT needs the lowest freq channel to be at index 0)
 if invertband:
+    logging.debug(f"Frequency slice used to read data: {read_inv_slc}\n")
 
     def read_gulp(filfile, gulp, nchans, arr_dtype):
         """Read in next gulp and prep it to feed into fdmt"""
@@ -206,7 +207,7 @@ if invertband:
         return data[:, read_inv_slc].T
 
 else:
-
+    logging.debug(f"Frequency slice used to read data: {read_slc}\n")
     def read_gulp(filfile, gulp, nchans, arr_dtype):
         """Read in next gulp and prep it to feed into fdmt"""
         data = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
@@ -214,9 +215,8 @@ else:
         )
         return data[:, read_slc].T
 
-# HERE compute and store DMs
-# check it's arange(maxDT) and not arange(1, maxDT + 1)
-# Hao said that's correct
+# Compute and store DMs
+# Hao said arange(maxDT) is correct
 if args.tophalf:
     flo = fmin + (fmax - fmin)/2
 else:
@@ -241,7 +241,7 @@ if args.split_file:
     nfiles = math.ceil(maxDT / dms_per_file)
     logging.info(f"Splitting the output into {nfiles} files of {dms_per_file} DMs")
     if nfiles > 1000:
-        log.warning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
+        logging.warning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
 
     fouts = []  # contains open file objects
     fouts_indices = list(range(nfiles))
@@ -280,6 +280,7 @@ logging.info("Reading in first gulp")
 intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
 fd.reset_ABQ()
 logging.info(f"Starting gulp 0")
+logging.debug(f"Shape of first chunk read: {intensities.shape}")
 logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
 t0 = time.perf_counter()
 out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
@@ -292,6 +293,8 @@ logging.debug(
 t1 = time.perf_counter()
 logging.info(f"Writing gulp 0")
 # write mid_arr
+logging.debug(f"FDMT transform shape: {out.shape}")
+logging.debug(f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples"")
 for ii in fouts_indices:
     fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
 
@@ -311,6 +314,8 @@ if ngulps > 1:
         prev_arr += out[:, :maxDT]
 
         # write prev_arr and mid_arr
+        logging.debug(f"gulp {g} out array shape {out.shape}")
+        logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
         for ii in fouts_indices:
             fouts[ii].write(prev_arr[dm_slices[ii],:].ravel())
             fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
