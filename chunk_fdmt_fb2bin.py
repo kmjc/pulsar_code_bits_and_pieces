@@ -294,7 +294,7 @@ t1 = time.perf_counter()
 logging.info(f"Writing gulp 0")
 # write mid_arr
 logging.debug(f"FDMT transform shape: {out.shape}")
-logging.debug(f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples"")
+logging.debug(f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples")
 for ii in fouts_indices:
     fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
 
