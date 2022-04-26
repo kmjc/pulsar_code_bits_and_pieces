@@ -36,9 +36,11 @@ logging.basicConfig(
     level=args.loglevel,
     )
 
+logging.info(f"Processing {args.filename}")
+
 with open(f"{args.filename}.yaml", "r") as fin:
     yam = yaml.safe_load(fin)
-logging.debug(f"yaml file loaded:")
+logging.info(f"yaml file {args.filename}.yaml loaded:")
 for key in yam.keys():
     logging.debug(f"{key:}")
     logging.debug(f"{yam[key]}")
@@ -47,8 +49,6 @@ for key in yam.keys():
 dat_names = [f"{infnm[:-4]}.dat" for infnm in yam['inf_names']]
 logging.debug(f"List of dat files to write to:")
 logging.debug(f"{dat_names}")
-# quicker to loop through and write one by one or write same chunk for all?
-
 
 # data will be in order
 # dm0t0 dm0t1 dm0t2 .... dm1t0 dm1t1
@@ -70,67 +70,13 @@ ngulps = yam['ngulps']
 
 last_gulp = yam.get("last_gulp", 0)
 if last_gulp:
+    logging.debug("Weird last gulp detected")
     ngulps -= 1
 has_breaks = yam['inf_dict'].get("breaks", 0)
 if has_breaks:
-    logging.debug("inf")
+    logging.debug("breaks found in inf_dict. Will pad dat files using medians in the yaml")
 
 logging.info(f"maxDT: {maxDT}, ndms: {ndms}, gulp: {gulp}, ngulps: {ngulps}, last_gulp: {last_gulp}, has_breaks: {has_breaks}")
-
-
-"""
-# loop through file for each DM and write one dat file at a time
-logging.debug("BENCHMARKING: loop through file for each dat")
-t0 = time.perf_counter()
-
-fdmtfile = open(args.filename, "rb")
-first_gulp_offset = ndms*(gulp-maxDT)
-for i in dm_indices:
-    datfile = open(dat_names[i], "wb")
-    # first chunk is  gulp-maxDT
-    offset = i * (gulp-maxDT)
-    fdmtfile.seek(offset*nbytes)
-    dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT), dtype=dt)
-    datfile.write(dmdata)
-
-    dm_offset = i*gulp
-    fdmtfile.seek((first_gulp_offset + dm_offset)*nbytes)
-
-    for g in range(1, ngulps):
-        dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
-        datfile.write(dmdata)
-        fdmtfile.seek((ndms - 1)*gulp*nbytes, 1)
-
-    # last gulp is weird size
-
-# skipping last gulp and padding for now.
-# rewrote so indices should be correct now, and takes median from yaml
-
-#    if last_gulp:
-#        last_gulp_offset = ndms * (gulp - maxDT) + ndms * gulp * (ngulps - 1) + i*last_gulp
-#        fdmtfile.seek(last_gulp_offset*nbytes)
-#        dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
-#        datfile.write(dmdata)
-
-    # file has been padded
-#    if has_breaks:
-#        onoff = yam['inf_dict']['onoff']
-#        padby = onoff[1][0] - onoff[0][1]
-#        med = yam['medians'][i]
-#        logging.debug(f"Padding DM {i} by {padby} with {med}")
-#        padding = np.zeros((padby), dtype=dt) + med
-#        datfile.write(padding)
-
-    datfile.close()
-    logging.debug(f"DM {i} done")
-
-
-fdmtfile.close()
-t1 = time.perf_counter()
-logging.debug(f"BENCHMARKING: loop through file for each dat - {t1 - t0} seconds for {len(dm_indices)} dats")
-"""
-
-
 
 
 # open all dats, loop through file writing to each
@@ -142,36 +88,45 @@ datfiles = [open(dat_name, "wb") for dat_name in dat_names]
 fdmtfile = open(args.filename, "rb")
 
 # first gulp, (gulp - maxDT) time samples
+samples_processed = 0
+
+logging.debug("GULP 0")
 for i in dm_indices:
     dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT), dtype=dt)
     datfiles[i].write(dmdata)
+    samples_processed += dmdata.size
+    logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
 
 # other gulps, (gulp) time samples
 for g in range(1, ngulps):
+    logging.debug(f"GULP {g}")
     for i in dm_indices:
         dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
         datfiles[i].write(dmdata)
+        samples_processed += dmdata.size
+        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
 
 
+# last gulp is weird size
+if last_gulp:
+    logging.DEBUG("LAST GULP")
+    for i in dm_indices:
+        dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
+        datfiles[i].write(dmdata)
+        samples_processed += dmdata.size
+        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
 
-# skipping last gulp and padding for now.
-# rewrote so indices should be correct now, and takes median from yaml
-
-    # last gulp is weird size
-    if last_gulp:
-        for i in dm_indices:
-            dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
-            datfiles[i].write(dmdata)
-
-    # file has been padded
-    if has_breaks:
-        onoff = yam['inf_dict']['onoff']
-        padby = onoff[1][0] - onoff[0][1]
-        for i in dm_indices:
-            med = yam['medians'][i]
-            logging.debug(f"Padding DM {i} by {padby} with {med}")
-            padding = np.zeros((padby), dtype=dt) + med
-            datfiles[i].write(padding)
+# file has been padded
+# UNTESTED
+if has_breaks:
+    logging.info("Padding data")
+    onoff = yam['inf_dict']['onoff']
+    padby = onoff[1][0] - onoff[0][1]
+    for i in dm_indices:
+        med = yam['medians'][i]
+        logging.debug(f"Padding DM {i} by {padby} with {med}")
+        padding = np.zeros((padby), dtype=dt) + med
+        datfiles[i].write(padding)
 
 fdmtfile.close()
 
