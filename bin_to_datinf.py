@@ -76,11 +76,11 @@ has_breaks = yam['inf_dict'].get("breaks", 0)
 if has_breaks:
     logging.debug("breaks found in inf_dict. Will pad dat files using medians in the yaml")
 
-logging.info(f"maxDT: {maxDT}, ndms: {ndms}, gulp: {gulp}, ngulps: {ngulps}, last_gulp: {last_gulp}, has_breaks: {has_breaks}")
+logging.info(f"maxDT: {maxDT}, ndms: {ndms}, gulp: {gulp}, ngulps: {ngulps}, last_gulp: {last_gulp}, has_breaks: {has_breaks}\n")
 
 
 # open all dats, loop through file writing to each
-logging.debug("\nBENCHMARKING: keep all dats open, loop through file")
+logging.debug("BENCHMARKING: keep all dats open, loop through file")
 t2 = time.perf_counter()
 
 datfiles = [open(dat_name, "wb") for dat_name in dat_names]
@@ -88,24 +88,26 @@ datfiles = [open(dat_name, "wb") for dat_name in dat_names]
 fdmtfile = open(args.filename, "rb")
 
 # first gulp, (gulp - maxDT) time samples
-samples_processed = 0
+#samples_processed = 0
 
-logging.debug("GULP 0")
+logging.info("Procesing gulp 0")
+#logging.debug("GULP 0")
 for i in dm_indices:
     dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT), dtype=dt)
     datfiles[i].write(dmdata)
-    samples_processed += dmdata.size
-    logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
+#    samples_processed += dmdata.size
+#    logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
 
 # other gulps, (gulp) time samples
+logging.info(f"Processing gulps {list(range(1, ngulps))[0]} to {list(range(1, ngulps))[-1]}")
 for g in range(1, ngulps):
-    logging.debug(f"GULP {g}")
+#    logging.debug(f"GULP {g}")
     for i in dm_indices:
         dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
         datfiles[i].write(dmdata)
-        samples_processed += dmdata.size
-        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
-
+#        samples_processed += dmdata.size
+#        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
+logging.info("Finished normal gulps")
 
 # last gulp is weird size
 if last_gulp:
@@ -128,10 +130,14 @@ if has_breaks:
         padding = np.zeros((padby), dtype=dt) + med
         datfiles[i].write(padding)
 
+logging.debug("Closing fdmt file")
 fdmtfile.close()
+logging.debug("fdmt file closed")
 
+logging.debug("Closing dat files file")
 for datfile in datfiles:
     datfile.close()
+logging.debug("dat files closed")
 
 
 t3 = time.perf_counter()
