@@ -394,7 +394,7 @@ yaml_dict = dict(
 )
 
 if weird_last_gulp:
-    yaml_dict['gulp'] = args.gulp - 1
+    yaml_dict['ngulps'] = ngulps - 1
     yaml_dict['last_gulp'] = int(nsamples % args.gulp)
 
 logging.debug("Dict values to go into every yaml file:")
