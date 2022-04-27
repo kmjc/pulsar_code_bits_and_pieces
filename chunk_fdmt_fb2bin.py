@@ -304,7 +304,6 @@ logging.info(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
 # setup for next iteration
 prev_arr = np.zeros((maxDT, maxDT), dtype=intensities.dtype)
 prev_arr += out[:, -maxDT:]
-intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
 
 if ngulps > 1:
     for g in np.arange(1, ngulps):
