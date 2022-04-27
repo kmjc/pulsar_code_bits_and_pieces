@@ -71,7 +71,7 @@ ngulps = yam['ngulps']
 last_gulp = yam.get("last_gulp", 0)
 if last_gulp:
     logging.debug("Weird last gulp detected")
-    ngulps -= 1
+    #ngulps -= 1  # already do this in chunk_fdmt_fb2bin BUT . .  it is super clunky. this variable changes too much
 has_breaks = yam['inf_dict'].get("breaks", 0)
 if has_breaks:
     logging.debug("breaks found in inf_dict. Will pad dat files using medians in the yaml")
