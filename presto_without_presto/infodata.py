@@ -325,6 +325,11 @@ class infodata2(object):
                                  (ii, on, off))
             else:
                 ff.write(" Any breaks in the data? (1 yes, 0 no)  =  0\n")
+                # exploredat doesn't work if no On/Off pairs are in the inf file
+                if hasattr(self, 'N'):
+                    ff.write(" On/Off bin pair #%3d                   =  %-11.0f, %-11.0f\n" %
+                             (0, 0, self.N - 1))
+
             # These two were left out, I assume because there's some variation? e.g. beam_diam might not always be in arcsec
             if hasattr(self, 'waveband'):
                 ff.write(" Type of observation (EM band)          =  %s\n" %
