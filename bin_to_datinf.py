@@ -111,7 +111,7 @@ logging.info("Finished normal gulps")
 
 # last gulp is weird size
 if last_gulp:
-    logging.DEBUG("LAST GULP")
+    logging.debug("LAST GULP")
     for i in dm_indices:
         dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
         datfiles[i].write(dmdata)
