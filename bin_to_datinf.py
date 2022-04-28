@@ -115,8 +115,8 @@ if last_gulp:
     for i in dm_indices:
         dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
         datfiles[i].write(dmdata)
-        samples_processed += dmdata.size
-        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
+#        samples_processed += dmdata.size
+#        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
 
 # file has been padded
 # UNTESTED
