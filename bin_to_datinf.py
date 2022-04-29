@@ -1,10 +1,13 @@
+import sys
+sys.path.append('/home/kcrowter/pulsar_code_bits_and_pieces')
+sys.path.append('/home/kcrowter/FDMT')
+
 from presto_without_presto.infodata import infodata2
 import yaml
 import argparse
 import copy
 import numpy as np
 import time
-import sys
 import logging
 
 
