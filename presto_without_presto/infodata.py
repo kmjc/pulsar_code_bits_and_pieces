@@ -158,49 +158,49 @@ class infodata(object):
 # added tweaked version so can make it from a dict
 class infodata2(object):
     def __init__(self, init_dict):
-        if init_dict.get('basenm', 0):
+        if init_dict.get('basenm', None) is not None:
             self.basenm = init_dict['basenm']
-        if init_dict.get('telescope', 0):
+        if init_dict.get('telescope', None) is not None:
             self.telescope = init_dict['telescope']
-        if init_dict.get('instrument', 0):
+        if init_dict.get('instrument', None) is not None:
             self.instrument = init_dict['instrument']
-        if init_dict.get('object', 0):
+        if init_dict.get('object', None) is not None:
             self.object = init_dict['object']
-        if init_dict.get('RA', 0):
+        if init_dict.get('RA', None) is not None:
             self.RA = init_dict['RA']
-        if init_dict.get('DEC', 0):
+        if init_dict.get('DEC', None) is not None:
             self.DEC = init_dict['DEC']
-        if init_dict.get('observer', 0):
+        if init_dict.get('observer', None) is not None:
             self.observer = init_dict['observer']
-        if init_dict.get('epoch', 0):
+        if init_dict.get('epoch', None) is not None:
             self.epoch = init_dict['epoch']
-        if init_dict.get('bary', 0):
+        if init_dict.get('bary', None) is not None:
             self.bary = init_dict['bary']
-        if init_dict.get('N', 0):
+        if init_dict.get('N', None) is not None:
             self.N = init_dict['N']
-        if init_dict.get('dt', 0):
+        if init_dict.get('dt', None) is not None:
             self.dt = init_dict['dt']
-        if init_dict.get('breaks', 0):
+        if init_dict.get('breaks', None) is not None:
             self.breaks = init_dict['breaks']
-        if init_dict.get('onoff', 0):
+        if init_dict.get('onoff', None) is not None:
             self.onoff = init_dict['onoff']
-        if init_dict.get('waveband', 0):
+        if init_dict.get('waveband', None) is not None:
             self.waveband = init_dict['waveband']
-        if init_dict.get('beam_diam', 0):
+        if init_dict.get('beam_diam', None) is not None:
             self.beam_diam = init_dict['beam_diam']
-        if init_dict.get('DM', 0):
+        if init_dict.get('DM', None) is not None:
             self.DM = init_dict['DM']
-        if init_dict.get('lofreq', 0):
+        if init_dict.get('lofreq', None) is not None:
             self.lofreq = init_dict['lofreq']
-        if init_dict.get('BW', 0):
+        if init_dict.get('BW', None) is not None:
             self.BW = init_dict['BW']
-        if init_dict.get('numchan', 0):
+        if init_dict.get('numchan', None) is not None:
             self.numchan = init_dict['numchan']
-        if init_dict.get('chan_width', 0):
+        if init_dict.get('chan_width', None) is not None:
             self.chan_width = init_dict['chan_width']
-        if init_dict.get('analyzer', 0):
+        if init_dict.get('analyzer', None) is not None:
             self.analyzer = init_dict['analyzer']
-        if init_dict.get('deorbited', 0):
+        if init_dict.get('deorbited', None) is not None:
             self.deorbited = init_dict['deorbited']
 
     @classmethod
