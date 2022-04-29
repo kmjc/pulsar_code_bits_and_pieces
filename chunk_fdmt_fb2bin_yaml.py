@@ -1,7 +1,4 @@
-# chunk fdmt a filterbank and save as hdf5
-# don't worry about the inf file,
-# thinking tht after I've got this bit sorted I can nab the hdf5 1 row at a time
-# pad, write the .dat's and the .inf's
+# NOT UP TO DATE WITH chunk_fdmt_fb2bin
 import sys, os
 import numpy as np
 from fdmt.cpu_fdmt import FDMT
@@ -77,10 +74,6 @@ parser.add_argument(
 
 parser.add_argument(
     "--dmprec", type=int, default=3, help="DM precision (for filenames)"
-)
-
-parser.add_argument(
-    "--pad", action='store_true', help="Compute numbers needed to pad the .dat files to a highly factorable length (untested)"
 )
 
 parser.add_argument(
@@ -376,33 +369,9 @@ inf_dict = dict(
     numchan=header['nchans'],
     chan_width=abs(header['foff']),
     analyzer=os.environ.get( "USER" ),
+    breaks=0,
+    N=int(origNdat),
 )
-
-# add padding-dependent inf_dict variables
-PAD_MEDIAN_NSAMP = 4096
-if args.pad:
-    logging.info("Recording padding parameters for assembling dat files")
-    # find good N
-    N = choose_N(origNdat)
-    logging.debug(f"In next stage of process, data will be padded from {origNdat} to {N} samples")
-    # get medians of last PAD_MEDIAN_NSAMP samples if possible
-    if out.shape[1] - 2*maxDT < PAD_MEDIAN_NSAMP:
-        logging.warning(f"Padding using median over last {out.shape[1] - 2*maxDT} samples rather than {PAD_MEDIAN_NSAMP}")
-        meds = np.median(out[:,maxDT:-maxDT])
-    else:
-        logging.info(f"Padding using median over last {PAD_MEDIAN_NSAMP} samples")
-        meds = np.median(out[:, -(PAD_MEDIAN_NSAMP+maxDT):-maxDT])
-
-    inf_dict['breaks'] = 1
-    inf_dict['onoff'] = [(0, origNdat - 1), (N - 1, N - 1)]
-
-else:
-    N = origNdat
-    logging.debug(f"Not padding data, will stay as {N} time samples")
-    inf_dict['breaks'] = 0
-
-inf_dict['N'] = int(N)  # otherwise it's a numpy int which does not play nice with yaml
-
 
 # Construct a dictionary with extra information needed to assemble the dat and inf files
 # General stuff that goes into every file:
@@ -411,6 +380,7 @@ yaml_dict = dict(
     gulp=args.gulp,
     inf_dict=inf_dict,
     maxDT=int(maxDT),  # otherwise numpy int
+    origNdat=int(origNdat),
 )
 
 if weird_last_gulp:
