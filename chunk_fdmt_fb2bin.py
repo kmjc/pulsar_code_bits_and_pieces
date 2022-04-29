@@ -24,7 +24,9 @@ from chunk_dedisperse import (
     not_zero_or_none,
 )
 
-
+BEAM_DIAM = 6182  # CHIME-specific, grabbed from a presto-generated inf file, haven't looked it up to confirm if it's accurate
+# hackey, should have a dict/function which selects this based on the machine id etc
+# but riptide breaks without this in the inf file
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -355,6 +357,7 @@ inf_dict = dict(
     numchan=header['nchans'],
     chan_width=abs(header['foff']),
     analyzer=os.environ.get( "USER" ),
+    beam_diam=BEAM_DIAM,  # hackey, see note at top of script where BEAM_DIAM is defined
 )
 
 # add padding-dependent inf_dict variables
