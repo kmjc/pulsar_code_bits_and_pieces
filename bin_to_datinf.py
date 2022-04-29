@@ -13,7 +13,13 @@ parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     description="Go from output of chunk_fdmt_fb2bin.py to presto-style .dat and .inf files"
 )
+
 parser.add_argument("filename", type=str, help=".fdmt file to process. Must have a corresponding .fdmt.yaml file")
+
+parser.add_argument(
+    "--pad", action='store_true', help="Pad the .dat files to a highly factorable length using their mean (untested)"
+)
+
 parser.add_argument(
     "--log", type=str, help="name of file to write log to", default="bin_to_datinf.log"
 )
@@ -72,9 +78,6 @@ last_gulp = yam.get("last_gulp", 0)
 if last_gulp:
     logging.debug("Weird last gulp detected")
     #ngulps -= 1  # already do this in chunk_fdmt_fb2bin BUT . .  it is super clunky. this variable changes too much
-has_breaks = yam['inf_dict'].get("breaks", 0)
-if has_breaks:
-    logging.debug("breaks found in inf_dict. Will pad dat files using medians in the yaml")
 
 logging.info(f"maxDT: {maxDT}, ndms: {ndms}, gulp: {gulp}, ngulps: {ngulps}, last_gulp: {last_gulp}, has_breaks: {has_breaks}\n")
 
@@ -90,10 +93,13 @@ fdmtfile = open(args.filename, "rb")
 # first gulp, (gulp - maxDT) time samples
 #samples_processed = 0
 
+running_sum = np.zeros((maxDT))
+
 logging.info("Procesing gulp 0")
 #logging.debug("GULP 0")
 for i in dm_indices:
     dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT), dtype=dt)
+    running_sum[i] += dmdata.sum()
     datfiles[i].write(dmdata)
 #    samples_processed += dmdata.size
 #    logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
@@ -104,6 +110,7 @@ for g in range(1, ngulps):
 #    logging.debug(f"GULP {g}")
     for i in dm_indices:
         dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
+        running_sum[i] += dmdata.sum()
         datfiles[i].write(dmdata)
 #        samples_processed += dmdata.size
 #        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
@@ -114,21 +121,33 @@ if last_gulp:
     logging.debug("LAST GULP")
     for i in dm_indices:
         dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
+        running_sum[i] += dmdata.sum()
         datfiles[i].write(dmdata)
 #        samples_processed += dmdata.size
 #        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
 
-# file has been padded
+# Pad dat files
 # UNTESTED
-if has_breaks:
+if args.pad:
     logging.info("Padding data")
-    onoff = yam['inf_dict']['onoff']
+    origNdat = yam['origNdat']
+    N = choose_N(origNdat)
+    logging.debug(f"Data will be padded from {origNdat} to {N} samples")
+
+    onoff = [(0, origNdat - 1), (N - 1, N - 1)]
     padby = onoff[1][0] - onoff[0][1]
+
+    means = running_sum / origNdat
     for i in dm_indices:
-        med = yam['medians'][i]
-        logging.debug(f"Padding DM {i} by {padby} with {med}")
-        padding = np.zeros((padby), dtype=dt) + med
+        logging.debug(f"Padding DM {i} by {padby} with {means[i]}")
+        padding = np.zeros((padby), dtype=dt) + means[i]
         datfiles[i].write(padding)
+
+    # update inf dict
+    yam['inf_dict']['breaks'] = 1
+    yam['inf_dict']['onoff'] = onoff
+    yam['inf_dict']['N'] = N
+    logging.debug(f"updated inf dict to N: {yam['inf_dict']['N']}, breaks:{yam['inf_dict']['breaks']}, onoff: {yam['inf_dict']['onoff']}")
 
 logging.debug("Closing fdmt file")
 fdmtfile.close()
