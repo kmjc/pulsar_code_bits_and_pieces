@@ -1,4 +1,3 @@
-# NOT UP TO DATE WITH chunk_fdmt_fb2bin
 import sys, os
 import numpy as np
 from fdmt.cpu_fdmt import FDMT
@@ -21,7 +20,9 @@ from chunk_dedisperse import (
     not_zero_or_none,
 )
 
-
+BEAM_DIAM = 6182  # CHIME-specific, grabbed from a presto-generated inf file, haven't looked it up to confirm if it's accurate
+# hackey, should have a dict/function which selects this based on the machine id etc
+# but riptide breaks without this in the inf file
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -160,8 +161,8 @@ if DM == 0:
 ngulps = nsamples // args.gulp
 if nsamples % args.gulp:
     if (nsamples % args.gulp) < maxDT:
-        log.warning(f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end")
-        log.warning(f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n")
+        logging.warning(f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end")
+        logging.warning(f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n")
     else:
         weird_last_gulp = True
         ngulps += 1
@@ -194,6 +195,7 @@ else:
 # also need to transpose anyway for FDMT so it's (nchans, gulp)
 # (NB FDMT needs the lowest freq channel to be at index 0)
 if invertband:
+    logging.debug(f"Frequency slice used to read data: {read_inv_slc}\n")
 
     def read_gulp(filfile, gulp, nchans, arr_dtype):
         """Read in next gulp and prep it to feed into fdmt"""
@@ -203,7 +205,7 @@ if invertband:
         return data[:, read_inv_slc].T
 
 else:
-
+    logging.debug(f"Frequency slice used to read data: {read_slc}\n")
     def read_gulp(filfile, gulp, nchans, arr_dtype):
         """Read in next gulp and prep it to feed into fdmt"""
         data = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
@@ -211,9 +213,8 @@ else:
         )
         return data[:, read_slc].T
 
-# HERE compute and store DMs
-# check it's arange(maxDT) and not arange(1, maxDT + 1)
-# Hao said that's correct
+# Compute and store DMs
+# Hao said arange(maxDT) is correct
 if args.tophalf:
     flo = fmin + (fmax - fmin)/2
 else:
@@ -238,9 +239,8 @@ if args.split_file:
     nfiles = math.ceil(maxDT / dms_per_file)
     logging.info(f"Splitting the output into {nfiles} files of {dms_per_file} DMs")
     if nfiles > 1000:
-        log.warning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
+        logging.warning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
 
-    fouts = []  # contains open file objects
     fouts_indices = list(range(nfiles))
     fouts_names = []  # contains names of files
     dm_slices = []  # contains dm_slices, so for file with fouts_indices i DMs[dm_slices[i]] will give you the DMs it contains
@@ -256,7 +256,6 @@ if args.split_file:
     logging.info(f"Outfiles:\n{fouts_names}")
     logging.debug(f"DM slices:\n{dm_slices}")
 else:
-    fouts = [open(f"{args.filename[:-4]}.fdmt", "wb")]
     fouts_indices = [0]
     fout_names = [f"{args.filename[:-4]}.fdmt"]
     dm_slices = [slice(None)]
@@ -280,6 +279,7 @@ if not args.yaml_only:
     intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
     fd.reset_ABQ()
     logging.info(f"Starting gulp 0")
+    logging.debug(f"Shape of first chunk read: {intensities.shape}")
     logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
     out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
@@ -292,6 +292,8 @@ if not args.yaml_only:
     t1 = time.perf_counter()
     logging.info(f"Writing gulp 0")
     # write mid_arr
+    logging.debug(f"FDMT transform shape: {out.shape}")
+    logging.debug(f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples")
     for ii in fouts_indices:
         fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
 
@@ -301,7 +303,6 @@ if not args.yaml_only:
     # setup for next iteration
     prev_arr = np.zeros((maxDT, maxDT), dtype=intensities.dtype)
     prev_arr += out[:, -maxDT:]
-    intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
 
     if ngulps > 1:
         for g in np.arange(1, ngulps):
@@ -311,6 +312,8 @@ if not args.yaml_only:
             prev_arr += out[:, :maxDT]
 
             # write prev_arr and mid_arr
+            logging.debug(f"gulp {g} out array shape {out.shape}")
+            logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
             for ii in fouts_indices:
                 fouts[ii].write(prev_arr[dm_slices[ii],:].ravel())
                 fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
@@ -330,20 +333,6 @@ if not args.yaml_only:
 
 else:
     logging.info("Yaml-only")
-    if args.pad:
-        logging.info("FDMT-ing last gulp to compute medians used for padding")
-        t0 = time.perf_counter()
-        filfile = open(args.filename, "rb")
-        filfile.seek(hdrlen + args.gulp * (ngulps - 1) * nchans * int(header["nbits"]//8))
-        intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
-        fd.reset_ABQ()
-        out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-        filfile.close()
-        t3 = time.perf_counter()
-        logging.info(f"FDMT of last gulp completed in {t3-t0} s\n")
-    else:
-        t3 = time.perf_counter()
-        logging.info("Skipping FDMT\n")
 
 
 
@@ -369,6 +358,7 @@ inf_dict = dict(
     numchan=header['nchans'],
     chan_width=abs(header['foff']),
     analyzer=os.environ.get( "USER" ),
+    beam_diam=BEAM_DIAM,  # hackey, see note at top of script where BEAM_DIAM is defined
     breaks=0,
     N=int(origNdat),
 )
@@ -384,7 +374,7 @@ yaml_dict = dict(
 )
 
 if weird_last_gulp:
-    yaml_dict['gulp'] = args.gulp - 1
+    yaml_dict['ngulps'] = ngulps - 1
     yaml_dict['last_gulp'] = int(nsamples % args.gulp)
 
 logging.debug("Dict values to go into every yaml file:")
@@ -396,8 +386,6 @@ for ii in fouts_indices:
     specific_yaml_dict = copy.copy(yaml_dict)
 
     slc = dm_slices[ii]
-    if args.pad:
-        specific_yaml_dict["medians"] = [float(md) for md in meds[slc]]
     specific_yaml_dict["inf_names"] = inf_names[slc]
     specific_yaml_dict["DMs"] = [float(aDM) for aDM in DMs[slc]]
 
