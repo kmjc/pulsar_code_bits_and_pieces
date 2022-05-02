@@ -333,6 +333,7 @@ if not args.yaml_only:
 
 else:
     logging.info("Yaml-only")
+    t3 = time.perf_counter()
 
 
 
