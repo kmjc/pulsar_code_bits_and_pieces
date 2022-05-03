@@ -6,6 +6,7 @@ import copy
 import numpy as np
 import time
 import logging
+import os
 
 
 
@@ -158,11 +159,21 @@ for datfile in datfiles:
     datfile.close()
 logging.debug("dat files closed")
 
+# check number of samples wrote
+sz = os.path.getsize(dat_names[0]) / 4
+logging.info(f"dat files each contain {sz} samples")
+for dat_name in dat_names:
+    sz_i = os.path.getsize(dat_name) / 4
+    if sz_i != sz:
+        logging.warning(f"{dat_name} has a different number of samples! ({sz_i})")
+
 
 t3 = time.perf_counter()
 logging.debug(f"BENCHMARKING: keep all dats open, loop through file - {t3 - t2} seconds for {len(dm_indices)} dats")
 
-
+# check number of samples wrote matches the inf file value
+if yam['inf_dict']['N'] != sz:
+    logging.warning(f"inf N ({yam['inf_dict']['N']}) does not match size of dat files ({sz})")
 
 t8 = time.perf_counter()
 # write .inf files
