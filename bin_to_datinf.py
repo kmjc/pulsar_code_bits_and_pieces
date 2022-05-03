@@ -1,5 +1,6 @@
 import sys
 from presto_without_presto.infodata import infodata2
+from presto_without_presto.psr_utils import choose_N
 import yaml
 import argparse
 import copy
