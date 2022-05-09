@@ -154,6 +154,7 @@ if DM == 0:
 
 # checks and other stuff based on gulp size
 ngulps = nsamples // args.gulp
+weird_last_gulp = False
 if nsamples % args.gulp:
     if (nsamples % args.gulp) < maxDT:
         logging.warning(f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end")
