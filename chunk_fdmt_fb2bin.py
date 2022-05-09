@@ -334,11 +334,11 @@ logging.info(f"Writing yaml:")
 lofreq = fmin + abs(header['foff'])/2
 inf_dict = dict(
     basenm=args.filename[:-4],
-    telescope=ids_to_telescope[header['telescope_id']],
-    instrument=ids_to_machine[header['machine_id']],
+    telescope=ids_to_telescope[header.get('telescope_id', 0)],
+    instrument=ids_to_machine[header.get('machine_id', 0)],
     object=header.get('source_name', 'Unknown'),
-    RA=radec2string(header['src_raj']),
-    DEC=radec2string(header['src_dej']),
+    RA=radec2string(header.get('src_raj', 0)),
+    DEC=radec2string(header.get('src_dej', 0)),
     observer='unset',
     epoch= header['tstart'],
     bary=0,
