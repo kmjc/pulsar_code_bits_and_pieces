@@ -256,11 +256,11 @@ if args.split_file:
     logging.debug(f"DM slices:\n{dm_slices}")
 else:
     fouts_indices = [0]
-    fout_names = [f"{args.filename[:-4]}.fdmt"]
+    fouts_names = [f"{args.filename[:-4]}.fdmt"]
     dm_slices = [slice(None)]
 
 if not args.yaml_only:
-    fouts = [open(fout_name, "wb") for fout_name in fout_names]
+    fouts = [open(fout_name, "wb") for fout_name in fouts_names]
 
 dm_indices = range(len(DMs))
 

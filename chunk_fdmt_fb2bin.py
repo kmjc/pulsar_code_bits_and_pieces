@@ -248,16 +248,16 @@ if args.split_file:
             end = (ii + 1) * dms_per_file
         fout_name = f"{args.filename[:-4]}_{start}-{end-1}.fdmt"
         fouts_names.append(fout_name)
-        fouts.append(open(fout_name, "wb"))
         dm_slices.append(slice(start, end))
     logging.info(f"Outfiles:\n{fouts_names}")
     logging.debug(f"DM slices:\n{dm_slices}")
 else:
     fouts = [open(f"{args.filename[:-4]}.fdmt", "wb")]
     fouts_indices = [0]
-    fout_names = [f"{args.filename[:-4]}.fdmt"]
+    fouts_names = [f"{args.filename[:-4]}.fdmt"]
     dm_slices = [slice(None)]
 
+fouts = [open(fout_name, "wb") for fout_name in fouts_names]
 dm_indices = range(len(DMs))
 
 
