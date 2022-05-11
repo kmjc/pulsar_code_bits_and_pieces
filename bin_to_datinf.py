@@ -90,7 +90,8 @@ for i in range(1, ngulps):
     unravel_plan.extend([maxDT, gulp - maxDT])
 if last_gulp:
     unravel_plan.extend([maxDT, last_gulp - maxDT])
-logging.info(unravel_plan, "\n")
+logging.info(unravel_plan)
+logging.info("\n")
 
 
 
