@@ -97,36 +97,13 @@ fdmtfile = open(args.filename, "rb")
 
 running_sum = np.zeros((maxDT))
 
-logging.info("Procesing gulp 0")
-#logging.debug("GULP 0")
-for i in dm_indices:
-    dmdata = np.fromfile(fdmtfile, count=(gulp-maxDT), dtype=dt)
-    running_sum[i] += dmdata.sum()
-    datfiles[i].write(dmdata)
-#    samples_processed += dmdata.size
-#    logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
-
-# other gulps, (gulp) time samples
-logging.info(f"Processing gulps {list(range(1, ngulps))[0]} to {list(range(1, ngulps))[-1]}")
-for g in range(1, ngulps):
-#    logging.debug(f"GULP {g}")
+logging.info("Unravelling data")
+for chunk in yam['unravel_plan']:
     for i in dm_indices:
-        dmdata = np.fromfile(fdmtfile, count=gulp, dtype=dt)
+        dmdata = np.fromfile(fdmtfile, count=chunk, dtype=dt)
         running_sum[i] += dmdata.sum()
         datfiles[i].write(dmdata)
-#        samples_processed += dmdata.size
-#        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
-logging.info("Finished normal gulps")
-
-# last gulp is weird size
-if last_gulp:
-    logging.debug("LAST GULP")
-    for i in dm_indices:
-        dmdata = np.fromfile(fdmtfile, count=yam['last_gulp'], dtype=dt)
-        running_sum[i] += dmdata.sum()
-        datfiles[i].write(dmdata)
-#        samples_processed += dmdata.size
-#        logging.debug(f"\tDM {i}\tsamples processed: {samples_processed}")
+logging.info("Done\n")
 
 # Pad dat files
 # UNTESTED
