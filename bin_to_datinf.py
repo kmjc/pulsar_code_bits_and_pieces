@@ -107,8 +107,6 @@ fdmtfile = open(args.filename, "rb")
 
 running_sum = np.zeros((maxDT))
 
-for i in range(ngulps)
-
 # I'd prefer to make unravel_plan in chunk_fdmt_fb2bin as you write the data
 # since it's more likely to be accurate then, but with lots of gulps it takes too long
 logging.info("Unravelling data")
