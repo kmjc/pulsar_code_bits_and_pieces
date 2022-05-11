@@ -292,7 +292,6 @@ logging.debug(f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shap
 for ii in fouts_indices:
     fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
 
-unravel_plan = [int(out.shape[1] - 2*maxDT)]
 
 t2 = time.perf_counter()
 logging.info(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
@@ -314,8 +313,6 @@ if ngulps > 1:
         for ii in fouts_indices:
             fouts[ii].write(prev_arr[dm_slices[ii],:].ravel())
             fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
-        unravel_plan.append(int(maxDT))
-        unravel_plan.append(int(out.shape[1] - 2*maxDT))
         logging.debug(f"Completed gulp {g}")
 
         # reset for next gulp
@@ -366,7 +363,6 @@ yaml_dict = dict(
     inf_dict=inf_dict,
     maxDT=int(maxDT),  # otherwise numpy int
     origNdat=int(origNdat),
-    unravel_plan=unravel_plan,
 )
 
 if weird_last_gulp:

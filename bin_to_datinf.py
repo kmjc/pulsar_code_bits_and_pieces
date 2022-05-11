@@ -73,7 +73,7 @@ gulp = yam['gulp']
 maxDT = yam['maxDT']
 ndms = len(yam['DMs'])
 dm_indices = range(ndms)  # if want to grab a specific DM just change dm_indices
-ngulps = yam['ngulps']
+ngulps = yam['ngulps']  # does NOT include last gulp if it's a weird length
 
 
 last_gulp = yam.get("last_gulp", 0)
@@ -82,6 +82,16 @@ if last_gulp:
     #ngulps -= 1  # already do this in chunk_fdmt_fb2bin BUT . .  it is super clunky. this variable changes too much
 
 logging.info(f"maxDT: {maxDT}, ndms: {ndms}, gulp: {gulp}, ngulps: {ngulps}, last_gulp: {last_gulp}\n")
+
+# Make unravel_plan
+logging.info("Unravel plan:")
+unravel_plan = [gulp - maxDT]
+for i in range(1, ngulps):
+    unravel_plan.extend([maxDT, gulp - maxDT])
+if last_gulp:
+    unravel_plan.extend([maxDT, last_gulp - maxDT])
+logging.info(unravel_plan, "\n")
+
 
 
 # open all dats, loop through file writing to each
@@ -97,8 +107,12 @@ fdmtfile = open(args.filename, "rb")
 
 running_sum = np.zeros((maxDT))
 
+for i in range(ngulps)
+
+# I'd prefer to make unravel_plan in chunk_fdmt_fb2bin as you write the data
+# since it's more likely to be accurate then, but with lots of gulps it takes too long
 logging.info("Unravelling data")
-for chunk in yam['unravel_plan']:
+for chunk in unravel_plan:
     for i in dm_indices:
         dmdata = np.fromfile(fdmtfile, count=chunk, dtype=dt)
         running_sum[i] += dmdata.sum()
