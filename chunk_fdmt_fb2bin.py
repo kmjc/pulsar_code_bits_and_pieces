@@ -85,6 +85,10 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--yaml_only", action='store_true', help="Don't write fdmt files, only their yamls"
+)
+
+parser.add_argument(
     "--log", type=str, help="name of file to write log to", default="chunk_fdmt_fb2bin.log"
 )
 
@@ -237,7 +241,6 @@ if args.split_file:
     if nfiles > 1000:
         logging.warning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
 
-    fouts = []  # contains open file objects
     fouts_indices = list(range(nfiles))
     fouts_names = []  # contains names of files
     dm_slices = []  # contains dm_slices, so for file with fouts_indices i DMs[dm_slices[i]] will give you the DMs it contains
@@ -253,79 +256,85 @@ if args.split_file:
     logging.info(f"Outfiles:\n{fouts_names}")
     logging.debug(f"DM slices:\n{dm_slices}")
 else:
-    fouts = [open(f"{args.filename[:-4]}.fdmt", "wb")]
     fouts_indices = [0]
     fouts_names = [f"{args.filename[:-4]}.fdmt"]
     dm_slices = [slice(None)]
 
-fouts = [open(fout_name, "wb") for fout_name in fouts_names]
+if not args.yaml_only:
+    fouts = [open(fout_name, "wb") for fout_name in fouts_names]
+
 dm_indices = range(len(DMs))
 
 
 ############################################################################
 # Do FDMT
 
-# read in data
-filfile = open(args.filename, "rb")
-filfile.seek(hdrlen)
+if not args.yaml_only:
+    # read in data
+    filfile = open(args.filename, "rb")
+    filfile.seek(hdrlen)
 
-logging.info("Reading in first gulp")
-# Do first gulp separately
-intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
-fd.reset_ABQ()
-logging.info(f"Starting gulp 0")
-logging.debug(f"Shape of first chunk read: {intensities.shape}")
-logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
-t0 = time.perf_counter()
-out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-logging.debug(
-    f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB"
-)
-logging.debug(
-    f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB"
-)
-t1 = time.perf_counter()
-logging.info(f"Writing gulp 0")
-# write mid_arr
-logging.debug(f"FDMT transform shape: {out.shape}")
-logging.debug(f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples")
-for ii in fouts_indices:
-    fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
+    logging.info("Reading in first gulp")
+    # Do first gulp separately
+    intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
+    fd.reset_ABQ()
+    logging.info(f"Starting gulp 0")
+    logging.debug(f"Shape of first chunk read: {intensities.shape}")
+    logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
+    t0 = time.perf_counter()
+    out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
+    logging.debug(
+        f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB"
+    )
+    logging.debug(
+        f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB"
+    )
+    t1 = time.perf_counter()
+    logging.info(f"Writing gulp 0")
+    # write mid_arr
+    logging.debug(f"FDMT transform shape: {out.shape}")
+    logging.debug(f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples")
+    for ii in fouts_indices:
+        fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
 
+    t2 = time.perf_counter()
+    logging.info(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
 
-t2 = time.perf_counter()
-logging.info(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
+    # setup for next iteration
+    prev_arr = np.zeros((maxDT, maxDT), dtype=intensities.dtype)
+    prev_arr += out[:, -maxDT:]
 
-# setup for next iteration
-prev_arr = np.zeros((maxDT, maxDT), dtype=intensities.dtype)
-prev_arr += out[:, -maxDT:]
+    if ngulps > 1:
+        for g in np.arange(1, ngulps):
+            intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
+            fd.reset_ABQ()
+            out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
+            prev_arr += out[:, :maxDT]
 
-if ngulps > 1:
-    for g in np.arange(1, ngulps):
-        intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
-        fd.reset_ABQ()
-        out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-        prev_arr += out[:, :maxDT]
+            # write prev_arr and mid_arr
+            logging.debug(f"gulp {g} out array shape {out.shape}")
+            logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
+            for ii in fouts_indices:
+                fouts[ii].write(prev_arr[dm_slices[ii],:].ravel())
+                fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
+            logging.debug(f"Completed gulp {g}")
 
-        # write prev_arr and mid_arr
-        #logging.debug(f"gulp {g} out array shape {out.shape}")
-        #logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
-        for ii in fouts_indices:
-            fouts[ii].write(prev_arr[dm_slices[ii],:].ravel())
-            fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
-        logging.debug(f"Completed gulp {g}")
+            # reset for next gulp
+            # setting it to 0 and using += stops prev_arr changing when out does
+            prev_arr[:, :] = 0
+            prev_arr += out[:, -maxDT:]
 
-        # reset for next gulp
-        # setting it to 0 and using += stops prev_arr changing when out does
-        prev_arr[:, :] = 0
-        prev_arr += out[:, -maxDT:]
+    for ii in fouts_indices:
+        fouts[ii].close()
+        logging.info(f"FDMT data written to {fouts_names[ii]}")
+    filfile.close()
+    t3 = time.perf_counter()
+    logging.info(f"FDMT completed in {(t3-t0)/60/60} hrs\n")
 
-for ii in fouts_indices:
-    fouts[ii].close()
-    logging.info(f"FDMT data written to {fouts_names[ii]}")
-filfile.close()
-t3 = time.perf_counter()
-logging.info(f"FDMT completed in {(t3-t0)/60/60} hrs\n")
+else:
+    logging.info("Yaml-only")
+    t3 = time.perf_counter()
+
 
 
 
