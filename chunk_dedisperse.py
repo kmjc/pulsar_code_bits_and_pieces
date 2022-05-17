@@ -686,14 +686,42 @@ if __name__ == "__main__":
         logging.info(f"Mask loaded")
         ptsperint = mask.ptsperint
         zerochans = mask.mask_zap_chans | ignorechans
+        logging.info(f"ptsperint of {ptsperint} read from mask")
+        # if data has been downsampled wrt mask, adjust ptsperint accordingly
+        maskdt = mask.dtint / mask.ptsperint
+        if np.isclose(maskdt, tsamp, atol=1e-10):
+            logging.info(f"tsamp {tsamp} matches mask dt {maskdt}, no downsampling of ptsperint required")
+        elif tsamp > maskdt:
+            if np.isclose(tsamp % maskdt, 0):
+                downsamp = tsamp / maskdt
+                ptsperint /= downsamp
+                if ptsperint % 1:
+                    logging.error(f"Tried to downsample ptsperint {mask.ptsperint} by {downsamp} and did not get an integer ({ptsperint})")
+                ptsperint = int(ptsperint)
+                logging.info(f"tsamp {tsamp} is {downsamp} x maskdt ({maskdt}), downsampling ptsperint from {mask.ptsperint} to {ptsperint}")
+            else:
+                logging.error(f"tsamp > maskdt, but not by an integer factor. tsamp/maskdt = {tsamp}/{maskdt} = {tsamp/maskdt}")
+        else:
+            if np.isclose(maskdt % tsamp, 0):
+                upsamp = maskdt / tsamp
+                ptsperint = int(upsamp * ptsperint)
+                logging.info(f"tsamp {tsamp} is 1/{upsamp} x maskdt ({maskdt}), upsampling ptsperint from {mask.ptsperint} to {ptsperint}")
+            else:
+                logging.error(f"maskdt > tsamp, but not by an integer factor. maskdt/tsamp = {maskdt}/{tsamp} = {maskdt/tsamp}")
+
+        
+        # check mask covers all data
+        if not ((mask.nint - 1) * ptsperint) < nsamples <= (mask.nint * ptsperint):
+            logging.error(f"Mask has {mask.nint} intervals and using {ptsperint} ptsperint. Data is {nsamples} samples but mask covers {(mask.nint - 1) * ptsperint} < samples <= {(mask.nint * ptsperint}")
+
     else:
         mask = None
         ptsperint = 2400  # presto default
         zerochans = ignorechans
+        logging.info(f"Using presto default for ptsperint")
 
-    logging.info(
-        f"clipping etc will be done in intervals of {ptsperint} as per mask/presto default",
-    )
+    logging.info(f"Clipping etc will be done in intervals of {ptsperint}")
+
 
     # Select gulp
     #######################################################################
@@ -709,7 +737,7 @@ if __name__ == "__main__":
     if DM == 0:
         sys.exit("DM=0, why are you running this?")
 
-    # Find minimum number of intervals need to read in
+    # Find minimum number of samples need to read in, must be a multiple of ptsperint
     if maxDT % ptsperint:
         mingulp = ((maxDT // ptsperint) + 1) * ptsperint
     else:
