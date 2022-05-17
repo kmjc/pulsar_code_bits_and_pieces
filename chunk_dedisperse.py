@@ -712,7 +712,7 @@ if __name__ == "__main__":
 
         # check mask covers all data
         if not ((mask.nint - 1) * ptsperint) < nsamples <= (mask.nint * ptsperint):
-            logging.error(f"Mask has {mask.nint} intervals and using {ptsperint} ptsperint. Data is {nsamples} samples but mask covers {(mask.nint - 1) * ptsperint} < samples <= {(mask.nint * ptsperint}")
+            logging.error(f"Mask has {mask.nint} intervals and using {ptsperint} ptsperint. Data is {nsamples} samples but mask covers {(mask.nint - 1) * ptsperint} < samples <= {mask.nint * ptsperint}")
 
     else:
         mask = None
