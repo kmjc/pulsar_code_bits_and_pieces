@@ -5,14 +5,16 @@
 import sys, os
 import numpy as np
 from fdmt.cpu_fdmt import FDMT
-import h5py
 import argparse
 import time
+import copy
 import logging
 
 from presto_without_presto import sigproc
-
-from sigproc_utils import (get_fmin_fmax_invert, get_dtype)
+from presto_without_presto.psr_utils import choose_N
+from presto_without_presto.sigproc import (ids_to_telescope, ids_to_machine)
+from presto_without_presto.infodata import infodata2
+from sigproc_utils import (radec2string, get_fmin_fmax_invert, get_dtype)
 
 from chunk_dedisperse import (
     inverse_DM_delay,
@@ -29,10 +31,7 @@ if __name__ == "__main__":
         FDMT incoherently dedispersion a filterbank.
         (You probably want to pre-mask and remove the baseline from the filterbank)
 
-        Result is a hdf5 file containing
-            'DMs' = DMs corresponding to each row in the data
-            'data' = the FDMT transform, with shape (maxDT, nsamples), so each row is a time series dedispersed to a different DM
-            'header' = a group with a key and entry for each header parameter
+        Outputs presto-style .dat and .inf files
 
         Uses the Manchester-Taylor 1/2.4E-4 convention for dedispersion
         """,
@@ -78,7 +77,15 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--log", type=str, help="name of file to write log to", default="chunk_fdmt_fb2h5.log"
+        "--dmprec", type=int, default=3, help="DM precision (for filenames)"
+    )
+
+    parser.add_argument(
+        "--pad", action='store_true', help="Pad the .dat files to a highly factorable length"
+    )
+
+    parser.add_argument(
+        "--log", type=str, help="name of file to write log to", default="chunk_fdmt_fb2datinf.log"
     )
 
     parser.add_argument(
@@ -147,6 +154,9 @@ if __name__ == "__main__":
             )
         else:
             ngulps += 1
+            logging.info(f"\nWill process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}")
+    else:
+        logging.info(f"\nWill process the file in {ngulps} gulps of {args.gulp}")
 
     if args.gulp <= maxDT:
         raise RuntimeError(
@@ -205,11 +215,6 @@ if __name__ == "__main__":
     if os.path.exists(outfilename):
         logging.info(f"{outfilename} already exists, deleting\n")
         os.remove(outfilename)
-    fout = h5py.File(outfilename, "a")
-    # following https://stackoverflow.com/questions/48212394/how-to-store-a-dictionary-with-strings-and-numbers-in-a-hdf5-file
-    for key, item in header.items():
-        if "HEADER" not in str(key):
-            fout[f"header/{key}"] = item
 
     # HERE compute and store DMs
     # check it's arange(maxDT) and not arange(1, maxDT + 1)
@@ -223,7 +228,10 @@ if __name__ == "__main__":
     logging.info(
         f"DMs in h5 are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}\n"
     )
-    fout.create_dataset("DMs", data=DMs)
+
+    # name all output dat files
+    dat_names = [f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.dat" for aDM in DMs]
+    dm_indices = range(len(DMs))
 
     # read in data
     filfile = open(args.filename, "rb")
@@ -246,9 +254,10 @@ if __name__ == "__main__":
     t1 = time.perf_counter()
     logging.info(f"Writing gulp 0")
     # write mid_arr
-    fout.create_dataset(
-        "data", data=out[:, maxDT:-maxDT], maxshape=(maxDT, None)
-    )  # compression="gzip", chunks=True
+    for i in dm_indices:
+        with open(dat_names[i], "wb") as fout:
+            fout.write(out[i, maxDT:-maxDT])
+
     t2 = time.perf_counter()
     logging.info(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
 
@@ -257,24 +266,96 @@ if __name__ == "__main__":
     prev_arr += out[:, -maxDT:]
     intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
 
-    if intensities.size:
+    if ngulps > 1:
         for g in np.arange(1, ngulps):
+            intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
             fd.reset_ABQ()
             out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
             prev_arr += out[:, :maxDT]
 
             # write prev_arr and mid_arr
-            psz = maxDT
-            msz = out.shape[1] - maxDT - maxDT
-            fout["data"].resize((fout["data"].shape[1] + psz + msz), axis=1)
-            fout["data"][:, -(psz + msz) : -msz] = prev_arr
-            fout["data"][:, -msz:] = out[:, maxDT:-maxDT]
+            for i in dm_indices:
+                with open(dat_names[i], "ab") as fout:
+                    fout.write(prev_arr[i,:])
+                    fout.write(out[i, maxDT:-maxDT])
             logging.debug(f"Completed gulp {g}")
 
             # reset for next gulp
             # setting it to 0 and using += stops prev_arr changing when out does
             prev_arr[:, :] = 0
             prev_arr += out[:, -maxDT:]
-            intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
+    t3 = time.perf_counter()
+    logging.info(f"FDMT completed in {t3-t0} s")
 
-    fout.close()
+
+    # find length of data written
+    if (nsamples % args.gulp) < maxDT:
+        origNdat = int(nsamples // args.gulp) * args.gulp - maxDT
+    else:
+        origNdat = nsamples - maxDT
+
+
+    PAD_MEDIAN_NSAMP = 4096
+    if args.pad:
+        logging.info("\nPadding dat files")
+        # find good N
+        N = choose_N(origNdat)
+        # get medians of last PAD_MEDIAN_NSAMP samples if possible
+        if out.shape[1] - maxDT < PAD_MEDIAN_NSAMP:
+            logging.info(f"Warning padding using median over last {out.shape[1] - maxDT} samples rather than {PAD_MEDIAN_NSAMP}")
+            meds = np.median(out[:,:-maxDT])
+        else:
+            logging.info(f"Padding using median over last {PAD_MEDIAN_NSAMP} samples")
+            meds = np.median(out[:, -(PAD_MEDIAN_NSAMP+maxDT):-maxDT])
+
+        for i in dm_indices:
+            with open(dat_names[i], "ab") as fout:
+                padding = np.zeros((N - origNdat,), dtype=intensities.dtype) + meds[i]
+                fout.write(padding)
+        t4 = time.perf_counter()
+        logging.info(f"Padding completed in {t4-t3} s")
+    else:
+        N = origNdat
+        t4 = time.perf_counter()
+
+
+    logging.info(f"{len(fout_indicesices)} dat files written")
+
+
+    # write all the inf files:
+    logging.info(f"\nWriting inf files:")
+    lofreq = fmin + abs(header['foff'])/2
+    infdict = dict(
+        basenm=args.filename[:-4],
+        telescope=ids_to_telescope[header['telescope_id']],
+        instrument=ids_to_machine[header['machine_id']],
+        object=header.get('source_name', 'Unknown'),
+        RA=radec2string(header['src_raj']),
+        DEC=radec2string(header['src_dej']),
+        observer='unset',
+        epoch= header['tstart'],
+        bary=0,
+        dt=header['tsamp'],
+        lofreq=lofreq,
+        BW=abs(header['nchans'] * header['foff']),
+        N=N,
+        numchan=header['nchans'],
+        chan_width=abs(header['foff']),
+        analyzer=os.environ.get( "USER" ),
+    )
+
+
+    if args.pad:
+        infdict['breaks'] = 1
+        infdict['onoff'] = [(0, origNdat - 1), (N - 1, N - 1)]
+    else:
+        infdict['breaks'] = 0
+
+    for aDM in DMs:
+        inf_fname = f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf"
+        specific_infdict = copy.copy(infdict)
+        specific_infdict['DM'] = aDM
+        inf = infodata2(specific_infdict)
+        inf.to_file(inf_fname, notes="fdmt")
+        logging.info(f"Wrote {inf_fname}")
+    logging.info(f"Done")

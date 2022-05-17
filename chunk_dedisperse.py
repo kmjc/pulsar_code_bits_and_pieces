@@ -1,11 +1,13 @@
 import numpy as np
 from presto_without_presto import rfifind, sigproc
+from sigproc_utils import get_dtype, get_nbits, write_header, get_fmin_fmax_invert
 
 # from presto import rfifind, sigproc
 import copy
 import time
 import argparse
 import sys
+import logging
 
 
 ################################################################################
@@ -55,85 +57,6 @@ def try_remove(thing, from_list):
         from_list.remove(thing)
     except ValueError:
         pass
-
-
-################################################################################
-# FILTERBANK FUNCTIONS:
-
-# presto's filterbank has a get_dtype could use too, but haven't without_presto-ed that yet
-def get_dtype(nbits):
-    """
-    Returns:
-        dtype of the data
-    """
-    if nbits == 8:
-        return np.uint8
-    elif nbits == 16:
-        return np.uint16
-    elif nbits == 32:
-        return np.float32
-    else:
-        raise RuntimeError(f"nbits={nbits} not supported")
-
-
-def get_nbits(dtype):
-    """
-    Returns:
-        number of bits of the data
-    """
-    if dtype == np.uint8:
-        return 8
-    elif dtype == np.uint16:
-        return 16
-    elif dtype == np.float32:
-        return 32
-    else:
-        raise RuntimeError(f"dtype={dtype} not supported")
-
-
-# OK so if it's a filterbank it SHOULD have HEADER_START and HEADER_END
-# I think I was testing it on one that wasn't properly written, so I had to
-# add them in
-def write_header(header, outfile):
-    header_list = list(header.keys())
-    manual_head_start_end = False
-    if header_list[0] != "HEADER_START" or header_list[-1] != "HEADER_END":
-        verbose_message3(
-            f"HEADER_START not first and/or HEADER_END not last in header_list"
-            f"removing them from header_list (if present) and writing them manually",
-        )
-        try_remove("HEADER_START", header_list)
-        try_remove("HEADER_END", header_list)
-        manual_head_start_end = True
-
-    if manual_head_start_end:
-        outfile.write(sigproc.addto_hdr("HEADER_START", None))
-    for paramname in header_list:
-        if paramname not in sigproc.header_params:
-            # Only add recognized parameters
-            continue
-        verbose_message3("Writing header param (%s)" % paramname)
-        value = header[paramname]
-        outfile.write(sigproc.addto_hdr(paramname, value))
-    if manual_head_start_end:
-        outfile.write(sigproc.addto_hdr("HEADER_END", None))
-
-
-def get_fmin_fmax_invert(header):
-    """Calculate band edges and whether the band is inverted from a filterbank header.
-    The presto sense of inverted, aka for a normal sigproc file where foff<0 inverted=True
-    Returns fmin, fmax, inverted"""
-
-    if header["foff"] < 0:
-        fmax = header["fch1"] - header["foff"] / 2
-        fmin = fmax + header["nchans"] * header["foff"]
-        invert = True
-    else:
-        fmin = header["fch1"] - header["foff"] / 2
-        fmax = fmin + header["nchans"] * header["foff"]
-        invert = False
-
-    return fmin, fmax, invert
 
 
 ################################################################################
@@ -364,7 +287,7 @@ def clip_mask_subbase_gulp(
                 **running_dict,
             )
         except IndexError:  # in case on leftover partial-interval
-            verbose_message2(
+            logging.debug(
                 f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
             )
             slc = slice(interval * ptsperint, None)
@@ -403,7 +326,7 @@ def clip_subbase_gulp(
                 **running_dict,
             )
         except IndexError:  # in case on leftover partial-interval
-            verbose_message2(
+            logging.debug(
                 f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
             )
             slc = slice(interval * ptsperint, None)
@@ -575,7 +498,7 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
                 print(
                     f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off",
                 )
-            # verbose_message2(f"Picking gulp which minimizes leftover")
+            # logging.debug(f"Picking gulp which minimizes leftover")
             # ipg = ipg_over_maxDT[leftovers == leftovers.min()]
             # if not isinstance(ipg, int):  # multiple options have the same leftover
             #    ipg = find_nearest(ipg, desired_gulp / ptsperint)
@@ -650,16 +573,6 @@ if __name__ == "__main__":
         help="DM precision (only used when writing filename if <out_filename> not given)",
     )
 
-    parser.add_argument(
-        "-v",
-        "--verbosity",
-        action="count",
-        default=0,
-        help="""-v = some information
-    -vv = more information
-    -vvv = the most information""",
-    )
-
     # masking options, this will definitely break for an inverted band
     parser.add_argument(
         "-m", "--mask", type=str, default="", help="rfifind .mask file to apply"
@@ -686,7 +599,27 @@ if __name__ == "__main__":
         default=4.5,
     )
 
+    parser.add_argument(
+        "--log", type=str, help="name of file to write log to", default="chunk_dedisperse.log"
+    )
+
+    parser.add_argument(
+        '-v', '--verbose',
+        help="Increase logging level to debug",
+        action="store_const", dest="loglevel", const=logging.DEBUG,
+        default=logging.INFO,
+    )
+
+
     args = parser.parse_args()
+
+    logging.basicConfig(
+        filename=args.log,
+        filemode='w',
+        format='%(asctime)s - %(message)s',
+        datefmt='%d-%b-%y %H:%M:%S',
+        level=args.loglevel,
+        )
 
     t0 = time.perf_counter()
 
@@ -694,40 +627,6 @@ if __name__ == "__main__":
     out_filename = args.out_filename
     dmprec = args.dmprec
     where_channel_ref_freq = "center"
-
-    # didn't want the verbose_message if testing in loops
-    def verbose_message0(message):
-        print(message)
-
-    if args.verbosity > 0:
-
-        def verbose_message1(message):
-            print(message)
-
-    else:
-
-        def verbose_message1(message):
-            pass
-
-    if args.verbosity > 1:
-
-        def verbose_message2(message):
-            print(message)
-
-    else:
-
-        def verbose_message2(message):
-            pass
-
-    if args.verbosity > 2:
-
-        def verbose_message3(message):
-            print(message)
-
-    else:
-
-        def verbose_message3(message):
-            pass
 
     # define gulp preprocessing based on args
     if args.clipsig or args.droptotsig or args.mask:
@@ -744,17 +643,17 @@ if __name__ == "__main__":
                 clip_subbase_gulp(*args, **kwargs)
 
     else:
-        verbose_message0(
+        logging.info(
             "Preprocess is: NOT clipping/computing running averages, NOT subtracting baseline, NOT masking"
         )
 
         def preprocess(*args, **kwargs):
             pass
 
-    verbose_message0(f"Working on file: {args.filename}")
+    logging.info(f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
     nsamples = int(sigproc.samples_per_file(args.filename, header, hdrlen))
-    verbose_message2(header)
+    logging.debug(header)
 
     if header["nifs"] != 1:
         raise ValueError(f"Code not written to deal with unsummed polarization data")
@@ -766,7 +665,7 @@ if __name__ == "__main__":
     # calculate fmin and fmax FROM HEADER
     fmin, fmax, invertband = get_fmin_fmax_invert(header)
 
-    verbose_message0(
+    logging.info(
         f"fmin: {fmin}, fmax: {fmax}, nchans: {nchans} tsamp: {tsamp} nsamples: {nsamples}",
     )
 
@@ -782,9 +681,9 @@ if __name__ == "__main__":
 
     # Load the mask
     if not_zero_or_none(args.mask):
-        verbose_message0(f"Loading mask from {args.mask}")
+        logging.info(f"Loading mask from {args.mask}")
         mask = Mask(args.mask)
-        verbose_message0(f"Mask loaded")
+        logging.info(f"Mask loaded")
         ptsperint = mask.ptsperint
         zerochans = mask.mask_zap_chans | ignorechans
     else:
@@ -792,7 +691,7 @@ if __name__ == "__main__":
         ptsperint = 2400  # presto default
         zerochans = ignorechans
 
-    verbose_message0(
+    logging.info(
         f"clipping etc will be done in intervals of {ptsperint} as per mask/presto default",
     )
 
@@ -802,11 +701,11 @@ if __name__ == "__main__":
     fs = get_fs(fmin, fmax, nchans, type=where_channel_ref_freq, invertband=invertband)
 
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
-    verbose_message0(f"Brute force incoherent DM is {DM}")
-    verbose_message1(
+    logging.info(f"Brute force incoherent DM is {DM}")
+    logging.info(
         f"Maximum brute force incoherent DM delay need to shift by is {max_delay_s} s"
     )
-    verbose_message0(f"This corresponds to {maxDT} time samples\n")
+    logging.info(f"This corresponds to {maxDT} time samples\n")
     if DM == 0:
         sys.exit("DM=0, why are you running this?")
 
@@ -816,16 +715,16 @@ if __name__ == "__main__":
     else:
         mingulp = maxDT
 
-    verbose_message0(
+    logging.info(
         f"Minimum gulp is {mingulp} time samples (= {mingulp / ptsperint:.1f} intervals)",
     )
 
     gulp, nsamp_cut_off = get_gulp(
         nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(args.verbosity >= 2)
     )
-    verbose_message0(f"Selected gulp of {gulp}")
-    verbose_message0(f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
-    verbose_message1(f"The last {nsamp_cut_off} samples will be cut off")
+    logging.info(f"Selected gulp of {gulp}")
+    logging.info(f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
+    logging.info(f"The last {nsamp_cut_off} samples will be cut off")
 
     if gulp % ptsperint:
         raise ValueError(
@@ -865,17 +764,17 @@ if __name__ == "__main__":
     # Update and write header
     header["nbits"] = 32
     if header.get("nsamples", ""):
-        verbose_message2(
+        logging.debug(
             f"Updating header, nsamples ({header['nsamples']}) will be decreased by {maxDT + nsamp_cut_off}",
         )
         header["nsamples"] -= maxDT + nsamp_cut_off
-        verbose_message1(f"Updated header, nsamples = {header['nsamples']}")
+        logging.info(f"Updated header, nsamples = {header['nsamples']}")
 
     if zero_or_none(out_filename):
         out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
     outf = open(out_filename, "wb")
 
-    verbose_message0(f"Writing header to {out_filename}\n")
+    logging.info(f"Writing header to {out_filename}\n")
     write_header(header, outf)
 
     t1 = time.perf_counter()
@@ -889,9 +788,9 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(arr_outdtype)
     )
-    verbose_message2("Read in first chunk")
-    verbose_message3(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
-    verbose_message3(
+    logging.debug("Read in first chunk")
+    logging.debug(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
+    logging.debug(
         f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB"
     )
 
@@ -909,14 +808,14 @@ if __name__ == "__main__":
         current_int,
         mask,
     )
-    # verbose_message3("First gulp, initializing prev_array")
+    # logging.debug("First gulp, initializing prev_array")
     prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
-    # verbose_message3(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
+    # logging.debug(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
     prev_array, mid_array, end_array = shift_and_stack(
         intensities, shifts, prev_array, maxDT
     )
-    # verbose_message3(f"shifted and stacked first gulp")
-    # verbose_message3(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
+    # logging.debug(f"shifted and stacked first gulp")
+    # logging.debug(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
     outf.write(mid_array.ravel().astype(arr_outdtype))
 
     # reset for next loop
@@ -949,7 +848,7 @@ if __name__ == "__main__":
                 mask,
             )
             # tt1 = time.perf_counter()
-            # verbose_message3(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
+            # logging.debug(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
 
             # Brute-force dedisperse whole gulp
             prev_array, mid_array, end_array = shift_and_stack(
@@ -958,8 +857,8 @@ if __name__ == "__main__":
             outf.write(prev_array.ravel().astype(arr_outdtype))
             outf.write(mid_array.ravel().astype(arr_outdtype))
             # tt2 = time.perf_counter()
-            # verbose_message3(f"Dedispersed in {tt2-tt1} s")
-            # verbose_message1(f"Processed gulp {current_gulp}")
+            # log.debug(f"Dedispersed in {tt2-tt1} s")
+            # log.debug(f"Processed gulp {current_gulp}")
             print(f"Processed gulp {current_gulp}")
             current_gulp += 1
 
@@ -983,9 +882,9 @@ if __name__ == "__main__":
 
     t2 = time.perf_counter()
 
-    verbose_message0("\nDone")
-    verbose_message1(f"TIME initialize: {t1-t0} s")
-    verbose_message1(f"TIME clip, mask, dedisperse all gulps: {t2-t1} s")
-    verbose_message0(f"TIME total: {t2-t0} s")
+    logging.info("\nDone")
+    logging.info(f"TIME initialize: {t1-t0} s")
+    logging.info(f"TIME clip, mask, dedisperse all gulps: {t2-t1} s")
+    logging.info(f"TIME total: {t2-t0} s")
 
     sys.exit()
