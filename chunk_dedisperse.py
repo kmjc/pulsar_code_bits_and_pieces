@@ -709,7 +709,7 @@ if __name__ == "__main__":
             else:
                 logging.error(f"maskdt > tsamp, but not by an integer factor. maskdt/tsamp = {maskdt}/{tsamp} = {maskdt/tsamp}")
 
-        
+
         # check mask covers all data
         if not ((mask.nint - 1) * ptsperint) < nsamples <= (mask.nint * ptsperint):
             logging.error(f"Mask has {mask.nint} intervals and using {ptsperint} ptsperint. Data is {nsamples} samples but mask covers {(mask.nint - 1) * ptsperint} < samples <= {(mask.nint * ptsperint}")
@@ -722,6 +722,9 @@ if __name__ == "__main__":
 
     logging.info(f"Clipping etc will be done in intervals of {ptsperint}")
 
+    logging.info(
+        f"clipping etc will be done in intervals of {ptsperint} as per mask/presto default",
+    )
 
     # Select gulp
     #######################################################################
