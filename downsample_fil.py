@@ -20,6 +20,8 @@ if __name__ == "__main__":
     parser.add_argument("downsamp", type=int, nargs="+", help="Sownsampling factor/s to apply (multiple factors should be separated by spaces)")
     parser.add_argument("--gulp", type=int, default=2400, help="Maximum number of samples to read at one time")
 
+    args = parser.parse_args()
+
     downsample_fil(args.filename, args.downsamp, gulp=args.gulp)
 
     sys.exit()
