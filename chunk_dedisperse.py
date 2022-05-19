@@ -746,7 +746,8 @@ if __name__ == "__main__":
     )
     logging.info(f"This corresponds to {maxDT} time samples\n")
     if DM == 0:
-        sys.exit("DM=0, why are you running this?")
+        logging.warning("DM=0, will likely break")
+    #    sys.exit("DM=0, why are you running this?")
 
     # Find minimum number of samples need to read in, must be a multiple of ptsperint
     if maxDT % ptsperint:
