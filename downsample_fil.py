@@ -9,7 +9,7 @@ def downsample_fil(fil_fname, factors, gulp=2400):
         factors = list(factors)
     for factor in factors:
         print(f"Downsampling {fil_fname} by {factor} (in time)")
-        fil.downsample(tfactor=factor, filename=f"{fil_fname[:-4]}_t{tfact}.fil", gulp=gulp)
+        fil.downsample(tfactor=factor, filename=f"{fil_fname[:-4]}_t{factor}.fil", gulp=gulp)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
