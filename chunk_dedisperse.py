@@ -187,7 +187,6 @@ def clip(
         running_avg, running_std = running_avg_std
 
     # Calculate the zero DM time series
-    print("clipping chunk shape", intensities.shape)
     zero_dm_time_series = intensities.sum(axis=-1)
     current_avg = zero_dm_time_series.mean()
     current_std = zero_dm_time_series.std()
@@ -208,7 +207,6 @@ def clip(
     numgoodpts = good_pts_idx.size
 
     if numgoodpts < 1:
-        # print("no good points")
         current_avg = running_avg
         current_std = running_std
         chan_avg_temp = chan_running_avg
@@ -235,7 +233,7 @@ def clip(
         chan_running_avg = chan_avg_temp
         chan_running_std = chan_std_temp  # for CHIME dropped-packet clipping
         if current_avg == 0:
-            print("Warning: problem with clipping in first block!!!\n\n")
+            logging.warning("Warning: problem with clipping in first block!!!\n\n")
 
     # See if any points need clipping
     if not_zero_or_none(clip_sigma):
@@ -282,15 +280,13 @@ def clip_mask_subbase_gulp(
     for interval in range(nint):
         try:
             slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
-            print("working on slice:", slc)
             data[slc, :], running_dict = clip(
                 data[slc, :],
                 clipsig,
                 droptot_sig=droptotsig,
                 **running_dict,
             )
-        except IndexError:  # in case on leftover partial-interval
-            print("last interval")
+        except IndexError:  # in case on leftover partial-interval  # this seems to not get activated ever?
             logging.debug(
                 f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
             )
@@ -322,7 +318,6 @@ def clip_subbase_gulp(
     """Same as clip_mask_subbase_gulp but no mask"""
     for interval in range(nint):
         try:
-            print("working on slice:", slc)
             slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
             data[slc, :], running_dict = clip(
                 data[slc, :],
@@ -330,8 +325,7 @@ def clip_subbase_gulp(
                 droptot_sig=droptotsig,
                 **running_dict,
             )
-        except IndexError:  # in case on leftover partial-interval
-            print("last interval")
+        except IndexError:  # in case on leftover partial-interval  # this seems to not get activated ever?
             logging.debug(
                 f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
             )
@@ -458,7 +452,7 @@ def approx_size_shifted_arrays(data, maxDT):
     return 2 * prev_sz + mid_sz + end_sz
 
 
-def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
+def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
     if mingulp == 0:  # DM = 0 case
         gulp = (int(desired_gulp // ptsperint) + 1)*ptsperint
         return gulp, 0
@@ -488,8 +482,7 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
         # divide exactly, quite unlikely
         good_ipg = ipg_over_maxDT[leftovers == 0]
         if good_ipg.size:
-            if verbose:
-                print(f"Found gulps with no leftovers: {good_ipg*ptsperint}")
+            logging.debug(f"Found gulps with no leftovers: {good_ipg*ptsperint}")
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
             return ipg * ptsperint, nsamp_cut_off
@@ -497,24 +490,21 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
         # leftover > maxDT
         good_ipg = ipg_over_maxDT[leftovers > maxDT]
         if good_ipg.size:
-            if verbose:
-                print(
+            logging.debug(
                     f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}",
                 )
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
             return ipg * ptsperint, nsamp_cut_off
         else:
-            if verbose:
-                print(
-                    f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off",
+            logging.debug(
+                    f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off"
                 )
             # logging.debug(f"Picking gulp which minimizes leftover")
             # ipg = ipg_over_maxDT[leftovers == leftovers.min()]
             # if not isinstance(ipg, int):  # multiple options have the same leftover
             #    ipg = find_nearest(ipg, desired_gulp / ptsperint)
-            if verbose:
-                print(
+            logging.debug(
                     f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}",
                 )
             ipg = find_nearest(ipg_over_maxDT, desired_gulp / ptsperint)
@@ -650,11 +640,6 @@ if __name__ == "__main__":
     dmprec = args.dmprec
     where_channel_ref_freq = "center"
 
-    if args.loglevel == logging.DEBUG:
-        super_verbose = True
-    else:
-        super_verbose = False
-
     # define gulp preprocessing based on args
     if args.clipsig or args.droptotsig or args.mask:
         if not_zero_or_none(args.mask):
@@ -779,7 +764,7 @@ if __name__ == "__main__":
     )
 
     gulp, nsamp_cut_off = get_gulp(
-        nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=super_verbose
+        nsamples, ptsperint, maxDT, mingulp, args.gulp,
     )
     logging.info(f"Selected gulp of {gulp}")
     logging.info(f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
@@ -877,6 +862,7 @@ if __name__ == "__main__":
     # logging.debug(f"shifted and stacked first gulp")
     # logging.debug(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
     outf.write(mid_array.ravel().astype(arr_outdtype))
+    current_gulp += 1
 
     # reset for next loop
     prev_array = end_array
@@ -885,7 +871,6 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(arr_outdtype)
     )
-    print("read 2nd gulp", intensities.shape)
 
     # test if need to do next loop, or if on last gulp
     if intensities.shape[0] > maxDT:
@@ -921,7 +906,7 @@ if __name__ == "__main__":
             # tt2 = time.perf_counter()
             # log.debug(f"Dedispersed in {tt2-tt1} s")
             # log.debug(f"Processed gulp {current_gulp}")
-            print(f"Processed gulp {current_gulp}")
+            logging.info(f"Processed gulp {current_gulp}")
             current_gulp += 1
 
             # reset for next loop
@@ -931,14 +916,13 @@ if __name__ == "__main__":
                 .reshape(-1, nchans)
                 .astype(arr_outdtype)
             )
-            print("read data for gulp", current_gulp, intensities.shape)
 
             # Test if on last interval or end of file
             if intensities.shape[0] < gulp:
                 if intensities.size == 0 or intensities.shape[0] < maxDT:
                     break
                 elif intensities.shape[0] % ptsperint:
-                    intspergulp = (gulp // ptsperint) + 1
+                    intspergulp = (intensities.shape[0] // ptsperint) + 1
                     logging.debug(f"last gulp detected, intspergulp changed to {intspergulp}")
 
     outf.close()
