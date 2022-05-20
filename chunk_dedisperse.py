@@ -422,7 +422,7 @@ def get_maxDT_DM(DM, maxDT, tsamp, fs):
         max_delay_s = outmaxDT * tsamp
         outDM = inverse_DM_delay(max_delay_s, flo, fhi)
     else:
-        outDM = np.zeros_like(fs)
+        outDM = 0
         outmaxDT = 0
         max_delay_s = 0
     return outDM, outmaxDT, max_delay_s
