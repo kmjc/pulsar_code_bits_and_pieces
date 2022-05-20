@@ -11,8 +11,11 @@ from presto_without_presto import infodata
 #from presto.Pgplot import *
 from matplotlib import pyplot as plt
 
-# only tweak is commenting out the plot sections, since can't access presto.Pgplot
-# also moved the comment string -> the class docstring since that's clearly where it's supposed to be
+# so many tweaks
+# changed stuff to sets since inconsistency was bugging me
+# matplotlib-ified some plotting
+# masked median filter
+# the whole new mask thing
 
 # gave it a self.mask numpy array
 # ability to get the new mask out as an array
