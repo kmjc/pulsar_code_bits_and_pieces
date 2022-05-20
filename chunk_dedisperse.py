@@ -422,7 +422,9 @@ def get_maxDT_DM(DM, maxDT, tsamp, fs):
         max_delay_s = outmaxDT * tsamp
         outDM = inverse_DM_delay(max_delay_s, flo, fhi)
     else:
-        raise AttributeError(f"must set a value for DM ({DM}) or maxDT ({maxDT})")
+        outDM = np.zeros_like(fs)
+        outmaxDT = 0
+        max_delay_s = 0
     return outDM, outmaxDT, max_delay_s
 
 
@@ -637,6 +639,11 @@ if __name__ == "__main__":
     dmprec = args.dmprec
     where_channel_ref_freq = "center"
 
+    if args.loglevel == logging.DEBUG:
+        super_verbose = True
+    else:
+        super_verbose = False
+
     # define gulp preprocessing based on args
     if args.clipsig or args.droptotsig or args.mask:
         if not_zero_or_none(args.mask):
@@ -761,7 +768,7 @@ if __name__ == "__main__":
     )
 
     gulp, nsamp_cut_off = get_gulp(
-        nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(args.verbosity >= 2)
+        nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=super_verbose
     )
     logging.info(f"Selected gulp of {gulp}")
     logging.info(f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
