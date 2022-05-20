@@ -97,6 +97,7 @@ class Mask:
         self.nchan = rfimask.nchan
         self.nint = rfimask.nint
         self.ptsperint = rfimask.ptsperint
+        self.dtint = rfimask.dtint
         # original rfimask has this as an array, convert to set if necessary
         self.mask_zap_ints = set(rfimask.mask_zap_ints)
         if invertband:
