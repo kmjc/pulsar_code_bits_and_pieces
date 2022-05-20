@@ -5,12 +5,40 @@ from builtins import zip
 from builtins import range
 from builtins import object
 import numpy as np
-from scipy.signal import medfilt
+#from scipy.signal import medfilt
+from scipy.ndimage import generic_filter
 from presto_without_presto import infodata
 #from presto.Pgplot import *
+from matplotlib import pyplot as plt
 
 # only tweak is commenting out the plot sections, since can't access presto.Pgplot
 # also moved the comment string -> the class docstring since that's clearly where it's supposed to be
+
+# gave it a self.mask numpy array
+# ability to get the new mask out as an array
+# and to replace/combine the new mask with the old
+
+def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
+    """Return the mask as a numpy array of size (nint, nchan)
+    (1 = masked, 0 = unmasked)
+
+    nint = number of intervals
+    nchan = number of channels
+    zap_ints (set) - intervals to zap
+    zap_chans (set) - channels to zap
+    zap_chans_per_int - list (of length nint) of sets such that
+                        zap_chans_per_int[i] gives a set of channels to mask in interval i
+    """
+    mask = np.zeros((nint,nchan), dtype=bool)
+    if len(zap_ints) != 0:
+        mask[tuple(zap_ints),:] = 1
+    if len(zap_chans) != 0:
+        mask[:,tuple(zap_chans)] = 1
+    for i in range(nint):
+        if len(zap_chans_per_int[i]) != 0:
+            mask[i,tuple(zap_chans_per_int[i])] = 1
+
+    return mask
 
 class rfifind(object):
     """
@@ -52,6 +80,7 @@ class rfifind(object):
         self.idata = infodata.infodata(self.basename+".inf")
         self.read_stats()
         self.read_mask()
+        self.initialize_new_mask()
         self.get_bandpass()
         if len(self.goodints):
             self.get_median_bandpass()
@@ -91,6 +120,7 @@ class rfifind(object):
             self.mask_zap_ints = np.fromfile(x, dtype=np.int32, count=nzap)
         else:
             self.mask_zap_ints = np.asarray([])
+        self.mask_zap_ints = set(self.mask_zap_ints)
         if len(self.mask_zap_ints)==self.nint:
             print("WARNING!:  All intervals recommended for masking!")
         nzap_per_int = np.fromfile(x, dtype=np.int32, count=nint)
@@ -103,8 +133,21 @@ class rfifind(object):
                     tozap = np.fromfile(x, dtype=np.int32, count=nzap)
             else:
                 tozap = np.asarray([])
-            self.mask_zap_chans_per_int.append(tozap)
+            self.mask_zap_chans_per_int.append(set(tozap))
         x.close()
+
+        self.mask = array_from_mask_params(self.nint, self.nchan, self.mask_zap_ints, self.mask_zap_chans, self.mask_zap_chans_per_int)
+
+    #KC
+    def initialize_new_mask(self):
+        """ Initialize attributes set by e.g. set_zap_chans
+        Sets zap_ints and zap_chans to empty sets, and zap_chans_per_int to a list of empty sets"""
+        self.zap_chans = set()
+        self.zap_ints = set()
+        zap_chans_per_int = []
+        for i in np.arange(self.nchan):
+            zap_chans_per_int.append(set())
+        self.zap_chans_per_int = zap_chans_per_int
 
     def get_bandpass(self, plot=False):
         """
@@ -121,9 +164,11 @@ class rfifind(object):
         if not len(goodints):
             print("WARNING!:  Cannot get bandpass because all intervals zapped.")
             return 0.0
-        self.bandpass_avg = self.avg_stats[goodints,:].mean(0)
-        self.bandpass_std = self.std_stats[goodints,:].mean(0)
-        self.bandpass_pow = self.pow_stats[goodints,:].mean(0)
+        # KC changed so it factors in individually zapped int-chan chunks
+        self.recalculate_mask()
+        self.bandpass_avg = np.mean(np.ma.array(self.avg_stats, mask=self.mask), axis=0)
+        self.bandpass_std = np.mean(np.ma.array(self.std_stats, mask=self.mask), axis=0)
+        self.bandpass_pow = np.mean(np.ma.array(self.pow_stats, mask=self.mask), axis=0)
         if plot:
 #            plotxy(self.bandpass_avg, self.freqs, labx="Frequency (MHz)")
 #            plotxy(self.bandpass_avg+self.bandpass_std, self.freqs, color="red")
@@ -133,8 +178,8 @@ class rfifind(object):
         return self.bandpass_avg
 
     def get_median_bandpass(self, medlen=21, plot=False):
-        self.median_bandpass_avg = medfilt(self.bandpass_avg, medlen)
-        self.median_bandpass_std = medfilt(self.bandpass_std, medlen)
+        self.median_bandpass_avg = generic_filter(self.bandpass_avg.filled(fill_value=np.nan), np.nanmedian, size=medlen, mode='nearest')
+        self.median_bandpass_std = generic_filter(self.bandpass_std.filled(fill_value=np.nan), np.nanmedian, size=medlen, mode='nearest')
         if plot:
 #            plotxy(self.median_bandpass_avg, self.freqs,
 #                   labx="Frequency (MHz)")
@@ -219,31 +264,72 @@ class rfifind(object):
             if len(onlymask):
                 print("  adding them to the zap_chans list.")
             self.zap_chans = self.zap_chans | self.mask_zap_chans
-        self.zap_chans = np.asarray(sorted(list(self.zap_chans)))
         if plot:
             #self.plot_zapped_bandpass()
             pass
 
     def plot_zapped_chans(self, device="/xwin"):
-        pass
+        """Based on zap_chans
+        (aka does NOT include mask_zap_chans)
+
+        If you pass in a string as device it'll give a PGPLOT plot (currently disabled)
+        If you pass in a matplotlib axis it'll use that
+        If you pass in nothing it'll make a matplotlib plot"""
+
+        zap_chans = np.asarray(sorted(list(self.zap_chans)))
+        call_plt_show = False
+
+        if isinstance(device, str):
+            print("Pglot functionality is not enabled")
 #        plotxy(self.bandpass_avg, self.freqs,
 #               labx="Frequency (MHz)", device=device)
 #        plotxy(self.median_bandpass_avg+self.median_bandpass_std,
 #               self.freqs, color='blue')
 #        plotxy(self.median_bandpass_avg-self.median_bandpass_std,
 #               self.freqs, color='blue')
-#        plotxy(self.bandpass_avg[self.zap_chans],
-#               self.freqs[self.zap_chans],
+#        plotxy(self.bandpass_avg[zap_chans],
+#               self.freqs[zap_chans],
 #               line=None, symbol=16, color="red")
 #        closeplot()
 
+        elif device is None:
+            fig, ax = plt.subplots()
+            device = ax
+            call_plt_show = True
+
+        if "Axes" in device.__class__.__name__:
+            device.plot(self.freqs, self.bandpass_avg)
+            device.plot(self.freqs, self.median_bandpass_avg+self.median_bandpass_std, color='blue')
+            device.plot(self.freqs, self.median_bandpass_avg-self.median_bandpass_std, color='blue')
+            device.scatter(self.freqs[zap_chans], self.bandpass_avg[zap_chans], color='red')
+
+            device.set_xlabel("Frequency (MHz)")
+
+        if call_plt_show:  # assume if you passed in an Axes, you don't want this
+            plt.show()
+
+
     def plot_zapped_bandpass(self, device="/xwin"):
-        pass
-#        not_zapped = set(np.arange(self.nchan)) - set(self.zap_chans)
-#        not_zapped = np.asarray(list(not_zapped))
-#        if len(not_zapped):
-#            yhi = (self.median_bandpass_avg+1.5*self.median_bandpass_std).max()
-#            ylo = (self.median_bandpass_avg-1.5*self.median_bandpass_std).min()
+        """Based on zap_chans
+        (aka does NOT include mask_zap_chans, but that is what was used to compute the median bandpass average)
+
+        If you pass in a string as device it'll give a PGPLOT plot (currently disabled)
+        If you pass in a matplotlib axis it'll use that
+        If you pass in nothing it'll make a matplotlib plot"""
+
+        call_plt_show = False
+        not_zapped = set(np.arange(self.nchan)) - self.zap_chans
+        not_zapped = np.asarray(list(not_zapped))
+        zap_chans = np.asarray(sorted(list(self.zap_chans)))
+        if len(not_zapped):
+            yhi = (self.median_bandpass_avg+1.5*self.median_bandpass_std).max()
+            ylo = (self.median_bandpass_avg-1.5*self.median_bandpass_std).min()
+        else:
+            print("WARNING!:  All channels recommended for masking!")
+
+        if isinstance(device, str):
+            print("Pglot functionality is not enabled")
+        # pglplot version
 #            plotxy(self.median_bandpass_avg, self.freqs, rangey=[ylo, yhi],
 #                   labx="Frequency (MHz)", color='light gray', device=device)
 #            plotxy(self.median_bandpass_avg+self.median_bandpass_std,
@@ -251,17 +337,34 @@ class rfifind(object):
 #            plotxy(self.median_bandpass_avg-self.median_bandpass_std,
 #                   self.freqs, color='blue')
 #            plotxy(self.bandpass_avg[not_zapped], self.freqs[not_zapped], color='white')
-#            plotxy(self.median_bandpass_avg[self.zap_chans], self.freqs[self.zap_chans],
+#            plotxy(self.median_bandpass_avg[zap_chans], self.freqs[zap_chans],
 #                   line=None, symbol=16, color='red')
 #            closeplot()
-#        else:
-#            print("WARNING!:  All channels recommended for masking!")
+
+        elif device is None:
+            fig, ax = plt.subplots()
+            device = ax
+            call_plt_show = True
+
+        if "Axes" in device.__class__.__name__:
+            device.plot(self.freqs, self.median_bandpass_avg, color='grey')
+            device.plot(self.freqs, self.median_bandpass_avg+self.median_bandpass_std, color='blue')
+            device.plot(self.freqs, self.median_bandpass_avg-self.median_bandpass_std, color='blue')
+            device.plot(self.freqs[not_zapped], self.bandpass_avg[not_zapped], color='black')
+            device.scatter(self.freqs[zap_chans], self.median_bandpass_avg[zap_chans], color='red')
+
+            device.set_xlabel("Frequency (MHz)")
+            device.set_ylim([ylo, yhi])
+
+        if call_plt_show:  # assume if you passed in an Axes, you don't want this
+            plt.show()
+
 
     def write_zap_chans(self, filename=None):
         if filename is None:
             filename = self.basename+".zapchans"
         outfile = open(filename, "w")
-        for chan in np.unique(sorted(self.zap_chans)):
+        for chan in np.asarray(sorted(list(self.zap_chans))):
             outfile.write("%d\n" % chan)
         outfile.close()
 
@@ -269,15 +372,16 @@ class rfifind(object):
         # The channel with the highest, non-zapped std has a weight of 1.0
         # That channels std is called std_norm.  All the others are set to
         # std_norm / std[i], where i is the channel number
-        not_zapped = set(np.arange(self.nchan)) - set(self.zap_chans)
+        not_zapped = set(np.arange(self.nchan)) - self.zap_chans
         not_zapped = np.asarray(list(not_zapped))
+        zap_chans = np.asarray(sorted(list(self.zap_chans)))
         if len(not_zapped):
             std_norm = self.bandpass_std[not_zapped].max()
             has_var = self.bandpass_std != 0.0
             # weights for channels without variance will automatically be 0
             self.weights = np.zeros_like(self.bandpass_std)
             self.weights[has_var] = std_norm / self.bandpass_std[has_var]
-            self.weights[self.zap_chans] = 0.0
+            self.weights[zap_chans] = 0.0
             self.offsets = self.bandpass_avg
         else:
             print("WARNING!:  All channels recommended for masking!")
@@ -330,6 +434,80 @@ class rfifind(object):
             else:
                 outfile.write("%5d     0\n" % (c))
         outfile.close()
+
+    #KC
+    def combine_masks(self):
+        """Returns the logical or of the self.zap_* and self.mask_zap* parameters
+        return order: `zap_chans`, `zap_ints`, `zap_chans_per_int`"""
+        zap_chans = self.zap_chans | self.mask_zap_chans
+        zap_ints = self.zap_ints | self.mask_zap_ints
+        zap_chans_per_int = [self.zap_chans_per_int[i] | self.mask_zap_chans_per_int[i] for i in range(self.nint)]
+
+        return zap_chans, zap_ints, zap_chans_per_int
+
+    #KC
+    def new_mask_array(self, include_current=True):
+        """Return the new mask as a numpy array of size (nint, nchan)
+        (1 = masked, 0 = unmasked)
+
+        `current` meaning the combination of
+        mask_zap_ints, mask_zap_chans, and mask_zap_chans_per_int
+        (which is what is used to produce the bandpass)
+
+        `new` meaning the combination of
+        zap_ints, zap_chans, and zap_chans_per_int
+        (these are set by functions like `set_zap_chans`)
+
+        include_current = True:
+        return the combination (logical OR) of the current mask and the new
+
+        include_current = False:
+        return only the new mask
+        """
+        new_mask = array_from_mask_params(self.nint, self.nchan, self.zap_ints, self.zap_chans, self.zap_chans_per_int)
+
+        if include_current:
+            curr_mask = array_from_mask_params(self.nint, self.nchan, self.mask_zap_ints, self.mask_zap_chans, self.mask_zap_chans_per_int)
+            return new_mask | curr_mask
+        else:
+            return new_mask
+
+    def recalculate_mask(self):
+        """recalculate the mask array from mask_zap_chans, mask_zap_ints, mask_zap_chans_per_int"""
+        self.mask = array_from_mask_params(self.nint, self.nchan, self.mask_zap_ints, self.mask_zap_chans, self.mask_zap_chans_per_int)
+
+
+    #KC
+    def update_mask(self, include_current=True):
+        """Update the current mask with the new one
+
+        if include_current = False:
+            Replace mask_zap_ints, mask_zap_chans, and mask_zap_chans_per_int with
+            zap_ints, zap_chans, and zap_chans_per_int.
+
+        if include_current=True:
+            Set mask_zap_ints, mask_zap_chans, and mask_zap_chans_per_int to the
+            logical OR of their current values and zap_ints, zap_chans, and zap_chans_per_int
+
+        For both options zap_ints, zap_chans, and zap_chans_per_int will be reinitialized and
+        the bandpass will be updated
+        """
+        if include_current:
+            zap_chans, zap_ints, zap_chans_per_int = self.combine_masks()
+        else:
+            zap_chans = self.zap_chans
+            zap_ints = self.zap_ints
+            zap_chans_per_int = self.zap_chans_per_int
+
+        self.mask_zap_ints = zap_ints
+        self.mask_zap_chans = zap_chans
+        self.mask_zap_chans_per_int = zap_chans_per_int
+        self.initialize_new_mask()
+        self.get_bandpass()
+        if len(self.goodints):
+            self.get_median_bandpass()
+            self.determine_padvals()
+
 
 if __name__=="__main__":
     import sys
