@@ -27,8 +27,8 @@ def write_mask_file(filename, maskarr, header):
              where the channels follow rfifind convention (index 0 corresponds to the lowest frequency channel)
              and 1/True in the array means mask, 0/False means don't mask
     header: dictionary which must contain keys:
-        'time_sig' (float) - from rfifind options, PRESTO default is 10
-        'freq_sig' (float) - from rfifind options, PRESTO default is 4
+        'timesig' (float) - from rfifind options, PRESTO default is 10
+        'freqsig' (float) - from rfifind options, PRESTO default is 4
         'MJD' (float) - starting MJD of the observation
         'dtint' (float) - length of one time interval in seconds
         'lofreq' (float) - center frequency of lowest channel
@@ -42,8 +42,8 @@ def write_mask_file(filename, maskarr, header):
         filename += ".mask"
 
     header_params = [
-        np.array(header["time_sig"], dtype=np.float64),
-        np.array(header["freq_sig"], dtype=np.float64),
+        np.array(header["timesig"], dtype=np.float64),
+        np.array(header["freqsig"], dtype=np.float64),
         np.array(header["MJD"], dtype=np.float64),
         np.array(header["dtint"], dtype=np.float64),
         np.array(header["lofreq"], dtype=np.float64),
