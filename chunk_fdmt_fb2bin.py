@@ -19,6 +19,8 @@ from chunk_dedisperse import (
     not_zero_or_none,
 )
 
+from gen_utils import handle_exception
+
 BEAM_DIAM = 6182  # CHIME-specific, grabbed from a presto-generated inf file, haven't looked it up to confirm if it's accurate
 # hackey, should have a dict/function which selects this based on the machine id etc
 # but riptide breaks without this in the inf file
@@ -109,6 +111,9 @@ logging.basicConfig(
     datefmt='%d-%b-%y %H:%M:%S',
     level=args.loglevel,
     )
+
+# log unhandled exception
+sys.excepthook = handle_exception
 
 
 if args.split_file and args.max_size is None:

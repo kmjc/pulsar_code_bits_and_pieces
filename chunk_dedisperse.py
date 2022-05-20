@@ -8,7 +8,7 @@ import time
 import argparse
 import sys
 import logging
-
+from gen_utils import handle_exception
 
 ################################################################################
 ############################ DEFINE FUNCTIONS ETC ##############################
@@ -634,6 +634,9 @@ if __name__ == "__main__":
             level=args.loglevel,
             stream=sys.stdout,
             )
+
+    # log unhandled exception
+    sys.excepthook = handle_exception
 
     t0 = time.perf_counter()
 
