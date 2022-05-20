@@ -454,8 +454,9 @@ def approx_size_shifted_arrays(data, maxDT):
 
 
 def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
-    if mingulp == 0:  # DM = 0 case 
-        return desired_gulp, 0
+    if mingulp == 0:  # DM = 0 case
+        gulp = (int(desired_gulp // ptsperint) + 1)*ptsperint
+        return gulp, 0
     if desired_gulp < mingulp:
         gulp = mingulp
         leftovers = nsamples % gulp
