@@ -187,6 +187,7 @@ def clip(
         running_avg, running_std = running_avg_std
 
     # Calculate the zero DM time series
+    print("clipping chunk shape", intensities.shape)
     zero_dm_time_series = intensities.sum(axis=-1)
     current_avg = zero_dm_time_series.mean()
     current_std = zero_dm_time_series.std()
@@ -280,6 +281,7 @@ def clip_mask_subbase_gulp(
     """Clip, mask and subtract the running_avg from a gulp"""
     for interval in range(nint):
         try:
+            print("working on slice:", slc)
             slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
             data[slc, :], running_dict = clip(
                 data[slc, :],
@@ -288,6 +290,7 @@ def clip_mask_subbase_gulp(
                 **running_dict,
             )
         except IndexError:  # in case on leftover partial-interval
+            print("last interval")
             logging.debug(
                 f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
             )
@@ -319,6 +322,7 @@ def clip_subbase_gulp(
     """Same as clip_mask_subbase_gulp but no mask"""
     for interval in range(nint):
         try:
+            print("working on slice:", slc)
             slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
             data[slc, :], running_dict = clip(
                 data[slc, :],
@@ -327,6 +331,7 @@ def clip_subbase_gulp(
                 **running_dict,
             )
         except IndexError:  # in case on leftover partial-interval
+            print("last interval")
             logging.debug(
                 f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
             )
@@ -786,6 +791,7 @@ if __name__ == "__main__":
         )
     else:
         intspergulp = gulp // ptsperint
+        logging.debug(f"intspergulp: {intspergulp}")
 
     # initialize things that need to survive multiple gulps
     current_int = 0
@@ -842,7 +848,7 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(arr_outdtype)
     )
-    logging.debug("Read in first chunk")
+    logging.debug(f"Read in first chunk {intensities.shape}")
     logging.debug(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
     logging.debug(
         f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB"
@@ -879,12 +885,14 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(arr_outdtype)
     )
+    print("read 2nd gulp", intensities.shape)
 
     # test if need to do next loop, or if on last gulp
     if intensities.shape[0] > maxDT:
         if intensities.shape[0] < gulp:  #  on last gulp
             if intensities.shape[0] % ptsperint:  # last int is weirdly sized
                 intspergulp = (gulp // ptsperint) + 1
+                logging.debug(f"intspergulp changed to {intspergulp}")
 
         while True:
             # tt0 = time.perf_counter()
@@ -923,6 +931,7 @@ if __name__ == "__main__":
                 .reshape(-1, nchans)
                 .astype(arr_outdtype)
             )
+            print("read data for gulp", current_gulp, intensities.shape)
 
             # Test if on last interval or end of file
             if intensities.shape[0] < gulp:
@@ -930,6 +939,7 @@ if __name__ == "__main__":
                     break
                 elif intensities.shape[0] % ptsperint:
                     intspergulp = (gulp // ptsperint) + 1
+                    logging.debug(f"last gulp detected, intspergulp changed to {intspergulp}")
 
     outf.close()
     filfile.close()
