@@ -1,5 +1,6 @@
 from presto_without_presto import sigproc
 import numpy as np
+import logging
 
 def radec2string(radec):
     """Convert the SIGPROC-style HHMMSS.SSSS right ascension
@@ -48,9 +49,8 @@ def write_header(header, outfile):
     header_list = list(header.keys())
     manual_head_start_end = False
     if header_list[0] != "HEADER_START" or header_list[-1] != "HEADER_END":
-        verbose_message3(
-            f"HEADER_START not first and/or HEADER_END not last in header_list"
-            f"removing them from header_list (if present) and writing them manually",
+        logging.debug(
+            f"HEADER_START not first and/or HEADER_END not last in header_list, removing them from header_list (if present) and writing them manually"
         )
         try_remove("HEADER_START", header_list)
         try_remove("HEADER_END", header_list)
@@ -62,7 +62,7 @@ def write_header(header, outfile):
         if paramname not in sigproc.header_params:
             # Only add recognized parameters
             continue
-        verbose_message3("Writing header param (%s)" % paramname)
+        logging.debug("Writing header param (%s)" % paramname)
         value = header[paramname]
         outfile.write(sigproc.addto_hdr(paramname, value))
     if manual_head_start_end:
