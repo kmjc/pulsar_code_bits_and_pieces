@@ -281,8 +281,8 @@ def clip_mask_subbase_gulp(
     """Clip, mask and subtract the running_avg from a gulp"""
     for interval in range(nint):
         try:
-            print("working on slice:", slc)
             slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+            print("working on slice:", slc)
             data[slc, :], running_dict = clip(
                 data[slc, :],
                 clipsig,
