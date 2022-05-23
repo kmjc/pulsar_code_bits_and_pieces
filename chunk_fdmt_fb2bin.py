@@ -90,6 +90,12 @@ parser.add_argument(
     "--yaml_only", action='store_true', help="Don't write fdmt files, only their yamls"
 )
 
+# currently no way to change the DM step in FDMT but can choose not to write all DMs out
+parser.add_argument(
+    "--mindmstep", type=float, help="""Minimum DM stepsize to write. 
+    e.g. if FDMT's DM stepsize is 0.002 and mindmstep is set to 0.004, only every other FDMT DM will be written to file"""
+)
+
 parser.add_argument(
     "--log", type=str, help="name of file to write log to", default="chunk_fdmt_fb2bin.log"
 )
@@ -226,9 +232,14 @@ else:
     flo = fmin
 DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, flo, fmax)
 DMs += args.atdm
-logging.info(
-    f"DMs in h5 are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}\n"
-)
+logging.info(f"FDMT DMs are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}")
+
+if not_zero_or_none(args.mindmstep):
+    DM_downsamp = int(args.mindmstep // ({DMs[1] - DMs[0]}))
+    logging.info(f"Downsampling output DMs by {DM_downsamp}")
+else:
+    DM_downsamp = 1
+logging.info(f"DMs to be written are from {DMs[0]} to {DMs[::DM_downsamp][-1]} in steps of {DMs[DM_downsamp] - DMs[0]}")
 
 # find length of data to be  written
 if (nsamples % args.gulp) < maxDT:
@@ -239,9 +250,9 @@ logging.debug(f"Length of data to be written is {origNdat} samples")
 
 # set up output file/s
 if args.split_file:
-    tot_filesize = origNdat * maxDT * (header["nbits"] // 8)
+    tot_filesize = origNdat * maxDT * (header["nbits"] / DM_downsamp // 8)
     dms_per_file = math.floor(maxDT / tot_filesize * args.max_size)
-    nfiles = math.ceil(maxDT / dms_per_file)
+    nfiles = math.ceil(maxDT // DM_downsamp / dms_per_file)
     logging.info(f"Splitting the output into {nfiles} files of {dms_per_file} DMs")
     if nfiles > 1000:
         logging.warning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
@@ -252,18 +263,18 @@ if args.split_file:
     for ii in fouts_indices:
         start = ii * dms_per_file
         if ii == fouts_indices[-1]:
-            end = maxDT
+            end = int(maxDT//DM_downsamp)
         else:
             end = (ii + 1) * dms_per_file
         fout_name = f"{args.filename[:-4]}_{start}-{end-1}.fdmt"
         fouts_names.append(fout_name)
-        dm_slices.append(slice(start, end))
+        dm_slices.append(slice(start, end, DM_downsamp))
     logging.info(f"Outfiles:\n{fouts_names}")
     logging.debug(f"DM slices:\n{dm_slices}")
 else:
     fouts_indices = [0]
     fouts_names = [f"{args.filename[:-4]}.fdmt"]
-    dm_slices = [slice(None)]
+    dm_slices = [slice(None, None, DM_downsamp)]
 
 if not args.yaml_only:
     fouts = [open(fout_name, "wb") for fout_name in fouts_names]

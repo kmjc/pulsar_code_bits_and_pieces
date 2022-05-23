@@ -107,7 +107,7 @@ fdmtfile = open(args.filename, "rb")
 # first gulp, (gulp - maxDT) time samples
 #samples_processed = 0
 
-running_sum = np.zeros((maxDT))
+running_sum = np.zeros(ndms)
 
 # I'd prefer to make unravel_plan in chunk_fdmt_fb2bin as you write the data
 # since it's more likely to be accurate then, but with lots of gulps it takes too long
@@ -161,7 +161,7 @@ for dat_name in dat_names:
 
 
 t3 = time.perf_counter()
-logging.debug(f"BENCHMARKING: keep all dats open, loop through file - {t3 - t2} seconds for {len(dm_indices)} dats")
+logging.debug(f"BENCHMARKING: keep all dats open, loop through file - {t3 - t2} seconds for {ndms} dats")
 
 # check number of samples wrote matches the inf file value
 if yam['inf_dict']['N'] != sz:
