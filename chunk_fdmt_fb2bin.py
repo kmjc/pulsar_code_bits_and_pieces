@@ -92,12 +92,12 @@ parser.add_argument(
 
 # currently no way to change the DM step in FDMT but can choose not to write all DMs out
 parser.add_argument(
-    "--mindmstep", type=float, help="""Minimum DM stepsize to write. 
+    "--mindmstep", type=float, help="""Minimum DM stepsize to write.
     e.g. if FDMT's DM stepsize is 0.002 and mindmstep is set to 0.004, only every other FDMT DM will be written to file"""
 )
 
 parser.add_argument(
-    "--log", type=str, help="name of file to write log to", default="chunk_fdmt_fb2bin.log"
+    "--log", type=str, help="name of file to write log to", default=None
 )
 
 parser.add_argument(
@@ -110,13 +110,21 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-logging.basicConfig(
-    filename=args.log,
-    filemode='w',
-    format='%(asctime)s - %(message)s',
-    datefmt='%d-%b-%y %H:%M:%S',
-    level=args.loglevel,
-    )
+if args.log is not None:
+    logging.basicConfig(
+        filename=args.log,
+        filemode='w',
+        format='%(asctime)s - %(message)s',
+        datefmt='%d-%b-%y %H:%M:%S',
+        level=args.loglevel,
+        )
+else:
+    logging.basicConfig(
+        format='%(asctime)s - %(message)s',
+        datefmt='%d-%b-%y %H:%M:%S',
+        level=args.loglevel,
+        stream=sys.stdout,
+        )
 
 # log unhandled exception
 sys.excepthook = handle_exception
