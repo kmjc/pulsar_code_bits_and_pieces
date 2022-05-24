@@ -243,7 +243,7 @@ DMs += args.atdm
 logging.info(f"FDMT DMs are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}")
 
 if not_zero_or_none(args.mindmstep):
-    DM_downsamp = int(args.mindmstep // ({DMs[1] - DMs[0]}))
+    DM_downsamp = int(args.mindmstep // (DMs[1] - DMs[0]))
     logging.info(f"Downsampling output DMs by {DM_downsamp}")
 else:
     DM_downsamp = 1
