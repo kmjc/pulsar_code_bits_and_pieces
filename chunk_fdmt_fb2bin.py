@@ -248,6 +248,8 @@ if not_zero_or_none(args.mindmstep):
 else:
     DM_downsamp = 1
 logging.info(f"DMs to be written are from {DMs[0]} to {DMs[::DM_downsamp][-1]} in steps of {DMs[DM_downsamp] - DMs[0]}")
+numDMs = math.ceil(maxDT / DM_downsamp)
+logging.info(f"{numDMs} DMs to be written")
 
 # find length of data to be  written
 if (nsamples % args.gulp) < maxDT:
@@ -258,9 +260,14 @@ logging.debug(f"Length of data to be written is {origNdat} samples")
 
 # set up output file/s
 if args.split_file:
-    tot_filesize = origNdat * maxDT * (header["nbits"] / DM_downsamp // 8)
-    dms_per_file = math.floor(maxDT / tot_filesize * args.max_size)
-    nfiles = math.ceil(maxDT // DM_downsamp / dms_per_file)
+    nbytes = header["nbits"] // 8
+    tot_filesize = origNdat * numDMs * ()
+    dms_per_file = math.floor(args.max_size / (origNdat * nbytes))
+    # adjust if not a multiple of DM_downsamp
+    if dms_per_file % DM_downsamp:
+        dms_per_file = int((dms_per_file // DM_downsamp) * DM_downsamp)
+
+    nfiles = math.ceil(numDMs / dms_per_file)
     logging.info(f"Splitting the output into {nfiles} files of {dms_per_file} DMs")
     if nfiles > 1000:
         logging.warning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
@@ -269,11 +276,11 @@ if args.split_file:
     fouts_names = []  # contains names of files
     dm_slices = []  # contains dm_slices, so for file with fouts_indices i DMs[dm_slices[i]] will give you the DMs it contains
     for ii in fouts_indices:
-        start = ii * dms_per_file
+        start = ii * dms_per_file * DM_downsamp
         if ii == fouts_indices[-1]:
-            end = int(maxDT//DM_downsamp)
+            end = maxDT
         else:
-            end = (ii + 1) * dms_per_file
+            end = (ii + 1) * dms_per_file * DM_downsamp
         fout_name = f"{args.filename[:-4]}_{start}-{end-1}.fdmt"
         fouts_names.append(fout_name)
         dm_slices.append(slice(start, end, DM_downsamp))
