@@ -28,7 +28,7 @@ BEAM_DIAM = 6182  # CHIME-specific, grabbed from a presto-generated inf file, ha
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     description="""
-    FDMT incoherently dedispersion a filterbank.
+    FDMT incoherent dedispersion of a filterbank.
     (You probably want to pre-mask and remove the baseline from the filterbank)
 
     Outputs a binary file storing the chunked transform (a stream of float32s),
