@@ -336,8 +336,8 @@ if not args.yaml_only:
             prev_arr += out[:, :maxDT]
 
             # write prev_arr and mid_arr
-            logging.debug(f"gulp {g} out array shape {out.shape}")
-            logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
+            #logging.debug(f"gulp {g} out array shape {out.shape}")
+            #logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
             for ii in fouts_indices:
                 fouts[ii].write(prev_arr[dm_slices[ii],:].ravel())
                 fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
