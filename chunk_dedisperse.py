@@ -6,7 +6,7 @@ from sigproc_utils import get_dtype, get_nbits, write_header, get_fmin_fmax_inve
 import copy
 import time
 import argparse
-import sys
+import sys, os
 import logging
 from gen_utils import handle_exception
 
@@ -533,10 +533,10 @@ if __name__ == "__main__":
     parser.add_argument("filename", type=str, help="Filterbank file to dedisperse")
     parser.add_argument(
         "-o",
-        "--out_filename",
+        "--outdir",
         type=str,
-        default=None,
-        help="Filename to write the output to (otherwise will append _DM<DM>.fil)",
+        default=".",
+        help="Directory in which to write the output",
     )
     parser.add_argument(
         "gulp",
@@ -571,7 +571,7 @@ if __name__ == "__main__":
         "--dmprec",
         type=int,
         default=2,
-        help="DM precision (only used when writing filename if <out_filename> not given)",
+        help="DM precision (only used when writing filename)",
     )
 
     # masking options, this will definitely break for an inverted band
@@ -636,7 +636,6 @@ if __name__ == "__main__":
     t0 = time.perf_counter()
 
     # being too lazy to refactor
-    out_filename = args.out_filename
     dmprec = args.dmprec
     where_channel_ref_freq = "center"
 
@@ -815,9 +814,9 @@ if __name__ == "__main__":
         header["nsamples"] -= maxDT + nsamp_cut_off
         logging.info(f"Updated header, nsamples = {header['nsamples']}")
 
-    if zero_or_none(out_filename):
-        out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
-    outf = open(out_filename, "wb")
+
+    out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
+    outf = open(os.path.join(args.outdir, out_filename), "wb")
 
     logging.info(f"Writing header to {out_filename}\n")
     write_header(header, outf)
