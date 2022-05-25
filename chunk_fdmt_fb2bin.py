@@ -64,6 +64,14 @@ g.add_argument(
 )
 
 parser.add_argument(
+    "-o",
+    "--outdir",
+    type=str,
+    default=".",
+    help="Directory in which to write the output .fdmt and .fdmt.yaml files",
+)
+
+parser.add_argument(
     "--atdm",
     help="DM to which filterbank has already been incoherently dedispersed",
     default=0,
@@ -292,7 +300,7 @@ else:
     dm_slices = [slice(None, None, DM_downsamp)]
 
 if not args.yaml_only:
-    fouts = [open(fout_name, "wb") for fout_name in fouts_names]
+    fouts = [open(os.path.join(args.outdir, fout_name), "wb") for fout_name in fouts_names]
 
 dm_indices = range(len(DMs))
 
@@ -422,7 +430,7 @@ for ii in fouts_indices:
     specific_yaml_dict["DMs"] = [float(aDM) for aDM in DMs[slc]]
 
     # write yaml
-    with open(f"{fouts_names[ii]}.yaml", "w") as fyaml:
+    with open(os.path.join(args.outdir, f"{fouts_names[ii]}.yaml"), "w") as fyaml:
         yaml.dump(specific_yaml_dict, fyaml)
     logging.info(f"yaml written to {fouts_names[ii]}.yaml")
 

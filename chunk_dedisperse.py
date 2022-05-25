@@ -536,7 +536,7 @@ if __name__ == "__main__":
         "--outdir",
         type=str,
         default=".",
-        help="Directory in which to write the output",
+        help="Directory in which to write the output .fil file",
     )
     parser.add_argument(
         "gulp",
