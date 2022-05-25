@@ -292,12 +292,14 @@ if args.split_file:
         fout_name = f"{args.filename[:-4]}_{start}-{end-1}.fdmt"
         fouts_names.append(fout_name)
         dm_slices.append(slice(start, end, DM_downsamp))
-    logging.info(f"Outfiles:\n{fouts_names}")
-    logging.debug(f"DM slices:\n{dm_slices}")
 else:
     fouts_indices = [0]
     fouts_names = [f"{args.filename[:-4]}.fdmt"]
     dm_slices = [slice(None, None, DM_downsamp)]
+
+logging.info(f"Output will be written in directory {args.outdir}")
+logging.info(f"Outfiles:\n{fouts_names}")
+logging.debug(f"DM slices:\n{dm_slices}")
 
 if not args.yaml_only:
     fouts = [open(os.path.join(args.outdir, fout_name), "wb") for fout_name in fouts_names]
