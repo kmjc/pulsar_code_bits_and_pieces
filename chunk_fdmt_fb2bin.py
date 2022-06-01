@@ -98,6 +98,10 @@ parser.add_argument(
     "--yaml_only", action='store_true', help="Don't write fdmt files, only their yamls"
 )
 
+parser.add_argument(
+    "--outdatbase", default="", type=str, help="Basename for dat files, e.g. 'base' would give a bunch of base_DMx.xx.dat files"
+)
+
 # currently no way to change the DM step in FDMT but can choose not to write all DMs out
 parser.add_argument(
     "--mindmstep", type=float, help="""Minimum DM stepsize to write.
@@ -384,8 +388,12 @@ else:
 # Construct a dictionary containing all the information necessary to make an inf file
 logging.info(f"Writing yaml:")
 lofreq = fmin + abs(header['foff'])/2
+if args.outdatbase:
+    basename = args.outdatbase
+else:
+    basename = args.filename[:-4]
 inf_dict = dict(
-    basenm=args.filename[:-4],
+    basenm=basename,
     telescope=ids_to_telescope[header.get('telescope_id', 0)],
     instrument=ids_to_machine[header.get('machine_id', 0)],
     object=header.get('source_name', 'Unknown'),
@@ -423,7 +431,7 @@ logging.debug("Dict values to go into every yaml file:")
 logging.debug(f"{yaml_dict}")
 
 # loop through each split file and write a yaml for each
-inf_names = [f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
+inf_names = [f"{basename}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
 for ii in fouts_indices:
     specific_yaml_dict = copy.copy(yaml_dict)
 
