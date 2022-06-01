@@ -12,9 +12,9 @@ import logging
 
 from presto_without_presto import sigproc
 from presto_without_presto.psr_utils import choose_N
-from presto_without_presto.sigproc import (ids_to_telescope, ids_to_machine)
+from presto_without_presto.sigproc import ids_to_telescope, ids_to_machine
 from presto_without_presto.infodata import infodata2
-from sigproc_utils import (radec2string, get_fmin_fmax_invert, get_dtype)
+from sigproc_utils import radec2string, get_fmin_fmax_invert, get_dtype
 
 from chunk_dedisperse import (
     inverse_DM_delay,
@@ -81,31 +81,37 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--pad", action='store_true', help="Pad the .dat files to a highly factorable length"
+        "--pad",
+        action="store_true",
+        help="Pad the .dat files to a highly factorable length",
     )
 
     parser.add_argument(
-        "--log", type=str, help="name of file to write log to", default="chunk_fdmt_fb2datinf.log"
+        "--log",
+        type=str,
+        help="name of file to write log to",
+        default="chunk_fdmt_fb2datinf.log",
     )
 
     parser.add_argument(
-        '-v', '--verbose',
+        "-v",
+        "--verbose",
         help="Increase logging level to debug",
-        action="store_const", dest="loglevel", const=logging.DEBUG,
+        action="store_const",
+        dest="loglevel",
+        const=logging.DEBUG,
         default=logging.INFO,
     )
-
 
     args = parser.parse_args()
 
     logging.basicConfig(
         filename=args.log,
-        filemode='w',
-        format='%(asctime)s - %(message)s',
-        datefmt='%d-%b-%y %H:%M:%S',
+        filemode="w",
+        format="%(asctime)s - %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
         level=args.loglevel,
-        )
-
+    )
 
     logging.info(f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
@@ -130,13 +136,9 @@ if __name__ == "__main__":
     # FDMT computes based on shift between fmin and fmax
     if args.tophalf:
         logging.info("Only using top half of the band")
-        fs = np.linspace(
-            fmin + (fmax - fmin)/2, fmax, nchans // 2, endpoint=True
-        )
+        fs = np.linspace(fmin + (fmax - fmin) / 2, fmax, nchans // 2, endpoint=True)
     else:
-        fs = np.linspace(
-            fmin, fmax, nchans, endpoint=True
-        )
+        fs = np.linspace(fmin, fmax, nchans, endpoint=True)
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
 
     logging.info(f"FDMT incoherent DM is {DM}")
@@ -154,7 +156,9 @@ if __name__ == "__main__":
             )
         else:
             ngulps += 1
-            logging.info(f"\nWill process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}")
+            logging.info(
+                f"\nWill process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}"
+            )
     else:
         logging.info(f"\nWill process the file in {ngulps} gulps of {args.gulp}")
 
@@ -166,10 +170,14 @@ if __name__ == "__main__":
 
     # initialize FDMT class object
     if args.tophalf:
-        fd = FDMT(fmin=fmin + (fmax - fmin)/2, fmax=fmax, nchan=nchans//2, maxDT=maxDT)
+        fd = FDMT(
+            fmin=fmin + (fmax - fmin) / 2, fmax=fmax, nchan=nchans // 2, maxDT=maxDT
+        )
     else:
         fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
-    logging.info(f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n")
+    logging.info(
+        f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n"
+    )
 
     # Define slices to return intensities in read_gulp
     if args.tophalf:
@@ -220,7 +228,7 @@ if __name__ == "__main__":
     # check it's arange(maxDT) and not arange(1, maxDT + 1)
     # Hao said that's correct
     if args.tophalf:
-        flo = fmin + (fmax - fmin)/2
+        flo = fmin + (fmax - fmin) / 2
     else:
         flo = fmin
     DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, flo, fmax)
@@ -245,12 +253,8 @@ if __name__ == "__main__":
     logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
     out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-    logging.debug(
-        f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB"
-    )
-    logging.debug(
-        f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB"
-    )
+    logging.debug(f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB")
+    logging.debug(f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB")
     t1 = time.perf_counter()
     logging.info(f"Writing gulp 0")
     # write mid_arr
@@ -276,7 +280,7 @@ if __name__ == "__main__":
             # write prev_arr and mid_arr
             for i in dm_indices:
                 with open(dat_names[i], "ab") as fout:
-                    fout.write(prev_arr[i,:])
+                    fout.write(prev_arr[i, :])
                     fout.write(out[i, maxDT:-maxDT])
             logging.debug(f"Completed gulp {g}")
 
@@ -287,13 +291,11 @@ if __name__ == "__main__":
     t3 = time.perf_counter()
     logging.info(f"FDMT completed in {t3-t0} s")
 
-
     # find length of data written
     if (nsamples % args.gulp) < maxDT:
         origNdat = int(nsamples // args.gulp) * args.gulp - maxDT
     else:
         origNdat = nsamples - maxDT
-
 
     PAD_MEDIAN_NSAMP = 4096
     if args.pad:
@@ -302,11 +304,13 @@ if __name__ == "__main__":
         N = choose_N(origNdat)
         # get medians of last PAD_MEDIAN_NSAMP samples if possible
         if out.shape[1] - maxDT < PAD_MEDIAN_NSAMP:
-            logging.info(f"Warning padding using median over last {out.shape[1] - maxDT} samples rather than {PAD_MEDIAN_NSAMP}")
-            meds = np.median(out[:,:-maxDT])
+            logging.info(
+                f"Warning padding using median over last {out.shape[1] - maxDT} samples rather than {PAD_MEDIAN_NSAMP}"
+            )
+            meds = np.median(out[:, :-maxDT])
         else:
             logging.info(f"Padding using median over last {PAD_MEDIAN_NSAMP} samples")
-            meds = np.median(out[:, -(PAD_MEDIAN_NSAMP+maxDT):-maxDT])
+            meds = np.median(out[:, -(PAD_MEDIAN_NSAMP + maxDT) : -maxDT])
 
         for i in dm_indices:
             with open(dat_names[i], "ab") as fout:
@@ -318,43 +322,40 @@ if __name__ == "__main__":
         N = origNdat
         t4 = time.perf_counter()
 
-
     logging.info(f"{len(fout_indicesices)} dat files written")
-
 
     # write all the inf files:
     logging.info(f"\nWriting inf files:")
-    lofreq = fmin + abs(header['foff'])/2
+    lofreq = fmin + abs(header["foff"]) / 2
     infdict = dict(
         basenm=args.filename[:-4],
-        telescope=ids_to_telescope[header['telescope_id']],
-        instrument=ids_to_machine[header['machine_id']],
-        object=header.get('source_name', 'Unknown'),
-        RA=radec2string(header['src_raj']),
-        DEC=radec2string(header['src_dej']),
-        observer='unset',
-        epoch= header['tstart'],
+        telescope=ids_to_telescope[header["telescope_id"]],
+        instrument=ids_to_machine[header["machine_id"]],
+        object=header.get("source_name", "Unknown"),
+        RA=radec2string(header["src_raj"]),
+        DEC=radec2string(header["src_dej"]),
+        observer="unset",
+        epoch=header["tstart"],
         bary=0,
-        dt=header['tsamp'],
+        dt=header["tsamp"],
         lofreq=lofreq,
-        BW=abs(header['nchans'] * header['foff']),
+        BW=abs(header["nchans"] * header["foff"]),
         N=N,
-        numchan=header['nchans'],
-        chan_width=abs(header['foff']),
-        analyzer=os.environ.get( "USER" ),
+        numchan=header["nchans"],
+        chan_width=abs(header["foff"]),
+        analyzer=os.environ.get("USER"),
     )
 
-
     if args.pad:
-        infdict['breaks'] = 1
-        infdict['onoff'] = [(0, origNdat - 1), (N - 1, N - 1)]
+        infdict["breaks"] = 1
+        infdict["onoff"] = [(0, origNdat - 1), (N - 1, N - 1)]
     else:
-        infdict['breaks'] = 0
+        infdict["breaks"] = 0
 
     for aDM in DMs:
         inf_fname = f"{args.filename[:-4]}_DM{aDM:.{args.dmprec}f}.inf"
         specific_infdict = copy.copy(infdict)
-        specific_infdict['DM'] = aDM
+        specific_infdict["DM"] = aDM
         inf = infodata2(specific_infdict)
         inf.to_file(inf_fname, notes="fdmt")
         logging.info(f"Wrote {inf_fname}")

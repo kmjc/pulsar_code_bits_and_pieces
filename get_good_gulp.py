@@ -354,7 +354,7 @@ elif args.thin:
         else:
             ids = [
                 np.where(same_nchunk["gulp"] == same_nchunk["gulp"].min())[0],
-                np.where(same_nchunk["gulp"] == same_nchunk["gulp"].max())[0]
+                np.where(same_nchunk["gulp"] == same_nchunk["gulp"].max())[0],
             ]
             for id in ids:
                 gulp, nchunks, leftover, byte_size_data = same_nchunk[id][0]

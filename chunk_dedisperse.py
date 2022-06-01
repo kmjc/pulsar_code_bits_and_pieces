@@ -454,7 +454,7 @@ def approx_size_shifted_arrays(data, maxDT):
 
 def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
     if mingulp == 0:  # DM = 0 case
-        gulp = (int(desired_gulp // ptsperint) + 1)*ptsperint
+        gulp = (int(desired_gulp // ptsperint) + 1) * ptsperint
         return gulp, 0
     if desired_gulp < mingulp:
         gulp = mingulp
@@ -491,22 +491,22 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
         good_ipg = ipg_over_maxDT[leftovers > maxDT]
         if good_ipg.size:
             logging.debug(
-                    f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}",
-                )
+                f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}",
+            )
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
             return ipg * ptsperint, nsamp_cut_off
         else:
             logging.debug(
-                    f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off"
-                )
+                f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off"
+            )
             # logging.debug(f"Picking gulp which minimizes leftover")
             # ipg = ipg_over_maxDT[leftovers == leftovers.min()]
             # if not isinstance(ipg, int):  # multiple options have the same leftover
             #    ipg = find_nearest(ipg, desired_gulp / ptsperint)
             logging.debug(
-                    f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}",
-                )
+                f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}",
+            )
             ipg = find_nearest(ipg_over_maxDT, desired_gulp / ptsperint)
             nsamp_cut_off = leftovers[ipg_over_maxDT == ipg][0]
             return ipg * ptsperint, nsamp_cut_off
@@ -601,34 +601,39 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--log", type=str, help="name of file to write log to", default=None,
+        "--log",
+        type=str,
+        help="name of file to write log to",
+        default=None,
     )
 
     parser.add_argument(
-        '-v', '--verbose',
+        "-v",
+        "--verbose",
         help="Increase logging level to debug",
-        action="store_const", dest="loglevel", const=logging.DEBUG,
+        action="store_const",
+        dest="loglevel",
+        const=logging.DEBUG,
         default=logging.INFO,
     )
-
 
     args = parser.parse_args()
 
     if args.log is not None:
         logging.basicConfig(
             filename=args.log,
-            filemode='w',
-            format='%(asctime)s - %(message)s',
-            datefmt='%d-%b-%y %H:%M:%S',
+            filemode="w",
+            format="%(asctime)s - %(message)s",
+            datefmt="%d-%b-%y %H:%M:%S",
             level=args.loglevel,
-            )
+        )
     else:
         logging.basicConfig(
-            format='%(asctime)s - %(message)s',
-            datefmt='%d-%b-%y %H:%M:%S',
+            format="%(asctime)s - %(message)s",
+            datefmt="%d-%b-%y %H:%M:%S",
             level=args.loglevel,
             stream=sys.stdout,
-            )
+        )
 
     # log unhandled exception
     sys.excepthook = handle_exception
@@ -701,29 +706,42 @@ if __name__ == "__main__":
         # if data has been downsampled wrt mask, adjust ptsperint accordingly
         maskdt = mask.dtint / mask.ptsperint
         if np.isclose(maskdt, tsamp, atol=1e-10):
-            logging.info(f"tsamp {tsamp} matches mask dt {maskdt}, no downsampling of ptsperint required")
+            logging.info(
+                f"tsamp {tsamp} matches mask dt {maskdt}, no downsampling of ptsperint required"
+            )
         elif tsamp > maskdt:
             if np.isclose(tsamp % maskdt, 0):
                 downsamp = tsamp / maskdt
                 ptsperint /= downsamp
                 if ptsperint % 1:
-                    logging.error(f"Tried to downsample ptsperint {mask.ptsperint} by {downsamp} and did not get an integer ({ptsperint})")
+                    logging.error(
+                        f"Tried to downsample ptsperint {mask.ptsperint} by {downsamp} and did not get an integer ({ptsperint})"
+                    )
                 ptsperint = int(ptsperint)
-                logging.info(f"tsamp {tsamp} is {downsamp} x maskdt ({maskdt}), downsampling ptsperint from {mask.ptsperint} to {ptsperint}")
+                logging.info(
+                    f"tsamp {tsamp} is {downsamp} x maskdt ({maskdt}), downsampling ptsperint from {mask.ptsperint} to {ptsperint}"
+                )
             else:
-                logging.error(f"tsamp > maskdt, but not by an integer factor. tsamp/maskdt = {tsamp}/{maskdt} = {tsamp/maskdt}")
+                logging.error(
+                    f"tsamp > maskdt, but not by an integer factor. tsamp/maskdt = {tsamp}/{maskdt} = {tsamp/maskdt}"
+                )
         else:
             if np.isclose(maskdt % tsamp, 0):
                 upsamp = maskdt / tsamp
                 ptsperint = int(upsamp * ptsperint)
-                logging.info(f"tsamp {tsamp} is 1/{upsamp} x maskdt ({maskdt}), upsampling ptsperint from {mask.ptsperint} to {ptsperint}")
+                logging.info(
+                    f"tsamp {tsamp} is 1/{upsamp} x maskdt ({maskdt}), upsampling ptsperint from {mask.ptsperint} to {ptsperint}"
+                )
             else:
-                logging.error(f"maskdt > tsamp, but not by an integer factor. maskdt/tsamp = {maskdt}/{tsamp} = {maskdt/tsamp}")
-
+                logging.error(
+                    f"maskdt > tsamp, but not by an integer factor. maskdt/tsamp = {maskdt}/{tsamp} = {maskdt/tsamp}"
+                )
 
         # check mask covers all data
         if not ((mask.nint - 1) * ptsperint) < nsamples <= (mask.nint * ptsperint):
-            logging.error(f"Mask has {mask.nint} intervals and using {ptsperint} ptsperint. Data is {nsamples} samples but mask covers {(mask.nint - 1) * ptsperint} < samples <= {mask.nint * ptsperint}")
+            logging.error(
+                f"Mask has {mask.nint} intervals and using {ptsperint} ptsperint. Data is {nsamples} samples but mask covers {(mask.nint - 1) * ptsperint} < samples <= {mask.nint * ptsperint}"
+            )
 
     else:
         mask = None
@@ -763,7 +781,11 @@ if __name__ == "__main__":
     )
 
     gulp, nsamp_cut_off = get_gulp(
-        nsamples, ptsperint, maxDT, mingulp, args.gulp,
+        nsamples,
+        ptsperint,
+        maxDT,
+        mingulp,
+        args.gulp,
     )
     logging.info(f"Selected gulp of {gulp}")
     logging.info(f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
@@ -813,7 +835,6 @@ if __name__ == "__main__":
         )
         header["nsamples"] -= maxDT + nsamp_cut_off
         logging.info(f"Updated header, nsamples = {header['nsamples']}")
-
 
     out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
     outf = open(os.path.join(args.outdir, out_filename), "wb")
@@ -922,7 +943,9 @@ if __name__ == "__main__":
                     break
                 elif intensities.shape[0] % ptsperint:
                     intspergulp = (intensities.shape[0] // ptsperint) + 1
-                    logging.debug(f"last gulp detected, intspergulp changed to {intspergulp}")
+                    logging.debug(
+                        f"last gulp detected, intspergulp changed to {intspergulp}"
+                    )
 
     outf.close()
     filfile.close()

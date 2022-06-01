@@ -2,16 +2,18 @@ from presto_without_presto import sigproc
 import numpy as np
 import logging
 
+
 def radec2string(radec):
     """Convert the SIGPROC-style HHMMSS.SSSS right ascension
     to a presto-inf-style HH:MM:SS.SSSS string
 
     or similarly for declination, DDMMSS.SSSS -> DD.MM.SS.SS"""
     hh = int(radec // 10000)
-    mm = int((radec - 10000*hh) // 100)
-    ss = int((radec - 10000*hh -100*mm) // 1)
-    ssss = int(((radec - 10000*hh -100*mm - ss) * 10000) // 1)
+    mm = int((radec - 10000 * hh) // 100)
+    ss = int((radec - 10000 * hh - 100 * mm) // 1)
+    ssss = int(((radec - 10000 * hh - 100 * mm - ss) * 10000) // 1)
     return f"{hh}:{mm}:{ss}.{ssss}"
+
 
 # presto's filterbank has a get_dtype could use too, but haven't without_presto-ed that yet
 def get_dtype(nbits):
@@ -28,6 +30,7 @@ def get_dtype(nbits):
     else:
         raise RuntimeError(f"nbits={nbits} not supported")
 
+
 def get_nbits(dtype):
     """
     Returns:
@@ -41,6 +44,7 @@ def get_nbits(dtype):
         return 32
     else:
         raise RuntimeError(f"dtype={dtype} not supported")
+
 
 # OK so if it's a filterbank it SHOULD have HEADER_START and HEADER_END
 # I think I was testing it on one that wasn't properly written, so I had to
@@ -67,6 +71,7 @@ def write_header(header, outfile):
         outfile.write(sigproc.addto_hdr(paramname, value))
     if manual_head_start_end:
         outfile.write(sigproc.addto_hdr("HEADER_END", None))
+
 
 def get_fmin_fmax_invert(header):
     """Calculate band edges and whether the band is inverted from a filterbank header.

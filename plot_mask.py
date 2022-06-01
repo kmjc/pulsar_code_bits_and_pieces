@@ -3,6 +3,7 @@ import argparse
 from matplotlib import pyplot as plt
 from presto_without_presto import rfifind
 
+
 def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
     """Return the mask as a numpy array of size (nint, nchan)
     (1 = masked, 0 = unmasked)
@@ -29,13 +30,13 @@ def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
     return mask
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Plot a rfifind mask")
     parser.add_argument("maskfile", type=str, help="rfifind .mask file")
     parser.add_argument("-c", "--compare", type=str, help="compare to this other mask")
     args = parser.parse_args()
 
-    fig, ax = plt.subplots(figsize=(10,6))
+    fig, ax = plt.subplots(figsize=(10, 6))
 
     rfimask = rfifind.rfifind(args.maskfile)
     rfimaskarr = array_from_mask_params(
@@ -61,7 +62,9 @@ if __name__ == '__main__':
         )
 
         if rfimaskarr.shape != rfimaskarr2.shape:
-            raise AttributeError(f"Masks have different shapes (mask has {rfimaskarr.shape}, compare has {rfimaskarr2.shape})")
+            raise AttributeError(
+                f"Masks have different shapes (mask has {rfimaskarr.shape}, compare has {rfimaskarr2.shape})"
+            )
 
         comparearr = np.zeros(rfimaskarr.shape, dtype=float)
         comparearr[(rfimaskarr == True) & (rfimaskarr2 == True)] = 0
@@ -69,10 +72,12 @@ if __name__ == '__main__':
         comparearr[(rfimaskarr == False) & (rfimaskarr2 == True)] = -1
         comparearr[(rfimaskarr == False) & (rfimaskarr2 == False)] = np.nan
 
-        im = ax.pcolormesh(comparearr, vmin=-1, vmax=1, cmap='cool')
+        im = ax.pcolormesh(comparearr, vmin=-1, vmax=1, cmap="cool")
         plt.colorbar(im)
-        plt.title(f"A ({rfimask.basename}) compared with B({rfimask2.basename}) \n"
-                  f"0 = both masked, +1 = A masked & B unmasked, -1 = A unmasked & B masked")
+        plt.title(
+            f"A ({rfimask.basename}) compared with B({rfimask2.basename}) \n"
+            f"0 = both masked, +1 = A masked & B unmasked, -1 = A unmasked & B masked"
+        )
 
     ax.set_xlabel("channel")
     ax.set_ylabel("interval")

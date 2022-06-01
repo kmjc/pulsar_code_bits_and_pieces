@@ -9,8 +9,8 @@ import math
 import logging
 
 from presto_without_presto import sigproc
-from presto_without_presto.sigproc import (ids_to_telescope, ids_to_machine)
-from sigproc_utils import (radec2string, get_fmin_fmax_invert, get_dtype)
+from presto_without_presto.sigproc import ids_to_telescope, ids_to_machine
+from sigproc_utils import radec2string, get_fmin_fmax_invert, get_dtype
 
 from chunk_dedisperse import (
     inverse_DM_delay,
@@ -87,7 +87,9 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--split_file", action='store_true', help="Split the output file into manageable smaller files. Must set --max_size"
+    "--split_file",
+    action="store_true",
+    help="Split the output file into manageable smaller files. Must set --max_size",
 )
 
 parser.add_argument(
@@ -95,17 +97,22 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--yaml_only", action='store_true', help="Don't write fdmt files, only their yamls"
+    "--yaml_only", action="store_true", help="Don't write fdmt files, only their yamls"
 )
 
 parser.add_argument(
-    "--outdatbase", default="", type=str, help="Basename for dat files, e.g. 'base' would give a bunch of base_DMx.xx.dat files"
+    "--outdatbase",
+    default="",
+    type=str,
+    help="Basename for dat files, e.g. 'base' would give a bunch of base_DMx.xx.dat files",
 )
 
 # currently no way to change the DM step in FDMT but can choose not to write all DMs out
 parser.add_argument(
-    "--mindmstep", type=float, help="""Minimum DM stepsize to write.
-    e.g. if FDMT's DM stepsize is 0.002 and mindmstep is set to 0.004, only every other FDMT DM will be written to file"""
+    "--mindmstep",
+    type=float,
+    help="""Minimum DM stepsize to write.
+    e.g. if FDMT's DM stepsize is 0.002 and mindmstep is set to 0.004, only every other FDMT DM will be written to file""",
 )
 
 parser.add_argument(
@@ -113,9 +120,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    '-v', '--verbose',
+    "-v",
+    "--verbose",
     help="Increase logging level to debug",
-    action="store_const", dest="loglevel", const=logging.DEBUG,
+    action="store_const",
+    dest="loglevel",
+    const=logging.DEBUG,
     default=logging.INFO,
 )
 
@@ -125,18 +135,18 @@ args = parser.parse_args()
 if args.log is not None:
     logging.basicConfig(
         filename=args.log,
-        filemode='w',
-        format='%(asctime)s - %(message)s',
-        datefmt='%d-%b-%y %H:%M:%S',
+        filemode="w",
+        format="%(asctime)s - %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
         level=args.loglevel,
-        )
+    )
 else:
     logging.basicConfig(
-        format='%(asctime)s - %(message)s',
-        datefmt='%d-%b-%y %H:%M:%S',
+        format="%(asctime)s - %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
         level=args.loglevel,
         stream=sys.stdout,
-        )
+    )
 
 # log unhandled exception
 sys.excepthook = handle_exception
@@ -172,13 +182,9 @@ logging.info(
 # FDMT computes based on shift between fmin and fmax
 if args.tophalf:
     logging.info("Only using top half of the band")
-    fs = np.linspace(
-        fmin + (fmax - fmin)/2, fmax, nchans // 2, endpoint=True
-    )
+    fs = np.linspace(fmin + (fmax - fmin) / 2, fmax, nchans // 2, endpoint=True)
 else:
-    fs = np.linspace(
-        fmin, fmax, nchans, endpoint=True
-    )
+    fs = np.linspace(fmin, fmax, nchans, endpoint=True)
 DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
 
 logging.info(f"FDMT incoherent DM is {DM}")
@@ -192,12 +198,18 @@ ngulps = nsamples // args.gulp
 weird_last_gulp = False
 if nsamples % args.gulp:
     if (nsamples % args.gulp) < maxDT:
-        logging.warning(f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end")
-        logging.warning(f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n")
+        logging.warning(
+            f"gulp ({args.gulp}) is not ideal. Will cut off {nsamples % args.gulp} samples at the end"
+        )
+        logging.warning(
+            f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n"
+        )
     else:
         weird_last_gulp = True
         ngulps += 1
-        logging.info(f"Will process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}")
+        logging.info(
+            f"Will process the file in {ngulps-1} gulps of {args.gulp}, and one of {nsamples % args.gulp}"
+        )
 else:
     logging.info(f"Will process the file in {ngulps} gulps of {args.gulp}")
 
@@ -209,10 +221,12 @@ if args.gulp <= maxDT:
 
 # initialize FDMT class object
 if args.tophalf:
-    fd = FDMT(fmin=fmin + (fmax - fmin)/2, fmax=fmax, nchan=nchans//2, maxDT=maxDT)
+    fd = FDMT(fmin=fmin + (fmax - fmin) / 2, fmax=fmax, nchan=nchans // 2, maxDT=maxDT)
 else:
     fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
-logging.info(f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n")
+logging.info(
+    f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n"
+)
 
 # Define slices to return intensities in read_gulp
 if args.tophalf:
@@ -237,6 +251,7 @@ if invertband:
 
 else:
     logging.debug(f"Frequency slice used to read data: {read_slc}\n")
+
     def read_gulp(filfile, gulp, nchans, arr_dtype):
         """Read in next gulp and prep it to feed into fdmt"""
         data = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
@@ -244,10 +259,11 @@ else:
         )
         return data[:, read_slc].T
 
+
 # Compute and store DMs
 # Hao said arange(maxDT) is correct
 if args.tophalf:
-    flo = fmin + (fmax - fmin)/2
+    flo = fmin + (fmax - fmin) / 2
 else:
     flo = fmin
 DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, flo, fmax)
@@ -259,7 +275,9 @@ if not_zero_or_none(args.mindmstep):
     logging.info(f"Downsampling output DMs by {DM_downsamp}")
 else:
     DM_downsamp = 1
-logging.info(f"DMs to be written are from {DMs[0]} to {DMs[::DM_downsamp][-1]} in steps of {DMs[DM_downsamp] - DMs[0]}")
+logging.info(
+    f"DMs to be written are from {DMs[0]} to {DMs[::DM_downsamp][-1]} in steps of {DMs[DM_downsamp] - DMs[0]}"
+)
 numDMs = math.ceil(maxDT / DM_downsamp)
 logging.info(f"{numDMs} DMs to be written")
 
@@ -282,11 +300,15 @@ if args.split_file:
     nfiles = math.ceil(numDMs / dms_per_file)
     logging.info(f"Splitting the output into {nfiles} files of {dms_per_file} DMs")
     if nfiles > 1000:
-        logging.warning(f"number of files to write ({nfiles}) is over 1000, might get OSError")
+        logging.warning(
+            f"number of files to write ({nfiles}) is over 1000, might get OSError"
+        )
 
     fouts_indices = list(range(nfiles))
     fouts_names = []  # contains names of files
-    dm_slices = []  # contains dm_slices, so for file with fouts_indices i DMs[dm_slices[i]] will give you the DMs it contains
+    dm_slices = (
+        []
+    )  # contains dm_slices, so for file with fouts_indices i DMs[dm_slices[i]] will give you the DMs it contains
     for ii in fouts_indices:
         start = ii * dms_per_file * DM_downsamp
         if ii == fouts_indices[-1]:
@@ -306,7 +328,9 @@ logging.info(f"Outfiles:\n{fouts_names}")
 logging.debug(f"DM slices:\n{dm_slices}")
 
 if not args.yaml_only:
-    fouts = [open(os.path.join(args.outdir, fout_name), "wb") for fout_name in fouts_names]
+    fouts = [
+        open(os.path.join(args.outdir, fout_name), "wb") for fout_name in fouts_names
+    ]
 
 dm_indices = range(len(DMs))
 
@@ -328,17 +352,15 @@ if not args.yaml_only:
     logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
     out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-    logging.debug(
-        f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB"
-    )
-    logging.debug(
-        f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB"
-    )
+    logging.debug(f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB")
+    logging.debug(f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB")
     t1 = time.perf_counter()
     logging.info(f"Writing gulp 0")
     # write mid_arr
     logging.debug(f"FDMT transform shape: {out.shape}")
-    logging.debug(f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples")
+    logging.debug(
+        f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples"
+    )
     for ii in fouts_indices:
         fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
 
@@ -357,10 +379,10 @@ if not args.yaml_only:
             prev_arr += out[:, :maxDT]
 
             # write prev_arr and mid_arr
-            #logging.debug(f"gulp {g} out array shape {out.shape}")
-            #logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
+            # logging.debug(f"gulp {g} out array shape {out.shape}")
+            # logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
             for ii in fouts_indices:
-                fouts[ii].write(prev_arr[dm_slices[ii],:].ravel())
+                fouts[ii].write(prev_arr[dm_slices[ii], :].ravel())
                 fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
             logging.debug(f"Completed gulp {g}")
 
@@ -381,33 +403,31 @@ else:
     t3 = time.perf_counter()
 
 
-
-
 ############################################################################
 # Write useful information to a yaml file
 # Construct a dictionary containing all the information necessary to make an inf file
 logging.info(f"Writing yaml:")
-lofreq = fmin + abs(header['foff'])/2
+lofreq = fmin + abs(header["foff"]) / 2
 if args.outdatbase:
     basename = args.outdatbase
 else:
     basename = args.filename[:-4]
 inf_dict = dict(
     basenm=basename,
-    telescope=ids_to_telescope[header.get('telescope_id', 0)],
-    instrument=ids_to_machine[header.get('machine_id', 0)],
-    object=header.get('source_name', 'Unknown'),
-    RA=radec2string(header.get('src_raj', 0)),
-    DEC=radec2string(header.get('src_dej', 0)),
-    observer='unset',
-    epoch= header['tstart'],
+    telescope=ids_to_telescope[header.get("telescope_id", 0)],
+    instrument=ids_to_machine[header.get("machine_id", 0)],
+    object=header.get("source_name", "Unknown"),
+    RA=radec2string(header.get("src_raj", 0)),
+    DEC=radec2string(header.get("src_dej", 0)),
+    observer="unset",
+    epoch=header["tstart"],
     bary=0,
-    dt=header['tsamp'],
+    dt=header["tsamp"],
     lofreq=lofreq,
-    BW=abs(header['nchans'] * header['foff']),
-    numchan=header['nchans'],
-    chan_width=abs(header['foff']),
-    analyzer=os.environ.get( "USER" ),
+    BW=abs(header["nchans"] * header["foff"]),
+    numchan=header["nchans"],
+    chan_width=abs(header["foff"]),
+    analyzer=os.environ.get("USER"),
     beam_diam=BEAM_DIAM,  # hackey, see note at top of script where BEAM_DIAM is defined
     breaks=0,
     N=int(origNdat),
@@ -424,8 +444,8 @@ yaml_dict = dict(
 )
 
 if weird_last_gulp:
-    yaml_dict['ngulps'] = ngulps - 1
-    yaml_dict['last_gulp'] = int(nsamples % args.gulp)
+    yaml_dict["ngulps"] = ngulps - 1
+    yaml_dict["last_gulp"] = int(nsamples % args.gulp)
 
 logging.debug("Dict values to go into every yaml file:")
 logging.debug(f"{yaml_dict}")
