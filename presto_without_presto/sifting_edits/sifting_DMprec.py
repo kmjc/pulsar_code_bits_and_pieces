@@ -46,7 +46,7 @@ fund_re = re.compile("^\d")
 harms_re = re.compile("^[ ]\d")
 # NB this only works if there's only one DMx.xx in your filename
 DM_re = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
-prit("DM_re expression:", f"DM(\d+\.\d{{{dmprec}}})")
+print("DM_re expression:", f"DM(\d+\.\d{{{dmprec}}})")
 
 # Add some functions to maintain support for the old
 # sifting API
