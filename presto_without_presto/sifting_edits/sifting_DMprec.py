@@ -46,7 +46,7 @@ fund_re = re.compile("^\d")
 harms_re = re.compile("^[ ]\d")
 # NB this only works if there's only one DMx.xx in your filename
 DM_re = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
-
+# AH! OK have to call this to refresh it because this gets set during the initial import when dmprec=2
 def refresh_DM_re():
     DM_re_refreshed = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
     return DM_re_refreshed
@@ -925,9 +925,6 @@ class Candlist(object):
             # Remove all the candidates where there are no hits at consecutive DMs
             if len(currcand.hits) > 1:
                 currcand.hits.sort(key=lambda cand: float(cand[0]))
-                print("DEBUG:")
-                print("dmdict:", dmdict)
-                print("can hit entry:", [currcand.hits[jj][0] for jj in range(len(currcand.hits))])
                 dm_indices = np.asarray([dmdict[f"{currcand.hits[jj][0]:.{dmprec}f}"] for jj in range(len(currcand.hits))])
                 min_dmind_diff = min(dm_indices[1:] - dm_indices[:-1])
                 if min_dmind_diff > 1:
@@ -1081,7 +1078,6 @@ class Candlist(object):
 
 
 def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
-    print("candlist_from_candfile dmprec", dmprec)
     candfile = open(filename, 'r')
     # First identify the length of the observation searched
     for line in candfile:
@@ -1118,7 +1114,6 @@ def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
 
             # Add it to the candidates list
             DMstr = DM_re.search(filename).groups()[0]
-            print("DM string from re search", DMstr)
             cands.append(Candidate(candnum, sigma, numharm,
                                           i_pow_det, c_pow, bin, z,
                                           DMstr, filename, tobs))
@@ -1198,7 +1193,6 @@ def read_candidates(filenms, prelim_reject=True, track=False):
                 (Default: False)
 
     """
-    print("read_candidates dmprec", dmprec)
     candlist = Candlist(trackbad=track, trackdupes=track)
     numfiles = len(filenms)
     if filenms:
