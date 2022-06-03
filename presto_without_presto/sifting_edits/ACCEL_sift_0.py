@@ -17,9 +17,13 @@ parser.add_argument("--c_pow_threshold", help="Ignore candidates with a coherent
 parser.add_argument("--dm_precision", help="Precision in DM (aka number of decimal places)", default=2, type=int)
 args = parser.parse_args()
 
+print(args)
+
 # DM precision
 prec = args.dm_precision
 sifting.dmprec = args.dm_precision
+
+print(sifting.dmprec)
 
 # Note:  You will almost certainly want to adjust
 #        the following variables for your particular search
