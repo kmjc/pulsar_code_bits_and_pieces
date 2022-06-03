@@ -1078,6 +1078,7 @@ class Candlist(object):
 
 
 def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
+    print("candlist_from_candfile dmprec", dmprec)
     candfile = open(filename, 'r')
     # First identify the length of the observation searched
     for line in candfile:
@@ -1194,6 +1195,7 @@ def read_candidates(filenms, prelim_reject=True, track=False):
                 (Default: False)
 
     """
+    print("read_candidates dmprec", dmprec)
     candlist = Candlist(trackbad=track, trackdupes=track)
     numfiles = len(filenms)
     if filenms:
