@@ -922,7 +922,7 @@ class Candlist(object):
                 currcand.hits.sort(key=lambda cand: float(cand[0]))
                 print("DEBUG:")
                 print("dmdict:", dmdict)
-                print("can hit entry:", currcand.hits[jj][0])
+                print("can hit entry:", [currcand.hits[jj][0] for jj in range(len(currcand.hits))])
                 dm_indices = np.asarray([dmdict[f"{currcand.hits[jj][0]:.{dmprec}f}"] for jj in range(len(currcand.hits))])
                 min_dmind_diff = min(dm_indices[1:] - dm_indices[:-1])
                 if min_dmind_diff > 1:
