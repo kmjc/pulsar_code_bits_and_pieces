@@ -15,6 +15,7 @@ parser.add_argument("--low_DM_cutoff", help="Lowest DM to consider as a 'real' p
 parser.add_argument("--sigma_threshold", help="Ignore candidates with a sigma (from incoherent power summation) less than this", type=float, default=4.0)
 parser.add_argument("--c_pow_threshold", help="Ignore candidates with a coherent power less than this", type=float, default=100.0)
 parser.add_argument("--dm_precision", help="Precision in DM (aka number of decimal places)", default=2, type=int)
+parser.add_argument("--outfile", help="Where to write sifted candidates", default=None, type=str)
 args = parser.parse_args()
 
 # DM precision
@@ -97,4 +98,4 @@ if len(cands):
 # Write candidates to STDOUT
 if len(cands):
     cands.sort(key=attrgetter('sigma'), reverse=True)
-    sifting.write_candlist(cands)
+    sifting.write_candlist(cands, candfilenm=args.outfile)
