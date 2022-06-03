@@ -275,7 +275,7 @@ class Candlist(object):
         yscale = "log" if maxdm > 2000.0 else "linear"
         plt.yscale(yscale)
 
-        if yscale is "log":
+        if yscale == "log":
             plt.ylim(1.0, maxdm+0.1*dmrange)
         else:
             plt.ylim(mindm-0.1*dmrange, maxdm+0.1*dmrange)
@@ -372,7 +372,7 @@ class Candlist(object):
         yscale = "log" if maxdm > 2000.0 else "linear"
         plt.yscale(yscale)
 
-        if yscale is "log":
+        if yscale == "log":
             plt.ylim(1.0, maxdm+0.1*dmrange)
         else:
             plt.ylim(mindm-0.1*dmrange, maxdm+0.1*dmrange)
