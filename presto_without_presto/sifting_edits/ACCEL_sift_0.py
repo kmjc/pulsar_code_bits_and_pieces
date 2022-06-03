@@ -22,8 +22,10 @@ print(args)
 # DM precision
 prec = args.dm_precision
 sifting.dmprec = args.dm_precision
+sifting.DM_re = sifting.refresh_DM_re()
 
 print(sifting.dmprec)
+
 
 # Note:  You will almost certainly want to adjust
 #        the following variables for your particular search
