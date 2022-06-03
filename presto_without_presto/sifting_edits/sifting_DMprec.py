@@ -46,6 +46,7 @@ fund_re = re.compile("^\d")
 harms_re = re.compile("^[ ]\d")
 # NB this only works if there's only one DMx.xx in your filename
 DM_re = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
+prit("DM_re expression:", f"DM(\d+\.\d{{{dmprec}}})")
 
 # Add some functions to maintain support for the old
 # sifting API
@@ -1113,6 +1114,7 @@ def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
 
             # Add it to the candidates list
             DMstr = DM_re.search(filename).groups()[0]
+            print("DM string from re search", DMstr)
             cands.append(Candidate(candnum, sigma, numharm,
                                           i_pow_det, c_pow, bin, z,
                                           DMstr, filename, tobs))
