@@ -428,6 +428,7 @@ inf_dict = dict(
     numchan=header["nchans"],
     chan_width=abs(header["foff"]),
     analyzer=os.environ.get("USER"),
+    waveband="Radio",
     beam_diam=BEAM_DIAM,  # hackey, see note at top of script where BEAM_DIAM is defined
     breaks=0,
     N=int(origNdat),
