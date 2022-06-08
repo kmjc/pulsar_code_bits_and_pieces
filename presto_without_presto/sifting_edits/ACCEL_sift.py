@@ -33,7 +33,7 @@ sifting.known_birds_f = []
 # But if we want to override them, uncomment and do it here.
 # You shouldn't need to adjust them for most searches, though.
 
-# How close a candidate has to be to another candidate to                
+# How close a candidate has to be to another candidate to
 # consider it the same candidate (in Fourier bins)
 sifting.r_err = 1.1
 # Shortest period candidates to consider (s)
@@ -43,7 +43,7 @@ sifting.long_period = 15.0
 # Ignore any candidates where at least one harmonic does exceed this power
 sifting.harm_pow_cutoff = 8.0
 
-#--------------------------------------------------------------
+# --------------------------------------------------------------
 
 # Try to read the .inf files first, as _if_ they are present, all of
 # them should be there.  (if no candidates are found by accelsearch
@@ -51,13 +51,13 @@ sifting.harm_pow_cutoff = 8.0
 inffiles = glob.glob(globinf)
 candfiles = glob.glob(globaccel)
 # Check to see if this is from a short search
-if len(re.findall("_[0-9][0-9][0-9]M_" , inffiles[0])):
+if len(re.findall("_[0-9][0-9][0-9]M_", inffiles[0])):
     dmstrs = [x.split("DM")[-1].split("_")[0] for x in candfiles]
 else:
     dmstrs = [x.split("DM")[-1].split(".inf")[0] for x in inffiles]
 dms = list(map(float, dmstrs))
 dms.sort()
-dmstrs = ["%.2f"%x for x in dms]
+dmstrs = ["%.2f" % x for x in dms]
 
 # Read in all the candidates
 cands = sifting.read_candidates(candfiles)
@@ -77,5 +77,5 @@ if len(cands):
 
 # Write candidates to STDOUT
 if len(cands):
-    cands.sort(key=attrgetter('sigma'), reverse=True)
+    cands.sort(key=attrgetter("sigma"), reverse=True)
     sifting.write_candlist(cands)

@@ -2,20 +2,58 @@ from __future__ import absolute_import
 from builtins import map
 import re
 import glob
-#import presto.sifting as sifting
+
+# import presto.sifting as sifting
 import sifting_DMprec as sifting
 from operator import itemgetter, attrgetter
 import argparse
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--zmax", help="zmax used in search, used in the glob to find candidate files", type=str, default="0")
-parser.add_argument("--basename", help="Base filename to look for in glob, e.g. J2119+49_59487_pow", type=str, default="*")
-parser.add_argument("--min_num_DMs", help="In how many DMs must a candidate be detected to be considered 'good'", type=int, default=2)
-parser.add_argument("--low_DM_cutoff", help="Lowest DM to consider as a 'real' pulsar", type=float, default=2.0)
-parser.add_argument("--sigma_threshold", help="Ignore candidates with a sigma (from incoherent power summation) less than this", type=float, default=4.0)
-parser.add_argument("--c_pow_threshold", help="Ignore candidates with a coherent power less than this", type=float, default=100.0)
-parser.add_argument("--dm_precision", help="Precision in DM (aka number of decimal places)", default=2, type=int)
-parser.add_argument("--outfile", help="Where to write sifted candidates", default=None, type=str)
+parser.add_argument(
+    "--zmax",
+    help="zmax used in search, used in the glob to find candidate files",
+    type=str,
+    default="0",
+)
+parser.add_argument(
+    "--basename",
+    help="Base filename to look for in glob, e.g. J2119+49_59487_pow",
+    type=str,
+    default="*",
+)
+parser.add_argument(
+    "--min_num_DMs",
+    help="In how many DMs must a candidate be detected to be considered 'good'",
+    type=int,
+    default=2,
+)
+parser.add_argument(
+    "--low_DM_cutoff",
+    help="Lowest DM to consider as a 'real' pulsar",
+    type=float,
+    default=2.0,
+)
+parser.add_argument(
+    "--sigma_threshold",
+    help="Ignore candidates with a sigma (from incoherent power summation) less than this",
+    type=float,
+    default=4.0,
+)
+parser.add_argument(
+    "--c_pow_threshold",
+    help="Ignore candidates with a coherent power less than this",
+    type=float,
+    default=100.0,
+)
+parser.add_argument(
+    "--dm_precision",
+    help="Precision in DM (aka number of decimal places)",
+    default=2,
+    type=int,
+)
+parser.add_argument(
+    "--outfile", help="Where to write sifted candidates", default=None, type=str
+)
 args = parser.parse_args()
 
 # DM precision
@@ -61,19 +99,19 @@ sifting.long_period = 15.0
 # Ignore any candidates where at least one harmonic does exceed this power
 sifting.harm_pow_cutoff = 8.0
 
-#--------------------------------------------------------------
+# --------------------------------------------------------------
 
 # Try to read the .inf files first, as _if_ they are present, all of
 # them should be there.  (if no candidates are found by accelsearch
 # we get no ACCEL files...
 # I have no inffiles . . .
 
-#inffiles = glob.glob(globinf)
+# inffiles = glob.glob(globinf)
 candfiles = glob.glob(globaccel)
 # Check to see if this is from a short search
-#if len(re.findall("_[0-9][0-9][0-9]M_" , inffiles[0])):
+# if len(re.findall("_[0-9][0-9][0-9]M_" , inffiles[0])):
 dmstrs = [x.split("DM")[-1].split("_")[0] for x in candfiles]
-#else:
+# else:
 #    dmstrs = [x.split("DM")[-1].split(".inf")[0] for x in inffiles]
 dms = list(map(float, dmstrs))
 dms.sort()
@@ -97,5 +135,5 @@ if len(cands):
 
 # Write candidates to STDOUT
 if len(cands):
-    cands.sort(key=attrgetter('sigma'), reverse=True)
+    cands.sort(key=attrgetter("sigma"), reverse=True)
     sifting.write_candlist(cands, candfilenm=args.outfile)
