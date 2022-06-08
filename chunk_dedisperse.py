@@ -6,9 +6,9 @@ from sigproc_utils import get_dtype, get_nbits, write_header, get_fmin_fmax_inve
 import copy
 import time
 import argparse
-import sys
+import sys, os
 import logging
-
+from gen_utils import handle_exception
 
 ################################################################################
 ############################ DEFINE FUNCTIONS ETC ##############################
@@ -97,6 +97,7 @@ class Mask:
         self.nchan = rfimask.nchan
         self.nint = rfimask.nint
         self.ptsperint = rfimask.ptsperint
+        self.dtint = rfimask.dtint
         # original rfimask has this as an array, convert to set if necessary
         self.mask_zap_ints = set(rfimask.mask_zap_ints)
         if invertband:
@@ -206,7 +207,6 @@ def clip(
     numgoodpts = good_pts_idx.size
 
     if numgoodpts < 1:
-        # print("no good points")
         current_avg = running_avg
         current_std = running_std
         chan_avg_temp = chan_running_avg
@@ -233,7 +233,7 @@ def clip(
         chan_running_avg = chan_avg_temp
         chan_running_std = chan_std_temp  # for CHIME dropped-packet clipping
         if current_avg == 0:
-            print("Warning: problem with clipping in first block!!!\n\n")
+            logging.warning("Warning: problem with clipping in first block!!!\n\n")
 
     # See if any points need clipping
     if not_zero_or_none(clip_sigma):
@@ -286,7 +286,7 @@ def clip_mask_subbase_gulp(
                 droptot_sig=droptotsig,
                 **running_dict,
             )
-        except IndexError:  # in case on leftover partial-interval
+        except IndexError:  # in case on leftover partial-interval  # this seems to not get activated ever?
             logging.debug(
                 f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
             )
@@ -325,7 +325,7 @@ def clip_subbase_gulp(
                 droptot_sig=droptotsig,
                 **running_dict,
             )
-        except IndexError:  # in case on leftover partial-interval
+        except IndexError:  # in case on leftover partial-interval  # this seems to not get activated ever?
             logging.debug(
                 f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
             )
@@ -421,7 +421,9 @@ def get_maxDT_DM(DM, maxDT, tsamp, fs):
         max_delay_s = outmaxDT * tsamp
         outDM = inverse_DM_delay(max_delay_s, flo, fhi)
     else:
-        raise AttributeError(f"must set a value for DM ({DM}) or maxDT ({maxDT})")
+        outDM = 0
+        outmaxDT = 0
+        max_delay_s = 0
     return outDM, outmaxDT, max_delay_s
 
 
@@ -450,7 +452,10 @@ def approx_size_shifted_arrays(data, maxDT):
     return 2 * prev_sz + mid_sz + end_sz
 
 
-def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
+def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
+    if mingulp == 0:  # DM = 0 case
+        gulp = (int(desired_gulp // ptsperint) + 1) * ptsperint
+        return gulp, 0
     if desired_gulp < mingulp:
         gulp = mingulp
         leftovers = nsamples % gulp
@@ -477,8 +482,7 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
         # divide exactly, quite unlikely
         good_ipg = ipg_over_maxDT[leftovers == 0]
         if good_ipg.size:
-            if verbose:
-                print(f"Found gulps with no leftovers: {good_ipg*ptsperint}")
+            logging.debug(f"Found gulps with no leftovers: {good_ipg*ptsperint}")
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
             return ipg * ptsperint, nsamp_cut_off
@@ -486,26 +490,23 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, verbose=False):
         # leftover > maxDT
         good_ipg = ipg_over_maxDT[leftovers > maxDT]
         if good_ipg.size:
-            if verbose:
-                print(
-                    f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}",
-                )
+            logging.debug(
+                f"Found {good_ipg.size} gulps which preserve all the data: {good_ipg*ptsperint}",
+            )
             ipg = find_nearest(good_ipg, desired_gulp / ptsperint)
             nsamp_cut_off = 0
             return ipg * ptsperint, nsamp_cut_off
         else:
-            if verbose:
-                print(
-                    f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off",
-                )
+            logging.debug(
+                f"No gulps preseve all the data, leftovers are all < maxDT and will be cut off"
+            )
             # logging.debug(f"Picking gulp which minimizes leftover")
             # ipg = ipg_over_maxDT[leftovers == leftovers.min()]
             # if not isinstance(ipg, int):  # multiple options have the same leftover
             #    ipg = find_nearest(ipg, desired_gulp / ptsperint)
-            if verbose:
-                print(
-                    f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}",
-                )
+            logging.debug(
+                f"Gulp which minimizes leftover is {ipg_over_maxDT[leftovers == leftovers.min()]*ptsperint}",
+            )
             ipg = find_nearest(ipg_over_maxDT, desired_gulp / ptsperint)
             nsamp_cut_off = leftovers[ipg_over_maxDT == ipg][0]
             return ipg * ptsperint, nsamp_cut_off
@@ -532,10 +533,10 @@ if __name__ == "__main__":
     parser.add_argument("filename", type=str, help="Filterbank file to dedisperse")
     parser.add_argument(
         "-o",
-        "--out_filename",
+        "--outdir",
         type=str,
-        default=None,
-        help="Filename to write the output to (otherwise will append _DM<DM>.fil)",
+        default=".",
+        help="Directory in which to write the output .fil file",
     )
     parser.add_argument(
         "gulp",
@@ -570,7 +571,7 @@ if __name__ == "__main__":
         "--dmprec",
         type=int,
         default=2,
-        help="DM precision (only used when writing filename if <out_filename> not given)",
+        help="DM precision (only used when writing filename)",
     )
 
     # masking options, this will definitely break for an inverted band
@@ -600,31 +601,46 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--log", type=str, help="name of file to write log to", default="chunk_dedisperse.log"
+        "--log",
+        type=str,
+        help="name of file to write log to",
+        default=None,
     )
 
     parser.add_argument(
-        '-v', '--verbose',
+        "-v",
+        "--verbose",
         help="Increase logging level to debug",
-        action="store_const", dest="loglevel", const=logging.DEBUG,
+        action="store_const",
+        dest="loglevel",
+        const=logging.DEBUG,
         default=logging.INFO,
     )
 
-
     args = parser.parse_args()
 
-    logging.basicConfig(
-        filename=args.log,
-        filemode='w',
-        format='%(asctime)s - %(message)s',
-        datefmt='%d-%b-%y %H:%M:%S',
-        level=args.loglevel,
+    if args.log is not None:
+        logging.basicConfig(
+            filename=args.log,
+            filemode="w",
+            format="%(asctime)s - %(message)s",
+            datefmt="%d-%b-%y %H:%M:%S",
+            level=args.loglevel,
         )
+    else:
+        logging.basicConfig(
+            format="%(asctime)s - %(message)s",
+            datefmt="%d-%b-%y %H:%M:%S",
+            level=args.loglevel,
+            stream=sys.stdout,
+        )
+
+    # log unhandled exception
+    sys.excepthook = handle_exception
 
     t0 = time.perf_counter()
 
     # being too lazy to refactor
-    out_filename = args.out_filename
     dmprec = args.dmprec
     where_channel_ref_freq = "center"
 
@@ -686,10 +702,54 @@ if __name__ == "__main__":
         logging.info(f"Mask loaded")
         ptsperint = mask.ptsperint
         zerochans = mask.mask_zap_chans | ignorechans
+        logging.info(f"ptsperint of {ptsperint} read from mask")
+        # if data has been downsampled wrt mask, adjust ptsperint accordingly
+        maskdt = mask.dtint / mask.ptsperint
+        if np.isclose(maskdt, tsamp, atol=1e-10):
+            logging.info(
+                f"tsamp {tsamp} matches mask dt {maskdt}, no downsampling of ptsperint required"
+            )
+        elif tsamp > maskdt:
+            if np.isclose(tsamp % maskdt, 0):
+                downsamp = tsamp / maskdt
+                ptsperint /= downsamp
+                if ptsperint % 1:
+                    logging.error(
+                        f"Tried to downsample ptsperint {mask.ptsperint} by {downsamp} and did not get an integer ({ptsperint})"
+                    )
+                ptsperint = int(ptsperint)
+                logging.info(
+                    f"tsamp {tsamp} is {downsamp} x maskdt ({maskdt}), downsampling ptsperint from {mask.ptsperint} to {ptsperint}"
+                )
+            else:
+                logging.error(
+                    f"tsamp > maskdt, but not by an integer factor. tsamp/maskdt = {tsamp}/{maskdt} = {tsamp/maskdt}"
+                )
+        else:
+            if np.isclose(maskdt % tsamp, 0):
+                upsamp = maskdt / tsamp
+                ptsperint = int(upsamp * ptsperint)
+                logging.info(
+                    f"tsamp {tsamp} is 1/{upsamp} x maskdt ({maskdt}), upsampling ptsperint from {mask.ptsperint} to {ptsperint}"
+                )
+            else:
+                logging.error(
+                    f"maskdt > tsamp, but not by an integer factor. maskdt/tsamp = {maskdt}/{tsamp} = {maskdt/tsamp}"
+                )
+
+        # check mask covers all data
+        if not ((mask.nint - 1) * ptsperint) < nsamples <= (mask.nint * ptsperint):
+            logging.error(
+                f"Mask has {mask.nint} intervals and using {ptsperint} ptsperint. Data is {nsamples} samples but mask covers {(mask.nint - 1) * ptsperint} < samples <= {mask.nint * ptsperint}"
+            )
+
     else:
         mask = None
         ptsperint = 2400  # presto default
         zerochans = ignorechans
+        logging.info(f"Using presto default for ptsperint")
+
+    logging.info(f"Clipping etc will be done in intervals of {ptsperint}")
 
     logging.info(
         f"clipping etc will be done in intervals of {ptsperint} as per mask/presto default",
@@ -707,9 +767,10 @@ if __name__ == "__main__":
     )
     logging.info(f"This corresponds to {maxDT} time samples\n")
     if DM == 0:
-        sys.exit("DM=0, why are you running this?")
+        logging.warning("DM=0, will likely break")
+    #    sys.exit("DM=0, why are you running this?")
 
-    # Find minimum number of intervals need to read in
+    # Find minimum number of samples need to read in, must be a multiple of ptsperint
     if maxDT % ptsperint:
         mingulp = ((maxDT // ptsperint) + 1) * ptsperint
     else:
@@ -720,7 +781,11 @@ if __name__ == "__main__":
     )
 
     gulp, nsamp_cut_off = get_gulp(
-        nsamples, ptsperint, maxDT, mingulp, args.gulp, verbose=(args.verbosity >= 2)
+        nsamples,
+        ptsperint,
+        maxDT,
+        mingulp,
+        args.gulp,
     )
     logging.info(f"Selected gulp of {gulp}")
     logging.info(f"Approx {nsamples // gulp} gulps (+1 if no samples cut off)")
@@ -732,6 +797,7 @@ if __name__ == "__main__":
         )
     else:
         intspergulp = gulp // ptsperint
+        logging.debug(f"intspergulp: {intspergulp}")
 
     # initialize things that need to survive multiple gulps
     current_int = 0
@@ -770,9 +836,8 @@ if __name__ == "__main__":
         header["nsamples"] -= maxDT + nsamp_cut_off
         logging.info(f"Updated header, nsamples = {header['nsamples']}")
 
-    if zero_or_none(out_filename):
-        out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
-    outf = open(out_filename, "wb")
+    out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
+    outf = open(os.path.join(args.outdir, out_filename), "wb")
 
     logging.info(f"Writing header to {out_filename}\n")
     write_header(header, outf)
@@ -788,7 +853,7 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(arr_outdtype)
     )
-    logging.debug("Read in first chunk")
+    logging.debug(f"Read in first chunk {intensities.shape}")
     logging.debug(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
     logging.debug(
         f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB"
@@ -817,6 +882,7 @@ if __name__ == "__main__":
     # logging.debug(f"shifted and stacked first gulp")
     # logging.debug(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
     outf.write(mid_array.ravel().astype(arr_outdtype))
+    current_gulp += 1
 
     # reset for next loop
     prev_array = end_array
@@ -831,6 +897,7 @@ if __name__ == "__main__":
         if intensities.shape[0] < gulp:  #  on last gulp
             if intensities.shape[0] % ptsperint:  # last int is weirdly sized
                 intspergulp = (gulp // ptsperint) + 1
+                logging.debug(f"intspergulp changed to {intspergulp}")
 
         while True:
             # tt0 = time.perf_counter()
@@ -859,7 +926,7 @@ if __name__ == "__main__":
             # tt2 = time.perf_counter()
             # log.debug(f"Dedispersed in {tt2-tt1} s")
             # log.debug(f"Processed gulp {current_gulp}")
-            print(f"Processed gulp {current_gulp}")
+            logging.info(f"Processed gulp {current_gulp}")
             current_gulp += 1
 
             # reset for next loop
@@ -875,7 +942,10 @@ if __name__ == "__main__":
                 if intensities.size == 0 or intensities.shape[0] < maxDT:
                     break
                 elif intensities.shape[0] % ptsperint:
-                    intspergulp = (gulp // ptsperint) + 1
+                    intspergulp = (intensities.shape[0] // ptsperint) + 1
+                    logging.debug(
+                        f"last gulp detected, intspergulp changed to {intspergulp}"
+                    )
 
     outf.close()
     filfile.close()

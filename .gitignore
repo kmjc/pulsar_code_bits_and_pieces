@@ -3,3 +3,7 @@ jupyter_notebooks/.ipynb_checkpoints/
 .DS_Store
 presto_without_presto/__pycache__/
 jupyter_notebooks/test_data/
+jupyter_notebooks/FDMT*
+jupyter_notebooks/*.png
+jupyter_notebooks/h5_dat_testing.ipynb
+__pycache__/*

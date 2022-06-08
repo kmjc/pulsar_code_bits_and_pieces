@@ -5,10 +5,12 @@ from builtins import zip
 from builtins import range
 from builtins import object
 import numpy as np
-#from scipy.signal import medfilt
+
+# from scipy.signal import medfilt
 from scipy.ndimage import generic_filter
 from presto_without_presto import infodata
-#from presto.Pgplot import *
+
+# from presto.Pgplot import *
 from matplotlib import pyplot as plt
 
 # so many tweaks
@@ -21,6 +23,7 @@ from matplotlib import pyplot as plt
 # ability to get the new mask out as an array
 # and to replace/combine the new mask with the old
 
+
 def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
     """Return the mask as a numpy array of size (nint, nchan)
     (1 = masked, 0 = unmasked)
@@ -32,16 +35,17 @@ def array_from_mask_params(nint, nchan, zap_ints, zap_chans, zap_chans_per_int):
     zap_chans_per_int - list (of length nint) of sets such that
                         zap_chans_per_int[i] gives a set of channels to mask in interval i
     """
-    mask = np.zeros((nint,nchan), dtype=bool)
+    mask = np.zeros((nint, nchan), dtype=bool)
     if len(zap_ints) != 0:
-        mask[tuple(zap_ints),:] = 1
+        mask[tuple(zap_ints), :] = 1
     if len(zap_chans) != 0:
-        mask[:,tuple(zap_chans)] = 1
+        mask[:, tuple(zap_chans)] = 1
     for i in range(nint):
         if len(zap_chans_per_int[i]) != 0:
-            mask[i,tuple(zap_chans_per_int[i])] = 1
+            mask[i, tuple(zap_chans_per_int[i])] = 1
 
     return mask
+
 
 class rfifind(object):
     """
@@ -78,9 +82,10 @@ class rfifind(object):
             In [6]: a.write_weights_and_offsets()
 
     """
+
     def __init__(self, filename):
-        self.basename = filename[:filename.find("_rfifind.")+8]
-        self.idata = infodata.infodata(self.basename+".inf")
+        self.basename = filename[: filename.find("_rfifind.") + 8]
+        self.idata = infodata.infodata(self.basename + ".inf")
         self.read_stats()
         self.read_mask()
         self.initialize_new_mask()
@@ -90,9 +95,14 @@ class rfifind(object):
             self.determine_padvals()
 
     def read_stats(self):
-        x = open(self.basename+".stats")
-        self.nchan, self.nint, self.ptsperint, self.lobin, self.numbetween = \
-                    np.fromfile(x, dtype=np.int32, count=5)
+        x = open(self.basename + ".stats")
+        (
+            self.nchan,
+            self.nint,
+            self.ptsperint,
+            self.lobin,
+            self.numbetween,
+        ) = np.fromfile(x, dtype=np.int32, count=5)
         count = self.nchan * self.nint
         self.pow_stats = np.fromfile(x, dtype=np.float32, count=count)
         self.avg_stats = np.fromfile(x, dtype=np.float32, count=count)
@@ -103,12 +113,18 @@ class rfifind(object):
         x.close()
 
     def read_mask(self):
-        x = open(self.basename+".mask")
-        self.time_sig, self.freq_sig, self.MJD, self.dtint, self.lofreq, self.df = \
-                       np.fromfile(x, dtype=np.float64, count=6)
-        self.freqs = np.arange(self.nchan)*self.df + self.lofreq
-        self.times = np.arange(self.nint)*self.dtint
-        self.MJDs = self.times/86400.0 + self.MJD
+        x = open(self.basename + ".mask")
+        (
+            self.time_sig,
+            self.freq_sig,
+            self.MJD,
+            self.dtint,
+            self.lofreq,
+            self.df,
+        ) = np.fromfile(x, dtype=np.float64, count=6)
+        self.freqs = np.arange(self.nchan) * self.df + self.lofreq
+        self.times = np.arange(self.nint) * self.dtint
+        self.MJDs = self.times / 86400.0 + self.MJD
         nchan, nint, ptsperint = np.fromfile(x, dtype=np.int32, count=3)
         nzap = np.fromfile(x, dtype=np.int32, count=1)[0]
         if nzap:
@@ -116,7 +132,7 @@ class rfifind(object):
         else:
             self.mask_zap_chans = np.asarray([])
         self.mask_zap_chans = set(self.mask_zap_chans)
-        if len(self.mask_zap_chans)==self.nchan:
+        if len(self.mask_zap_chans) == self.nchan:
             print("WARNING!:  All channels recommended for masking!")
         nzap = np.fromfile(x, dtype=np.int32, count=1)[0]
         if nzap:
@@ -124,7 +140,7 @@ class rfifind(object):
         else:
             self.mask_zap_ints = np.asarray([])
         self.mask_zap_ints = set(self.mask_zap_ints)
-        if len(self.mask_zap_ints)==self.nint:
+        if len(self.mask_zap_ints) == self.nint:
             print("WARNING!:  All intervals recommended for masking!")
         nzap_per_int = np.fromfile(x, dtype=np.int32, count=nint)
         self.mask_zap_chans_per_int = []
@@ -139,11 +155,17 @@ class rfifind(object):
             self.mask_zap_chans_per_int.append(set(tozap))
         x.close()
 
-        self.mask = array_from_mask_params(self.nint, self.nchan, self.mask_zap_ints, self.mask_zap_chans, self.mask_zap_chans_per_int)
+        self.mask = array_from_mask_params(
+            self.nint,
+            self.nchan,
+            self.mask_zap_ints,
+            self.mask_zap_chans,
+            self.mask_zap_chans_per_int,
+        )
 
-    #KC
+    # KC
     def initialize_new_mask(self):
-        """ Initialize attributes set by e.g. set_zap_chans
+        """Initialize attributes set by e.g. set_zap_chans
         Sets zap_ints and zap_chans to empty sets, and zap_chans_per_int to a list of empty sets"""
         self.zap_chans = set()
         self.zap_ints = set()
@@ -173,24 +195,34 @@ class rfifind(object):
         self.bandpass_std = np.mean(np.ma.array(self.std_stats, mask=self.mask), axis=0)
         self.bandpass_pow = np.mean(np.ma.array(self.pow_stats, mask=self.mask), axis=0)
         if plot:
-#            plotxy(self.bandpass_avg, self.freqs, labx="Frequency (MHz)")
-#            plotxy(self.bandpass_avg+self.bandpass_std, self.freqs, color="red")
-#            plotxy(self.bandpass_avg-self.bandpass_std, self.freqs, color="red")
-#            closeplot()
+            #            plotxy(self.bandpass_avg, self.freqs, labx="Frequency (MHz)")
+            #            plotxy(self.bandpass_avg+self.bandpass_std, self.freqs, color="red")
+            #            plotxy(self.bandpass_avg-self.bandpass_std, self.freqs, color="red")
+            #            closeplot()
             pass
         return self.bandpass_avg
 
     def get_median_bandpass(self, medlen=21, plot=False):
-        self.median_bandpass_avg = generic_filter(self.bandpass_avg.filled(fill_value=np.nan), np.nanmedian, size=medlen, mode='nearest')
-        self.median_bandpass_std = generic_filter(self.bandpass_std.filled(fill_value=np.nan), np.nanmedian, size=medlen, mode='nearest')
+        self.median_bandpass_avg = generic_filter(
+            self.bandpass_avg.filled(fill_value=np.nan),
+            np.nanmedian,
+            size=medlen,
+            mode="nearest",
+        )
+        self.median_bandpass_std = generic_filter(
+            self.bandpass_std.filled(fill_value=np.nan),
+            np.nanmedian,
+            size=medlen,
+            mode="nearest",
+        )
         if plot:
-#            plotxy(self.median_bandpass_avg, self.freqs,
-#                   labx="Frequency (MHz)")
-#            plotxy(self.median_bandpass_avg+self.median_bandpass_std,
-#                   self.freqs, color="red")
-#            plotxy(self.median_bandpass_avg-self.median_bandpass_std,
-#                   self.freqs, color="red")
-#            closeplot()
+            #            plotxy(self.median_bandpass_avg, self.freqs,
+            #                   labx="Frequency (MHz)")
+            #            plotxy(self.median_bandpass_avg+self.median_bandpass_std,
+            #                   self.freqs, color="red")
+            #            plotxy(self.median_bandpass_avg-self.median_bandpass_std,
+            #                   self.freqs, color="red")
+            #            closeplot()
             pass
         return self.median_bandpass_avg
 
@@ -201,12 +233,14 @@ class rfifind(object):
             channel.
         """
         # NOTE: Casting to 64/32-bit floats are done to mimick 'mask.c'.
-        num = int(np.round(self.nint*frac_to_keep))
+        num = int(np.round(self.nint * frac_to_keep))
         start = (self.nint - num) // 2
-        self.padvals = np.zeros(self.nchan, dtype='float32')
+        self.padvals = np.zeros(self.nchan, dtype="float32")
         for ichan in range(self.nchan):
-            isort = np.argsort(self.avg_stats[:,ichan])
-            self.padvals[ichan] = np.mean(self.avg_stats.astype('float64')[isort,ichan][start:start+num])
+            isort = np.argsort(self.avg_stats[:, ichan])
+            self.padvals[ichan] = np.mean(
+                self.avg_stats.astype("float64")[isort, ichan][start : start + num]
+            )
 
     def get_pow_zap_chans(self, pow_threshold=100.0):
         return np.where(self.bandpass_pow > pow_threshold)[0]
@@ -233,32 +267,49 @@ class rfifind(object):
 
     def get_edge_chans(self, edges=0.01):
         nedge = int(self.nchan * edges)
-        return np.concatenate((np.arange(nedge),
-                               np.arange(nedge) + self.nchan-nedge))
+        return np.concatenate((np.arange(nedge), np.arange(nedge) + self.nchan - nedge))
 
-    def set_zap_chans(self, power=100.0, asigma=5.0, ssigma=2.0, plot=True,
-                      edges=0.01, usemask=True, chans=[]):
+    def set_zap_chans(
+        self,
+        power=100.0,
+        asigma=5.0,
+        ssigma=2.0,
+        plot=True,
+        edges=0.01,
+        usemask=True,
+        chans=[],
+    ):
         self.user_zap_chans = set(chans)
         self.pow_zap_chans = set(self.get_pow_zap_chans(power))
         self.avg_zap_chans = set(self.get_avg_zap_chans(asigma))
         self.std_zap_chans = set(self.get_std_zap_chans(ssigma))
         self.no_signal_chans = set(self.get_no_signal_chans())
         self.edge_chans = set(self.get_edge_chans(edges))
-        self.zap_chans = self.pow_zap_chans | \
-                         self.avg_zap_chans | \
-                         self.std_zap_chans | \
-                         self.user_zap_chans | \
-                         self.edge_chans | \
-                         self.no_signal_chans
+        self.zap_chans = (
+            self.pow_zap_chans
+            | self.avg_zap_chans
+            | self.std_zap_chans
+            | self.user_zap_chans
+            | self.edge_chans
+            | self.no_signal_chans
+        )
         print("Recommending to zap %d channels:" % len(self.zap_chans))
-        print("  %d channels from Fourier power levels > %.1f" % \
-              (len(self.pow_zap_chans), power))
-        print("  %d channels from avgs levels being off by > %.1f sigma" % \
-              (len(self.avg_zap_chans), asigma))
-        print("  %d channels from stds levels being off by > %.1f sigma" % \
-              (len(self.std_zap_chans), ssigma))
-        print("  %d channels for being within %.3g of the band edge" % \
-              (len(self.edge_chans), edges))
+        print(
+            "  %d channels from Fourier power levels > %.1f"
+            % (len(self.pow_zap_chans), power)
+        )
+        print(
+            "  %d channels from avgs levels being off by > %.1f sigma"
+            % (len(self.avg_zap_chans), asigma)
+        )
+        print(
+            "  %d channels from stds levels being off by > %.1f sigma"
+            % (len(self.std_zap_chans), ssigma)
+        )
+        print(
+            "  %d channels for being within %.3g of the band edge"
+            % (len(self.edge_chans), edges)
+        )
         print("  %d channels were specified by the user" % len(self.user_zap_chans))
         print("  %d channels for having no variation" % len(self.no_signal_chans))
         if usemask:
@@ -268,7 +319,7 @@ class rfifind(object):
                 print("  adding them to the zap_chans list.")
             self.zap_chans = self.zap_chans | self.mask_zap_chans
         if plot:
-            #self.plot_zapped_bandpass()
+            # self.plot_zapped_bandpass()
             pass
 
     def plot_zapped_chans(self, device="/xwin"):
@@ -284,16 +335,16 @@ class rfifind(object):
 
         if isinstance(device, str):
             print("Pglot functionality is not enabled")
-#        plotxy(self.bandpass_avg, self.freqs,
-#               labx="Frequency (MHz)", device=device)
-#        plotxy(self.median_bandpass_avg+self.median_bandpass_std,
-#               self.freqs, color='blue')
-#        plotxy(self.median_bandpass_avg-self.median_bandpass_std,
-#               self.freqs, color='blue')
-#        plotxy(self.bandpass_avg[zap_chans],
-#               self.freqs[zap_chans],
-#               line=None, symbol=16, color="red")
-#        closeplot()
+        #        plotxy(self.bandpass_avg, self.freqs,
+        #               labx="Frequency (MHz)", device=device)
+        #        plotxy(self.median_bandpass_avg+self.median_bandpass_std,
+        #               self.freqs, color='blue')
+        #        plotxy(self.median_bandpass_avg-self.median_bandpass_std,
+        #               self.freqs, color='blue')
+        #        plotxy(self.bandpass_avg[zap_chans],
+        #               self.freqs[zap_chans],
+        #               line=None, symbol=16, color="red")
+        #        closeplot()
 
         elif device is None:
             fig, ax = plt.subplots()
@@ -302,15 +353,24 @@ class rfifind(object):
 
         if "Axes" in device.__class__.__name__:
             device.plot(self.freqs, self.bandpass_avg)
-            device.plot(self.freqs, self.median_bandpass_avg+self.median_bandpass_std, color='blue')
-            device.plot(self.freqs, self.median_bandpass_avg-self.median_bandpass_std, color='blue')
-            device.scatter(self.freqs[zap_chans], self.bandpass_avg[zap_chans], color='red')
+            device.plot(
+                self.freqs,
+                self.median_bandpass_avg + self.median_bandpass_std,
+                color="blue",
+            )
+            device.plot(
+                self.freqs,
+                self.median_bandpass_avg - self.median_bandpass_std,
+                color="blue",
+            )
+            device.scatter(
+                self.freqs[zap_chans], self.bandpass_avg[zap_chans], color="red"
+            )
 
             device.set_xlabel("Frequency (MHz)")
 
         if call_plt_show:  # assume if you passed in an Axes, you don't want this
             plt.show()
-
 
     def plot_zapped_bandpass(self, device="/xwin"):
         """Based on zap_chans
@@ -325,24 +385,24 @@ class rfifind(object):
         not_zapped = np.asarray(list(not_zapped))
         zap_chans = np.asarray(sorted(list(self.zap_chans)))
         if len(not_zapped):
-            yhi = (self.median_bandpass_avg+1.5*self.median_bandpass_std).max()
-            ylo = (self.median_bandpass_avg-1.5*self.median_bandpass_std).min()
+            yhi = (self.median_bandpass_avg + 1.5 * self.median_bandpass_std).max()
+            ylo = (self.median_bandpass_avg - 1.5 * self.median_bandpass_std).min()
         else:
             print("WARNING!:  All channels recommended for masking!")
 
         if isinstance(device, str):
             print("Pglot functionality is not enabled")
         # pglplot version
-#            plotxy(self.median_bandpass_avg, self.freqs, rangey=[ylo, yhi],
-#                   labx="Frequency (MHz)", color='light gray', device=device)
-#            plotxy(self.median_bandpass_avg+self.median_bandpass_std,
-#                   self.freqs, color='blue')
-#            plotxy(self.median_bandpass_avg-self.median_bandpass_std,
-#                   self.freqs, color='blue')
-#            plotxy(self.bandpass_avg[not_zapped], self.freqs[not_zapped], color='white')
-#            plotxy(self.median_bandpass_avg[zap_chans], self.freqs[zap_chans],
-#                   line=None, symbol=16, color='red')
-#            closeplot()
+        #            plotxy(self.median_bandpass_avg, self.freqs, rangey=[ylo, yhi],
+        #                   labx="Frequency (MHz)", color='light gray', device=device)
+        #            plotxy(self.median_bandpass_avg+self.median_bandpass_std,
+        #                   self.freqs, color='blue')
+        #            plotxy(self.median_bandpass_avg-self.median_bandpass_std,
+        #                   self.freqs, color='blue')
+        #            plotxy(self.bandpass_avg[not_zapped], self.freqs[not_zapped], color='white')
+        #            plotxy(self.median_bandpass_avg[zap_chans], self.freqs[zap_chans],
+        #                   line=None, symbol=16, color='red')
+        #            closeplot()
 
         elif device is None:
             fig, ax = plt.subplots()
@@ -350,11 +410,23 @@ class rfifind(object):
             call_plt_show = True
 
         if "Axes" in device.__class__.__name__:
-            device.plot(self.freqs, self.median_bandpass_avg, color='grey')
-            device.plot(self.freqs, self.median_bandpass_avg+self.median_bandpass_std, color='blue')
-            device.plot(self.freqs, self.median_bandpass_avg-self.median_bandpass_std, color='blue')
-            device.plot(self.freqs[not_zapped], self.bandpass_avg[not_zapped], color='black')
-            device.scatter(self.freqs[zap_chans], self.median_bandpass_avg[zap_chans], color='red')
+            device.plot(self.freqs, self.median_bandpass_avg, color="grey")
+            device.plot(
+                self.freqs,
+                self.median_bandpass_avg + self.median_bandpass_std,
+                color="blue",
+            )
+            device.plot(
+                self.freqs,
+                self.median_bandpass_avg - self.median_bandpass_std,
+                color="blue",
+            )
+            device.plot(
+                self.freqs[not_zapped], self.bandpass_avg[not_zapped], color="black"
+            )
+            device.scatter(
+                self.freqs[zap_chans], self.median_bandpass_avg[zap_chans], color="red"
+            )
 
             device.set_xlabel("Frequency (MHz)")
             device.set_ylim([ylo, yhi])
@@ -362,10 +434,9 @@ class rfifind(object):
         if call_plt_show:  # assume if you passed in an Axes, you don't want this
             plt.show()
 
-
     def write_zap_chans(self, filename=None):
         if filename is None:
-            filename = self.basename+".zapchans"
+            filename = self.basename + ".zapchans"
         outfile = open(filename, "w")
         for chan in np.asarray(sorted(list(self.zap_chans))):
             outfile.write("%d\n" % chan)
@@ -391,7 +462,7 @@ class rfifind(object):
 
     def write_weights_and_offsets(self, filename=None, invertband=False):
         if filename is None:
-            filename = self.basename+".weights"
+            filename = self.basename + ".weights"
         outfile = open(filename, "w")
         outfile.write("# Chan    Weight    Offset\n")
         weights = self.weights[::-1] if invertband else self.weights
@@ -402,7 +473,7 @@ class rfifind(object):
 
     def write_bandpass(self, filename=None, invertband=False):
         if filename is None:
-            filename = self.basename+".bandpass"
+            filename = self.basename + ".bandpass"
         outfile = open(filename, "w")
         avg = self.bandpass_avg[::-1] if invertband else self.bandpass_avg
         std = self.bandpass_std[::-1] if invertband else self.bandpass_std
@@ -414,7 +485,7 @@ class rfifind(object):
 
     def write_median_bandpass(self, filename=None, invertband=False):
         if filename is None:
-            filename = self.basename+".median_bandpass"
+            filename = self.basename + ".median_bandpass"
         outfile = open(filename, "w")
         avg = self.median_bandpass_avg[::-1] if invertband else self.median_bandpass_avg
         std = self.median_bandpass_std[::-1] if invertband else self.median_bandpass_std
@@ -427,7 +498,7 @@ class rfifind(object):
     def write_weights(self, threshold=0.05, filename=None, invertband=False):
         # This weights file works for psrfits_subband
         if filename is None:
-            filename = self.basename+".weights"
+            filename = self.basename + ".weights"
         outfile = open(filename, "w")
         outfile.write("# Chan    Weight\n")
         weights = self.weights[::-1] if invertband else self.weights
@@ -438,17 +509,20 @@ class rfifind(object):
                 outfile.write("%5d     0\n" % (c))
         outfile.close()
 
-    #KC
+    # KC
     def combine_masks(self):
         """Returns the logical or of the self.zap_* and self.mask_zap* parameters
         return order: `zap_chans`, `zap_ints`, `zap_chans_per_int`"""
         zap_chans = self.zap_chans | self.mask_zap_chans
         zap_ints = self.zap_ints | self.mask_zap_ints
-        zap_chans_per_int = [self.zap_chans_per_int[i] | self.mask_zap_chans_per_int[i] for i in range(self.nint)]
+        zap_chans_per_int = [
+            self.zap_chans_per_int[i] | self.mask_zap_chans_per_int[i]
+            for i in range(self.nint)
+        ]
 
         return zap_chans, zap_ints, zap_chans_per_int
 
-    #KC
+    # KC
     def new_mask_array(self, include_current=True):
         """Return the new mask as a numpy array of size (nint, nchan)
         (1 = masked, 0 = unmasked)
@@ -467,20 +541,33 @@ class rfifind(object):
         include_current = False:
         return only the new mask
         """
-        new_mask = array_from_mask_params(self.nint, self.nchan, self.zap_ints, self.zap_chans, self.zap_chans_per_int)
+        new_mask = array_from_mask_params(
+            self.nint, self.nchan, self.zap_ints, self.zap_chans, self.zap_chans_per_int
+        )
 
         if include_current:
-            curr_mask = array_from_mask_params(self.nint, self.nchan, self.mask_zap_ints, self.mask_zap_chans, self.mask_zap_chans_per_int)
+            curr_mask = array_from_mask_params(
+                self.nint,
+                self.nchan,
+                self.mask_zap_ints,
+                self.mask_zap_chans,
+                self.mask_zap_chans_per_int,
+            )
             return new_mask | curr_mask
         else:
             return new_mask
 
     def recalculate_mask(self):
         """recalculate the mask array from mask_zap_chans, mask_zap_ints, mask_zap_chans_per_int"""
-        self.mask = array_from_mask_params(self.nint, self.nchan, self.mask_zap_ints, self.mask_zap_chans, self.mask_zap_chans_per_int)
+        self.mask = array_from_mask_params(
+            self.nint,
+            self.nchan,
+            self.mask_zap_ints,
+            self.mask_zap_chans,
+            self.mask_zap_chans_per_int,
+        )
 
-
-    #KC
+    # KC
     def update_mask(self, include_current=True):
         """Update the current mask with the new one
 
@@ -512,29 +599,34 @@ class rfifind(object):
             self.determine_padvals()
 
 
-if __name__=="__main__":
+if __name__ == "__main__":
     import sys
+
     a = rfifind(sys.argv[1])
-    if len(a.goodints)==0:
+    if len(a.goodints) == 0:
         exit(0)
     sys.stderr.write("WARNING!:  If raw data have channels in decreasing freq\n")
     sys.stderr.write("           order, the channel ordering as given will be\n")
     sys.stderr.write("           inverted!  Use 'invertband=True' in \n")
     sys.stderr.write("           write_weights() in that case!\n")
-    if (a.idata.telescope=='GBT' and a.idata.lofreq < 1000.0):
-        sys.stderr.write("Data is from GBT Prime Focus, auto-flipping the weights/offsets...\n\n")
+    if a.idata.telescope == "GBT" and a.idata.lofreq < 1000.0:
+        sys.stderr.write(
+            "Data is from GBT Prime Focus, auto-flipping the weights/offsets...\n\n"
+        )
         invert = True
     else:
         invert = False
-    a.set_zap_chans(power=200.0,
-                    edges=0.01,
-                    asigma=2.0,
-                    ssigma=2.0,
-                    usemask=True,
-                    plot=True,
-                    chans=[])
+    a.set_zap_chans(
+        power=200.0,
+        edges=0.01,
+        asigma=2.0,
+        ssigma=2.0,
+        usemask=True,
+        plot=True,
+        chans=[],
+    )
     a.write_zap_chans()
     a.set_weights_and_offsets()
     a.write_weights(invertband=invert)
     a.write_bandpass(invertband=invert)
-    #a.write_weights_and_offsets(invertband=invert)
+    # a.write_weights_and_offsets(invertband=invert)

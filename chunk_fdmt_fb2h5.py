@@ -12,7 +12,7 @@ import logging
 
 from presto_without_presto import sigproc
 
-from sigproc_utils import (get_fmin_fmax_invert, get_dtype)
+from sigproc_utils import get_fmin_fmax_invert, get_dtype
 
 from chunk_dedisperse import (
     inverse_DM_delay,
@@ -78,27 +78,31 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--log", type=str, help="name of file to write log to", default="chunk_fdmt_fb2h5.log"
+        "--log",
+        type=str,
+        help="name of file to write log to",
+        default="chunk_fdmt_fb2h5.log",
     )
 
     parser.add_argument(
-        '-v', '--verbose',
+        "-v",
+        "--verbose",
         help="Increase logging level to debug",
-        action="store_const", dest="loglevel", const=logging.DEBUG,
+        action="store_const",
+        dest="loglevel",
+        const=logging.DEBUG,
         default=logging.INFO,
     )
-
 
     args = parser.parse_args()
 
     logging.basicConfig(
         filename=args.log,
-        filemode='w',
-        format='%(asctime)s - %(message)s',
-        datefmt='%d-%b-%y %H:%M:%S',
+        filemode="w",
+        format="%(asctime)s - %(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
         level=args.loglevel,
-        )
-
+    )
 
     logging.info(f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
@@ -123,13 +127,9 @@ if __name__ == "__main__":
     # FDMT computes based on shift between fmin and fmax
     if args.tophalf:
         logging.info("Only using top half of the band")
-        fs = np.linspace(
-            fmin + (fmax - fmin)/2, fmax, nchans // 2, endpoint=True
-        )
+        fs = np.linspace(fmin + (fmax - fmin) / 2, fmax, nchans // 2, endpoint=True)
     else:
-        fs = np.linspace(
-            fmin, fmax, nchans, endpoint=True
-        )
+        fs = np.linspace(fmin, fmax, nchans, endpoint=True)
     DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
 
     logging.info(f"FDMT incoherent DM is {DM}")
@@ -156,10 +156,14 @@ if __name__ == "__main__":
 
     # initialize FDMT class object
     if args.tophalf:
-        fd = FDMT(fmin=fmin + (fmax - fmin)/2, fmax=fmax, nchan=nchans//2, maxDT=maxDT)
+        fd = FDMT(
+            fmin=fmin + (fmax - fmin) / 2, fmax=fmax, nchan=nchans // 2, maxDT=maxDT
+        )
     else:
         fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT)
-    logging.info(f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n")
+    logging.info(
+        f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}\n"
+    )
 
     # Define slices to return intensities in read_gulp
     if args.tophalf:
@@ -215,7 +219,7 @@ if __name__ == "__main__":
     # check it's arange(maxDT) and not arange(1, maxDT + 1)
     # Hao said that's correct
     if args.tophalf:
-        flo = fmin + (fmax - fmin)/2
+        flo = fmin + (fmax - fmin) / 2
     else:
         flo = fmin
     DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, flo, fmax)
@@ -237,12 +241,8 @@ if __name__ == "__main__":
     logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
     out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-    logging.debug(
-        f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB"
-    )
-    logging.debug(
-        f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB"
-    )
+    logging.debug(f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB")
+    logging.debug(f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB")
     t1 = time.perf_counter()
     logging.info(f"Writing gulp 0")
     # write mid_arr
