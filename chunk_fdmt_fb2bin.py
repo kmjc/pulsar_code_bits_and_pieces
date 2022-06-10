@@ -156,6 +156,7 @@ if args.split_file and args.max_size is None:
     parser.error("--split_file requires --max_size")
 
 
+logging.info(f"Ran script in {os.getcwd()}")
 ############################################################################
 # A LOT of setup
 
