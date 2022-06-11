@@ -324,6 +324,8 @@ else:
     fouts_names = [f"{args.filename[:-4]}.fdmt"]
     dm_slices = [slice(None, None, DM_downsamp)]
 
+# make outdir if it doesn't exist
+os.makedirs(args.outdir, exist_ok=True)
 logging.info(f"Output will be written in directory {args.outdir}")
 logging.info(f"Outfiles:\n{fouts_names}")
 logging.debug(f"DM slices:\n{dm_slices}")
