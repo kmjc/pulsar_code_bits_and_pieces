@@ -205,6 +205,7 @@ if nsamples % args.gulp:
         logging.warning(
             f"Try running get_good_gulp.py --fdmt --maxdt {maxDT} {args.filename}\n"
         )
+        logging.info(f"Will process the file in {ngulps} gulps of {args.gulp}")
     else:
         weird_last_gulp = True
         ngulps += 1
