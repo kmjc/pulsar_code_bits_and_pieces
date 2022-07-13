@@ -176,7 +176,8 @@ logging.info(f"dat files each contain {sz} samples")
 for dat_name in dat_names:
     sz_i = os.path.getsize(dat_name) / 4
     if sz_i != sz:
-        logging.warning(f"{dat_name} has a different number of samples! ({sz_i})")
+        logging.error(f"{dat_name} has a different number of samples! ({sz_i}) Exiting")
+        sys.exit(1)
 
 
 t3 = time.perf_counter()
@@ -186,9 +187,10 @@ logging.debug(
 
 # check number of samples wrote matches the inf file value
 if yam["inf_dict"]["N"] != sz:
-    logging.warning(
-        f"inf N ({yam['inf_dict']['N']}) does not match size of dat files ({sz})"
+    logging.error(
+        f"inf N ({yam['inf_dict']['N']}) does not match size of dat files ({sz}) Exiting"
     )
+    sys.exit(1)
 
 t8 = time.perf_counter()
 # write .inf files
