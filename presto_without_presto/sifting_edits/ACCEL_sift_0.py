@@ -64,7 +64,7 @@ parser.add_argument(
     default=15.0,
 )
 parser.add_argument(
-    "harm_pow_cutoff",
+    "--harm_pow_cutoff",
     help="Ignore any candidates where at least one harmonic does exceed this power",
     type=float,
     default=8.0,
