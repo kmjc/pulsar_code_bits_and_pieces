@@ -34,6 +34,12 @@ parser.add_argument(
     default=2.0,
 )
 parser.add_argument(
+    "--r_err",
+    help="How close a candidate has to be to another candidate to consider it the same candidate (in Fourier bins)",
+    type=float,
+    default=1.1,
+)
+parser.add_argument(
     "--sigma_threshold",
     help="Ignore candidates with a sigma (from incoherent power summation) less than this",
     type=float,
@@ -46,6 +52,24 @@ parser.add_argument(
     default=100.0,
 )
 parser.add_argument(
+    "--short_period",
+    help="Shortest period candidates to consider (s)",
+    type=float,
+    default=0.0005,
+)
+parser.add_argument(
+    "--long_period",
+    help="Longest period candidates to consider (s)",
+    type=float,
+    default=15.0,
+)
+parser.add_argument(
+    "harm_pow_cutoff",
+    help="Ignore any candidates where at least one harmonic does exceed this power",
+    type=float,
+    default=8.0,
+)
+parser.add_argument(
     "--dm_precision",
     help="Precision in DM (aka number of decimal places)",
     default=2,
@@ -56,26 +80,25 @@ parser.add_argument(
 )
 args = parser.parse_args()
 
-# DM precision
-prec = args.dm_precision
-sifting.dmprec = args.dm_precision
-sifting.DM_re = sifting.refresh_DM_re()
-
-# Note:  You will almost certainly want to adjust
-#        the following variables for your particular search
-
 # glob for ACCEL files
 globaccel = args.basename + "_DM*ACCEL_" + args.zmax
 # glob for .inf files
 globinf = args.basename + "_DM*.inf"
-# In how many DMs must a candidate be detected to be considered "good"
+
+
+# set DM precision
+prec = args.dm_precision
+sifting.dmprec = args.dm_precision
+sifting.DM_re = sifting.refresh_DM_re()
+# set other sifting parameters
 min_num_DMs = args.min_num_DMs
-# Lowest DM to consider as a "real" pulsar
 low_DM_cutoff = args.low_DM_cutoff
-# Ignore candidates with a sigma (from incoherent power summation) less than this
 sifting.sigma_threshold = args.sigma_threshold
-# Ignore candidates with a coherent power less than this
 sifting.c_pow_threshold = args.c_pow_threshold
+sifting.r_err = args.r_err
+sifting.short_period = args.short_period
+sifting.long_period = args.long_period
+sifting.harm_pow_cutoff = args.harm_pow_cutoff
 
 # If the birds file works well, the following shouldn't
 # be needed at all...  If they are, add tuples with the bad
@@ -84,20 +107,6 @@ sifting.c_pow_threshold = args.c_pow_threshold
 sifting.known_birds_p = []
 #                (Hz, err)
 sifting.known_birds_f = []
-
-# The following are all defined in the sifting module.
-# But if we want to override them, uncomment and do it here.
-# You shouldn't need to adjust them for most searches, though.
-
-# How close a candidate has to be to another candidate to
-# consider it the same candidate (in Fourier bins)
-sifting.r_err = 1.1
-# Shortest period candidates to consider (s)
-sifting.short_period = 0.0005
-# Longest period candidates to consider (s)
-sifting.long_period = 15.0
-# Ignore any candidates where at least one harmonic does exceed this power
-sifting.harm_pow_cutoff = 8.0
 
 # --------------------------------------------------------------
 
