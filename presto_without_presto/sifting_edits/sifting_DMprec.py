@@ -171,7 +171,6 @@ class Candidate(object):
         self.snr = 0.0
         self.hits = []
         self.note = ""
-        print("candnum, DM", self.candnum, self.DMstr, self.DM)
 
     def add_as_hit(self, other):
         self.hits.extend(other.hits)
