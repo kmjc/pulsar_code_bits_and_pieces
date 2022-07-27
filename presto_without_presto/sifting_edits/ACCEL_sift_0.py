@@ -70,6 +70,12 @@ parser.add_argument(
     default=8.0,
 )
 parser.add_argument(
+    "--dm_iqr_limit",
+    help="Ignore any candidates where the DMs of its hits have an interquartile range above this value",
+    type=float,
+    default=20,
+)
+parser.add_argument(
     "--dm_precision",
     help="Precision in DM (aka number of decimal places)",
     default=2,
@@ -99,6 +105,7 @@ sifting.r_err = args.r_err
 sifting.short_period = args.short_period
 sifting.long_period = args.long_period
 sifting.harm_pow_cutoff = args.harm_pow_cutoff
+sifting.dm_iqr_limit = args.dm_iqr_limit
 
 # If the birds file works well, the following shouldn't
 # be needed at all...  If they are, add tuples with the bad

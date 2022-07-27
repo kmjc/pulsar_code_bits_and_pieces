@@ -33,6 +33,8 @@ sigma_threshold = 6.0
 c_pow_threshold = 100.0
 # Ignore any candidates where at least one harmonic does not exceed this power
 harm_pow_cutoff = 8.0
+# KC Ignore any candidates where the DMs of its hits have an interquartile range greater than this
+dm_iqr_limit = 20
 
 # If the birds file works well, the following shouldn't
 # be needed at all...
@@ -1023,11 +1025,13 @@ class Candlist(object):
         if verbosity >= 1:
             print("Removed a total of %d harmonics.\n" % numremoved)
 
-    def remove_DM_problems(self, numdms, dmlist, low_DM_cutoff, verbosity=1):
+    def remove_DM_problems(self, numdms, dmlist, low_DM_cutoff, verbosity=1, dm_iqr_limit=None):
         """Remove the candidates where any of the following are true:
         1) The number of hits is < numdms
         2) The highest S/N candidate occurs below a DM of low_DM_cutoff
         3) The minimum difference in DM indices between the hits is > 1
+        # KC:
+        4) DMs of hits have an IQR >
 
         Inputs:
             numdms: The minimum number of hits for a good candidate.
@@ -1048,7 +1052,10 @@ class Candlist(object):
         num_toofew = 0
         num_toolow = 0
         num_gaps = 0
+        num_iqr = 0
         self.cands.sort(key=attrgetter("sigma"), reverse=True)
+        if dm_iqr_limit is None:
+            dm_iqr_limit = globals()["dm_iqr_limit"]
         for ii in reversed(list(range(len(self.cands)))):
             currcand = self.cands[ii]
             # Remove all the candidates without enough DM hits
@@ -1116,12 +1123,34 @@ class Candlist(object):
                         print("    %s" % currcand.note)
                     continue
 
+                # KC remove candidate if IQR of hit dms is too large
+                if dm_iqr_limit:
+                    dm_hits = np.array([hit[0] for hit in currcand.hits])
+                    dm_iqr = np.subtract(*np.percentile(dm_hits, [75, 25]))
+                    if dm_iqr > dm_iqr_limit:
+                        numremoved += 1
+                        num_iqr += 1
+                        currcand.note = (
+                            "DM list of hits has a large IQR "
+                        )
+                        self.mark_as_bad(ii, "dmproblem")
+                        if verbosity >= 2:
+                            print(
+                                "Removing %s:%d (index: %d)"
+                                % (currcand.filename, currcand.candnum, ii)
+                            )
+                            print("    %s" % currcand.note)
+                        continue
+
+
+
         if verbosity >= 1:
             print("Removed %d candidates with DM problems.\n" % numremoved)
         if verbosity >= 2:
             print("  # with too few hits:", num_toofew)
             print("  # with peak SNR too low:", num_toolow)
             print("  # with gaps in DM hits:", num_gaps)
+            print("  # with large IQR for DM hits:", num_iqr)
 
     def print_cand_summary(self, summaryfilenm=None):
         """Write a summary of all candidates to file (or stdout).
