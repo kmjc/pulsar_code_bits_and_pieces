@@ -1146,7 +1146,7 @@ class Candlist(object):
 
         if verbosity >= 1:
             print("Removed %d candidates with DM problems.\n" % numremoved)
-        if verbosity >= 2:
+        if verbosity >= 1:
             print("  # with too few hits:", num_toofew)
             print("  # with peak SNR too low:", num_toolow)
             print("  # with gaps in DM hits:", num_gaps)
