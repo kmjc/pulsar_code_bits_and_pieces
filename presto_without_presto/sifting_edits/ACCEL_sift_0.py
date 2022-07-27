@@ -7,6 +7,7 @@ import glob
 import sifting_DMprec as sifting
 from operator import itemgetter, attrgetter
 import argparse
+import yaml
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
@@ -71,7 +72,7 @@ parser.add_argument(
 )
 parser.add_argument(
     "--dm_iqr_limit",
-    help="Ignore any candidates where the DMs of its hits have an interquartile range above this value",
+    help="Ignore any candidate where the DMs of its hits have an interquartile range above this value",
     type=float,
     default=20,
 )
@@ -80,6 +81,11 @@ parser.add_argument(
     help="Precision in DM (aka number of decimal places)",
     default=2,
     type=int,
+)
+parser.add_argument(
+    "--infyaml",
+    help="yaml file containing a list of all of the inf files used in the search",
+    type=str,
 )
 parser.add_argument(
     "--outfile", help="Where to write sifted candidates", default=None, type=str
@@ -123,12 +129,19 @@ sifting.known_birds_f = []
 # I have no inffiles . . .
 
 # inffiles = glob.glob(globinf)
+if args.infyaml:
+    with open(args.infyaml, "r") as f:
+        inffiles = yaml.safe_load(f)
+else:
+    inffiles = []
 candfiles = glob.glob(globaccel)
 # Check to see if this is from a short search
 # if len(re.findall("_[0-9][0-9][0-9]M_" , inffiles[0])):
-dmstrs = [x.split("DM")[-1].split("_")[0] for x in candfiles]
-# else:
-#    dmstrs = [x.split("DM")[-1].split(".inf")[0] for x in inffiles]
+if inffiles:
+    dmstrs = [x.split("DM")[-1].split("_")[0] for x in inffiles]
+else:
+    dmstrs = [x.split("DM")[-1].split("_")[0] for x in candfiles]
+
 dms = list(map(float, dmstrs))
 dms.sort()
 dmstrs = [f"{x:.{prec}f}" for x in dms]
