@@ -1131,7 +1131,7 @@ class Candlist(object):
                         numremoved += 1
                         num_iqr += 1
                         currcand.note = (
-                            "DM list of hits has a large IQR "
+                            f"DM list of hits has a large IQR ({dm_iqr})"
                         )
                         self.mark_as_bad(ii, "dmproblem")
                         if verbosity >= 2:
