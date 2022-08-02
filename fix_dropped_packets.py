@@ -13,7 +13,8 @@ import argparse
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
-    description="""Correct artefacts due to dropped packets in CHIME data.
+    description="""SLOW VERSION - use fix_dropped_packets_nopresto.py
+    Correct artefacts due to dropped packets in CHIME data.
     These show up as sudden dips (but not necessarily to 0) in 4 channels at the same time.
     This script
         - reads in a chunk of data,

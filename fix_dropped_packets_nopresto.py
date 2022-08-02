@@ -102,7 +102,7 @@ for i in range(loop_iters):
     # has shape (nspec, nchans) so it plays nice with brodcasting
     med = np.median(spec,axis=0)
     std = np.std(spec,axis=0)
-    #set the thresold
+    #set the threshold
     threshold = med - args.thresh_sig*std
     #find values below threshold and replace with the median
     mask = np.where(spec < threshold)
