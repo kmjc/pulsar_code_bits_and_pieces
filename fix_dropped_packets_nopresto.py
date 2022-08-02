@@ -8,7 +8,6 @@
 import numpy as np
 from presto_without_presto import rfifind, sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
-import logging
 import argparse
 import copy
 
@@ -57,15 +56,13 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-log = logging.getLogger(__name__)
-
 header, hdrlen = sigproc.read_header(args.fn)
 nspecs = int(sigproc.samples_per_file(args.fn, header, hdrlen))
 nchans = header["nchans"]
 arr_dtype = get_dtype(header["nbits"])
 
 if header["nifs"] != 1:
-    raise log.error(f"Code not written to deal with unsummed polarization data")
+    raise AttributeError(f"Code not written to deal with unsummed polarization data")
 
 
 #loop through chunks
@@ -74,7 +71,7 @@ fn_clean = args.fn.strip('.fil')
 fdp_fn = f"{fn_clean}_fdp.fil"
 new_fil = open(fdp_fn, "wb")
 write_header(header, new_fil)
-log.info(f"Output will be written to {fdp_fn}")
+print(f"Output will be written to {fdp_fn}")
 fil = open(args.fn, "rb")
 fil.seek(hdrlen)
 
@@ -82,7 +79,7 @@ additional_fils = []
 if args.downsamp is not None:
     for i, d in enumerate(args.downsamp):
         add_fn = f"{fn_clean}_fdp_t{d}.fil"
-        log.info(f"Also outputting downsampled file: {add_fn}")
+        print(f"Also outputting downsampled file: {add_fn}")
         additional_fils.append(open(add_fn, "wb"))
         add_header = copy.deepcopy(header)
         add_header["tsamp"] =  header["tsamp"] / d
@@ -91,7 +88,7 @@ if args.downsamp is not None:
         write_header(header, additional_fils[i])
 
 for i in range(loop_iters):
-    print(f"{i}/{loop_iters}\r")
+    print(f"{i+1}/{loop_iters}", end='\r', flush=True)
     spec = (
         np.fromfile(fil, count=args.gulp*nchans, dtype=arr_dtype)
         .reshape(-1, nchans)
