@@ -9,7 +9,15 @@ from presto_without_presto import rfifind, sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
 import logging
 import argparse
-import os
+
+#!/usr/bin/env python3
+from presto import filterbank as fb
+import sys
+import numpy as np
+import logging
+import matplotlib.pyplot as plt
+from presto import filterbank as fb
+import argparse
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -66,7 +74,7 @@ if header["nifs"] != 1:
 loop_iters = int(nspecs/args.chunk_size)
 fn_clean = args.fn.strip('.fil')
 fdp_fn = f"{fn_clean}_fdp2.fil"
-new_fil = open(fdp_fn, "wb")
+new_fil = open(os.path.join(fdp_fn), "wb")
 write_header(header, new_fil)
 fil = open(args.fn, "rb")
 fil.seek(hdrlen)
