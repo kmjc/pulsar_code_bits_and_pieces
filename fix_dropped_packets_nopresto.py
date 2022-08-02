@@ -4,9 +4,13 @@
 #     use shape broadcasting to cut down on memory useage
 #     don't use presto - no forced floats and hopefully speedier as less back and forth
 #     is a bit speedier ~0.7x
+#     downsample at the same time if desired
+#       NB if using --downsamp need to have you filterbank file be an argument before that,
+#       or the nargs='*' tries to package it in with downsamp
+#     refactored chunk_size to gulp to be consistent with my other scripts
 
 import numpy as np
-from presto_without_presto import rfifind, sigproc
+from presto_without_presto import sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
 import argparse
 import copy
