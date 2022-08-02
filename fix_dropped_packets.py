@@ -29,20 +29,20 @@ parser = argparse.ArgumentParser(
     """,
 )
 
-add_argument(
+parser.add_argument(
     "fn",
     type=str,
     help="filterbank file to process",
 )
 
-add_argument(
+parser.add_argument(
     "--chunk_size",
     type=int,
     default=30674,
     help="Number of samples to operate on at once",
 )
 
-add_argument(
+parser.add_argument(
     "--thresh_sig",
     type=float,
     default=4.5,
@@ -64,7 +64,7 @@ fb.create_filterbank_file(fdp_fn,fil.header,nbits=fil.header['nbits'])
 new_fil = fb.FilterbankFile(fdp_fn,mode='append')
 
 for i in range(loop_iters):
-    print(i,'/',loop_iters)
+    print(f"{i}/{loop_iters}\r")
     # gsv_arr = []
     s = i*args.chunk_size
     if i < loop_iters-1:
