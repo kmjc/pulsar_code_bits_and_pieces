@@ -107,7 +107,7 @@ for i in range(loop_iters):
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
         for i,d in enumerate(args.downsamp):
-            additional_fils[i].write(spec[::d,:].ravel(), astype(arr_dtype))
+            additional_fils[i].write(spec[::d,:].ravel().astype(arr_dtype))
 
 
 fil.close()
