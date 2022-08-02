@@ -58,8 +58,6 @@ parser.add_argument(
 args = parser.parse_args()
 
 log = logging.getLogger(__name__)
-log.level = logging.DEBUG
-log.debug(f"args: {args}")
 
 header, hdrlen = sigproc.read_header(args.fn)
 nspecs = int(sigproc.samples_per_file(args.fn, header, hdrlen))
