@@ -93,7 +93,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--max_size", type=float, help="Set maximum size for each file (in bytes)"
+    "--max_size", type=float, help="Set maximum size for each .fdmt file (in bytes)"
 )
 
 parser.add_argument(
@@ -114,6 +114,14 @@ parser.add_argument(
     help="""Minimum DM stepsize to write.
     e.g. if FDMT's DM stepsize is 0.002 and mindmstep is set to 0.004, only every other FDMT DM will be written to file""",
 )
+
+parser.add_argument(
+    "--padto",
+    type=int,
+    help="Pad to this number of samples (actual padding done by bin_to_datinf, this records the N in the .fdmt.yaml)"
+)
+
+
 
 parser.add_argument(
     "--log", type=str, help="name of file to write log to", default=None
@@ -416,6 +424,7 @@ if args.outdatbase:
     basename = args.outdatbase
 else:
     basename = args.filename[:-4]
+
 inf_dict = dict(
     basenm=basename,
     telescope=ids_to_telescope[header.get("telescope_id", 0)],
@@ -434,9 +443,16 @@ inf_dict = dict(
     analyzer=os.environ.get("USER"),
     waveband="Radio",
     beam_diam=BEAM_DIAM,  # hackey, see note at top of script where BEAM_DIAM is defined
-    breaks=0,
-    N=int(origNdat),
 )
+
+if args.padto is not None:
+    assert args.padto > origNdat
+    inf_dict["N"] = args.padto
+    inf_dict["breaks"] = 1
+    inf_dict["onoff"] = [(0, int(origNdat) - 1), (args.padto - 1, args.padto - 1)]
+else:
+    inf_dict["N"] = int(origNdat)
+    inf_dict["breaks"] = 0
 
 # Construct a dictionary with extra information needed to assemble the dat and inf files
 # General stuff that goes into every file:

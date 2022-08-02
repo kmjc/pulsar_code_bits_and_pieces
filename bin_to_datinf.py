@@ -1,6 +1,5 @@
 import sys
 from presto_without_presto.infodata import infodata2
-from presto_without_presto.psr_utils import choose_N
 import yaml
 import argparse
 import copy
@@ -23,12 +22,6 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--pad",
-    action="store_true",
-    help="Pad the .dat files to a highly factorable length using their mean (untested)",
-)
-
-parser.add_argument(
     "--log", type=str, help="name of file to write log to", default=None
 )
 
@@ -44,6 +37,9 @@ parser.add_argument(
 
 
 args = parser.parse_args()
+
+if args.N is not None:
+    args.pad = True
 
 if args.log is not None:
     logging.basicConfig(
@@ -137,29 +133,21 @@ for chunk in unravel_plan:
 logging.info("Done\n")
 
 # Pad dat files
-# UNTESTED
-if args.pad:
-    logging.info("Padding data")
-    origNdat = yam["origNdat"]
-    N = choose_N(origNdat)
-    logging.debug(f"Data will be padded from {origNdat} to {N} samples")
-
+N = yam["inf_dict"]["N"]
+origNdat = yam["origNdat"]
+if N > origNdat:
+    # breaks and onoff should already be set, but just in case they aren't
+    yam["inf_dict"]["breaks"] = 1
     onoff = [(0, origNdat - 1), (N - 1, N - 1)]
+    yam["inf_dict"]["onoff"] = onoff
+    logging.info("Padding data")
+    logging.debug(f"Data will be padded from {origNdat} to {N} samples")
     padby = onoff[1][0] - onoff[0][1]
-
     means = running_sum / origNdat
     for i in dm_indices:
         logging.debug(f"Padding DM {i} by {padby} with {means[i]}")
         padding = np.zeros((padby), dtype=dt) + means[i]
         datfiles[i].write(padding)
-
-    # update inf dict
-    yam["inf_dict"]["breaks"] = 1
-    yam["inf_dict"]["onoff"] = onoff
-    yam["inf_dict"]["N"] = N
-    logging.debug(
-        f"updated inf dict to N: {yam['inf_dict']['N']}, breaks:{yam['inf_dict']['breaks']}, onoff: {yam['inf_dict']['onoff']}"
-    )
 
 logging.debug("Closing fdmt file")
 fdmtfile.close()
