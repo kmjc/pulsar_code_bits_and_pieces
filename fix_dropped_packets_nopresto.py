@@ -3,21 +3,15 @@
 #     argparse
 #     use shape broadcasting to cut down on memory useage
 #     don't use presto - no forced floats and hopefully speedier as less back and forth
+#     is a bit speedier ~0.7x
 
 import numpy as np
 from presto_without_presto import rfifind, sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
 import logging
 import argparse
+import copy
 
-#!/usr/bin/env python3
-from presto import filterbank as fb
-import sys
-import numpy as np
-import logging
-import matplotlib.pyplot as plt
-from presto import filterbank as fb
-import argparse
 
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -28,12 +22,9 @@ parser = argparse.ArgumentParser(
         - calculates the median and standard deviation for each frequency channel,
         - replaces any values less than (median - <thresh_sig> * std) with the median
         - repeat
-    A new file ending in _fdp.fil will be writted
+    A new file ending in _fdp.fil will be written
 
-    Note:
-    There's a hidden forced conversion of the data into floats in the get_spectra
-    method of presto.filterbank.FilterbankFile. If the script is using more memory
-    than it seems like it should from the <chunk_size> this is likely the reason.
+    If downsampling factors are supplied additional _fdp_t<downsamp>.fil files will be written
     """,
 )
 
@@ -57,6 +48,13 @@ parser.add_argument(
     help="Replace values this number of standard deviations under the median",
 )
 
+parser.add_argument(
+    "--downsamp",
+    type=int,
+    nargs="*",
+    help="Downsampling factor/s to apply (multiple factors should be separated by spaces)",
+)
+
 args = parser.parse_args()
 
 log = logging.getLogger(__name__)
@@ -73,11 +71,24 @@ if header["nifs"] != 1:
 #loop through chunks
 loop_iters = int(nspecs/args.chunk_size)
 fn_clean = args.fn.strip('.fil')
-fdp_fn = f"{fn_clean}_fdp2.fil"
-new_fil = open(os.path.join(fdp_fn), "wb")
+fdp_fn = f"{fn_clean}_fdp.fil"
+new_fil = open(fdp_fn, "wb")
 write_header(header, new_fil)
+log.info(f"Output will be written to {fdp_fn}")
 fil = open(args.fn, "rb")
 fil.seek(hdrlen)
+
+additional_fils = []
+if args.downsamp is not None:
+    for i, d in enumerate(args.downsamp):
+        add_fn = f"{fn_clean}_fdp_t{d}.fil"
+        log.info(f"Also outputting downsampled file: {add_fn}")
+        additional_fils.append(open(add_fn, "wb"))
+        add_header = copy.deepcopy(header)
+        add_header["tsamp"] =  header["tsamp"] / d
+        if header.get("nsamples", ""):
+            add_header["nsamples"] = int(header["nsamples"] / d)
+        write_header(header, additional_fils[i])
 
 for i in range(loop_iters):
     print(f"{i}/{loop_iters}\r")
@@ -94,6 +105,13 @@ for i in range(loop_iters):
     mask = np.where(spec < threshold)
     spec[mask] = med[mask[1]]
     new_fil.write(spec.ravel().astype(arr_dtype))
+    if additional_fils:
+        for i,d in enumerate(args.downsamp):
+            additional_fils[i].write(spec[::d,:].ravel(), astype(arr_dtype))
+
 
 fil.close()
 new_fil.close()
+if additional_fils:
+    for add_fil in additional_fils:
+        add_fil.close()
