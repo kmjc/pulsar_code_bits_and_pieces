@@ -23,7 +23,7 @@ if __name__ == "__main__":
         "downsamp",
         type=int,
         nargs="+",
-        help="Sownsampling factor/s to apply (multiple factors should be separated by spaces)",
+        help="Downsampling factor/s to apply (multiple factors should be separated by spaces)",
     )
     parser.add_argument(
         "--gulp",
