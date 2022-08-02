@@ -70,7 +70,9 @@ if header["nifs"] != 1:
 
 
 #loop through chunks
-loop_iters = int(nspecs/args.gulp)
+loop_iters = int(nspecs//args.gulp)
+if nspecs % args.gulp:
+    loop_iters += 1
 fn_clean = args.fn.strip('.fil')
 fdp_fn = f"{fn_clean}_fdp.fil"
 new_fil = open(fdp_fn, "wb")
