@@ -35,7 +35,7 @@ parser.add_argument(
 )
 
 parser.add_argument(
-    "--chunk_size",
+    "--gulp",
     type=int,
     default=30674,
     help="Number of samples to operate on at once",
@@ -58,6 +58,8 @@ parser.add_argument(
 args = parser.parse_args()
 
 log = logging.getLogger(__name__)
+log.level = logging.DEBUG
+log.debug(f"args: {args}")
 
 header, hdrlen = sigproc.read_header(args.fn)
 nspecs = int(sigproc.samples_per_file(args.fn, header, hdrlen))
@@ -69,7 +71,7 @@ if header["nifs"] != 1:
 
 
 #loop through chunks
-loop_iters = int(nspecs/args.chunk_size)
+loop_iters = int(nspecs/args.gulp)
 fn_clean = args.fn.strip('.fil')
 fdp_fn = f"{fn_clean}_fdp.fil"
 new_fil = open(fdp_fn, "wb")
@@ -87,13 +89,13 @@ if args.downsamp is not None:
         add_header = copy.deepcopy(header)
         add_header["tsamp"] =  header["tsamp"] / d
         if header.get("nsamples", ""):
-            add_header["nsamples"] = int(header["nsamples"] / d)
+            add_header["nsamples"] = int(header["nsamples"] // d)
         write_header(header, additional_fils[i])
 
 for i in range(loop_iters):
     print(f"{i}/{loop_iters}\r")
     spec = (
-        np.fromfile(fil, count=args.chunk_size*nchans, dtype=arr_dtype)
+        np.fromfile(fil, count=args.gulp*nchans, dtype=arr_dtype)
         .reshape(-1, nchans)
     )
     # has shape (nspec, nchans) so it plays nice with brodcasting
