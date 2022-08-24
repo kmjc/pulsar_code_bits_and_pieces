@@ -91,7 +91,7 @@ if args.downsamp is not None:
         add_header["tsamp"] =  header["tsamp"] / d
         if header.get("nsamples", ""):
             add_header["nsamples"] = int(header["nsamples"] // d)
-        write_header(header, additional_fils[i])
+        write_header(add_header, additional_fils[i])
 
 for i in range(loop_iters):
     print(f"{i+1}/{loop_iters}", end='\r', flush=True)
