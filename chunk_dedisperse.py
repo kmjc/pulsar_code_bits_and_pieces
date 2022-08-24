@@ -717,6 +717,7 @@ if __name__ == "__main__":
                     logging.error(
                         f"Tried to downsample ptsperint {mask.ptsperint} by {downsamp} and did not get an integer ({ptsperint})"
                     )
+                    sys.exit(1)
                 ptsperint = int(ptsperint)
                 logging.info(
                     f"tsamp {tsamp} is {downsamp} x maskdt ({maskdt}), downsampling ptsperint from {mask.ptsperint} to {ptsperint}"
@@ -725,6 +726,7 @@ if __name__ == "__main__":
                 logging.error(
                     f"tsamp > maskdt, but not by an integer factor. tsamp/maskdt = {tsamp}/{maskdt} = {tsamp/maskdt}"
                 )
+                sys.exit(1)
         else:
             if np.isclose(maskdt % tsamp, 0):
                 upsamp = maskdt / tsamp
@@ -736,12 +738,14 @@ if __name__ == "__main__":
                 logging.error(
                     f"maskdt > tsamp, but not by an integer factor. maskdt/tsamp = {maskdt}/{tsamp} = {maskdt/tsamp}"
                 )
+                sys.exit(1)
 
         # check mask covers all data
         if not ((mask.nint - 1) * ptsperint) < nsamples <= (mask.nint * ptsperint):
             logging.error(
                 f"Mask has {mask.nint} intervals and using {ptsperint} ptsperint. Data is {nsamples} samples but mask covers {(mask.nint - 1) * ptsperint} < samples <= {mask.nint * ptsperint}"
             )
+            sys.exit(1)
 
     else:
         mask = None
@@ -924,8 +928,8 @@ if __name__ == "__main__":
             outf.write(prev_array.ravel().astype(arr_outdtype))
             outf.write(mid_array.ravel().astype(arr_outdtype))
             # tt2 = time.perf_counter()
-            # log.debug(f"Dedispersed in {tt2-tt1} s")
-            # log.debug(f"Processed gulp {current_gulp}")
+            # logging.debug(f"Dedispersed in {tt2-tt1} s")
+            # logging.debug(f"Processed gulp {current_gulp}")
             logging.info(f"Processed gulp {current_gulp}")
             current_gulp += 1
 
