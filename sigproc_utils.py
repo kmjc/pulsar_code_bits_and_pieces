@@ -50,6 +50,8 @@ def get_nbits(dtype):
 # I think I was testing it on one that wasn't properly written, so I had to
 # add them in
 def write_header(header, outfile):
+    """outfile = open file object
+    NB if want to overwrite a header a) check it's the same number of bites first or things and b) open the file in "r+b" mode and it should work fine"""
     header_list = list(header.keys())
     manual_head_start_end = False
     if header_list[0] != "HEADER_START" or header_list[-1] != "HEADER_END":
