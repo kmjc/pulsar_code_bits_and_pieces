@@ -45,13 +45,13 @@ if args.log is not None:
     logging.basicConfig(
         filename=args.log,
         filemode="w",
-        format="%(asctime)s - %(message)s",
+        format="%(asctime)s %(levelname)s:%(message)s",
         datefmt="%d-%b-%y %H:%M:%S",
         level=args.loglevel,
     )
 else:
     logging.basicConfig(
-        format="%(asctime)s - %(message)s",
+        format="%(asctime)s %(levelname)s:%(message)s",
         datefmt="%d-%b-%y %H:%M:%S",
         level=args.loglevel,
         stream=sys.stdout,
