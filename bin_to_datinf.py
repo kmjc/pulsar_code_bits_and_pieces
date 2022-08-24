@@ -136,7 +136,7 @@ logging.info("Done\n")
 N = yam["inf_dict"]["N"]
 origNdat = yam["origNdat"]
 if N > origNdat:
-    # breaks and onoff should already be set, but just in case they aren't
+    # Set onoff
     yam["inf_dict"]["breaks"] = 1
     onoff = [(0, origNdat - 1), (N - 1, N - 1)]
     yam["inf_dict"]["onoff"] = onoff

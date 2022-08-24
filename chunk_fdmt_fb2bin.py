@@ -449,10 +449,10 @@ if args.padto is not None:
     assert args.padto > origNdat
     inf_dict["N"] = args.padto
     inf_dict["breaks"] = 1
-    inf_dict["onoff"] = [(0, int(origNdat) - 1), (args.padto - 1, args.padto - 1)]
 else:
     inf_dict["N"] = int(origNdat)
     inf_dict["breaks"] = 0
+# set onoff in bin_to_datinf (yaml doesn't like tuples and this was easier)
 
 # Construct a dictionary with extra information needed to assemble the dat and inf files
 # General stuff that goes into every file:
