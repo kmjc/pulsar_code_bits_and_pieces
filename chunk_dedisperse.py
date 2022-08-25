@@ -645,15 +645,20 @@ if __name__ == "__main__":
     where_channel_ref_freq = "center"
 
     # define gulp preprocessing based on args
+    logging.info(f"clipsig = {args.clipsig}, droptotsig = {args.droptotsig}, mask = {args.mask}")
     if args.clipsig or args.droptotsig or args.mask:
         if not_zero_or_none(args.mask):
-            "Preprocess is: clipping/computing running averages, subtracting baseline, masking"
+            logging.info(
+                "Preprocess is: clipping/computing running averages, subtracting baseline, masking"
+            )
 
             def preprocess(*args, **kwargs):
                 clip_mask_subbase_gulp(*args, **kwargs)
 
         else:
-            "Preprocess is: clipping/computing running averages, subtracting baseline, NOT masking"
+            logging.info(
+                "Preprocess is: clipping/computing running averages, subtracting baseline, NOT masking"
+            )
 
             def preprocess(*args, **kwargs):
                 clip_subbase_gulp(*args, **kwargs)
