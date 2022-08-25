@@ -38,9 +38,6 @@ parser.add_argument(
 
 args = parser.parse_args()
 
-if args.N is not None:
-    args.pad = True
-
 if args.log is not None:
     logging.basicConfig(
         filename=args.log,
