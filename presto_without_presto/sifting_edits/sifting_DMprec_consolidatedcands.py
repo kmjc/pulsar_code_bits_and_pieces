@@ -1563,27 +1563,28 @@ def read_candidates_amalgamated(filenms, prelim_reject=True, track=False):
         print("\nReading candidates from %d files...." % len(filenms))
         for ii, filenm in enumerate(filenms):
             with open(filenm, "r") as fin:
-                chunk = []
-                accelname=""
-                for line in fin:
-                    if line.startswith("###"):
-                        if line.startswith("### END"):
-                            if chunk == []:
-                                continue
-                            curr_candlist = candlist_from_candfile_chunk(
-                                accelname,
-                                chunk,
-                                trackbad=track,
-                                trackdupes=track
-                                )
-                            if prelim_reject:
-                                curr_candlist.default_rejection()
-                            candlist.extend(curr_candlist)
-                        else:
-                            accelname = accelname_re.search(line).groups()[0]
-                            chunk = []
+                lines = fin.read().split("\n")
+            chunk = []
+            accelname=""
+            for line in lines:
+                if line.startswith("###"):
+                    if line.startswith("### END"):
+                        if chunk == []:
+                            continue
+                        curr_candlist = candlist_from_candfile_chunk(
+                            accelname,
+                            chunk,
+                            trackbad=track,
+                            trackdupes=track
+                            )
+                        if prelim_reject:
+                            curr_candlist.default_rejection()
+                        candlist.extend(curr_candlist)
                     else:
-                        chunk.append(line)
+                        accelname = accelname_re.search(line).groups()[0]
+                        chunk = []
+                else:
+                    chunk.append(line)
             sys.stdout.write(
                 " Read %d of %d files (%d cands)\r" % (ii + 1, numfiles, len(candlist))
             )
