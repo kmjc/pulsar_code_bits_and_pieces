@@ -194,6 +194,55 @@ class Candidate(object):
         harmamps[harmamps < 0.0] = 0.0
         self.snr = np.sum(np.sqrt(harmamps))
 
+    def as_dict(self):
+        ret_dict = dict(
+            path=self.path,
+            filename=self.filename,
+            candnum=self.candnum,
+            sigma=self.sigma,
+            numharm=self.numharm,
+            ipow_det=self.ipow_det,
+            cpow=self.cpow,
+            r=self.r,
+            f=self.f,
+            z=self.z,
+            T=self.T,
+            p=self.p,
+            DMstr=self.DMstr,
+            DM=self.DM,
+            harm_pows=self.harm_pows,
+            harm_amps=self.harm_amps,
+            snr=self.snr,
+            hits=self.hits,
+            note=self.note,
+        )
+        return ret_dict
+
+
+    @classmethod
+    def from_dict(cls, in_dict):
+        cand_out = cls(
+            in_dict["candnum"],
+            in_dict["sigma"],
+            in_dict["numharm"],
+            in_dict["ipow_det"],
+            in_dict["cpow"],
+            in_dict["r"],
+            in_dict["z"],
+            in_dict["DMstr"],
+            in_dict["filename"],
+            in_dict["T"],
+        )
+        cand_out.path = in_dict["path"]
+        cand_out.filename = in_dict["filename"]
+        cand_out.harm_pows = in_dict["harm_pows"],
+        cand_out.harm_amps = in_dict["harm_amps"],
+        cand_out.snr = in_dict["snr"],
+        cand_out.hits = in_dict["hits"],
+        cand_out.note = in_dict["note"],
+        return cand_out
+
+candnum, sigma, numharm, ipow, cpow, bin, z, DMstr, filename, T)
 
 class Candlist(object):
     def __init__(self, cands=None, trackbad=False, trackdupes=False):
@@ -1323,6 +1372,54 @@ class Candlist(object):
                     )
         if candfilenm is not None:
             candfile.close()
+
+    def to_npz(self, filename):
+        """Save a Candlist as a .npz file, preserving all its information."""
+        save_dict = dict(
+            cands=[x.as_dict() for x in self.cands],
+            trackbad=self.trackbad,
+            trackdupes=self.trackdupes,
+            duplicates=[x.as_dict() for x in self.duplicates],
+            knownbirds=[x.as_dict() for x in self.badlists["knownbirds"]],
+            longperiod=[x.as_dict() for x in self.badlists["longperiod"]],
+            shortperiod=[x.as_dict() for x in self.badlists["shortperiod"]],
+            threshold=[x.as_dict() for x in self.badlists["threshold"]],
+            harmpowcutoff=[x.as_dict() for x in self.badlists["harmpowcutoff"]],
+            rogueharmpow=[x.as_dict() for x in self.badlists["rogueharmpow"]],
+            harmonic=[x.as_dict() for x in self.badlists["harmonic"]],
+            dmproblem=[x.as_dict() for x in self.badlists["dmproblem"]],
+        )
+
+        np.savez(filename, **save_dict)
+        print(f"Saved Candlist to {filename}")
+
+    @classmethod
+    def from_npz(cls, filename):
+        """Load a Candlist from a .npz file"""
+        print(f"Reading Candlist from {filename}")
+        data = np.load(filename, allow_pickle=True)
+
+        # Initialize
+        init_dict = dict(
+            cands=[Candidate.from_dict(x) for x in data["cands"]],
+            trackbad=data["trackbad"],
+            trackdupes=data["trackdupes"],
+        )
+        candlist_out = cls(**init_dict)
+        # Set the uninitializable attributes
+        candlist_out.duplicates=[Candidate.from_dict(x) for x in data["duplicates"]],
+        candlist_out.badlists=dict(
+                knownbirds=[Candidate.from_dict(x) for x in data["knownbirds"]],
+                longperiod=[Candidate.from_dict(x) for x in data["longperiod"]],
+                shortperiod=[Candidate.from_dict(x) for x in data["shortperiod"]],
+                threshold=[Candidate.from_dict(x) for x in data["threshold"]],
+                harmpowcutoff=[Candidate.from_dict(x) for x in data["harmpowcutoff"]],
+                rogueharmpow=[Candidate.from_dict(x) for x in data["rogueharmpow"]],
+                harmonic=[Candidate.from_dict(x) for x in data["harmonic"]],
+                dmproblem=[Candidate.from_dict(x) for x in data["dmproblem"]],
+            )
+        )
+        return candlist_out
 
 
 def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
