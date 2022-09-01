@@ -1416,7 +1416,6 @@ class Candlist(object):
                 harmonic=[Candidate.from_dict(x) for x in data["harmonic"]],
                 dmproblem=[Candidate.from_dict(x) for x in data["dmproblem"]],
             )
-        )
         return candlist_out
 
 
