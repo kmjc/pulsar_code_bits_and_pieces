@@ -242,8 +242,6 @@ class Candidate(object):
         cand_out.note = in_dict["note"],
         return cand_out
 
-candnum, sigma, numharm, ipow, cpow, bin, z, DMstr, filename, T)
-
 class Candlist(object):
     def __init__(self, cands=None, trackbad=False, trackdupes=False):
         if cands is None:
