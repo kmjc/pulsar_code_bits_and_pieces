@@ -235,11 +235,11 @@ class Candidate(object):
         )
         cand_out.path = in_dict["path"]
         cand_out.filename = in_dict["filename"]
-        cand_out.harm_pows = in_dict["harm_pows"],
-        cand_out.harm_amps = in_dict["harm_amps"],
-        cand_out.snr = in_dict["snr"],
-        cand_out.hits = in_dict["hits"],
-        cand_out.note = in_dict["note"],
+        cand_out.harm_pows = in_dict["harm_pows"]
+        cand_out.harm_amps = in_dict["harm_amps"]
+        cand_out.snr = in_dict["snr"]
+        cand_out.hits = in_dict["hits"]
+        cand_out.note = in_dict["note"]
         return cand_out
 
 class Candlist(object):
