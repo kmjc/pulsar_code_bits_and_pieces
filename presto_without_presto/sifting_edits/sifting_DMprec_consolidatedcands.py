@@ -238,7 +238,9 @@ class Candidate(object):
         cand_out.harm_pows = in_dict["harm_pows"],
         cand_out.harm_amps = in_dict["harm_amps"],
         cand_out.snr = in_dict["snr"],
-        cand_out.hits = in_dict["hits"],
+        if len(in_dict["hits"] != 1):
+            print("I was wrong about how npz changes hits, go investigate")
+        cand_out.hits = in_dict["hits"][0],
         cand_out.note = in_dict["note"],
         return cand_out
 
