@@ -44,7 +44,7 @@ known_birds_p = []
 known_birds_f = []
 # ---------------------------------------------------
 
-accelname_re = re.compile("([a-zA-Z0-9_.]+_ACCEL_[0-9]+)")
+accelname_re = re.compile("([a-zA-Z0-9_.+-]+_ACCEL_[0-9]+)")
 fund_re = re.compile("^\d")
 harms_re = re.compile("^[ ]\d")
 # NB this only works if there's only one DMx.xx in your filename
