@@ -88,7 +88,7 @@ if args.downsamp is not None:
         print(f"Also outputting downsampled file: {add_fn}")
         additional_fils.append(open(add_fn, "wb"))
         add_header = copy.deepcopy(header)
-        add_header["tsamp"] =  header["tsamp"] / d
+        add_header["tsamp"] =  header["tsamp"] * d
         if header.get("nsamples", ""):
             add_header["nsamples"] = int(header["nsamples"] // d)
         write_header(add_header, additional_fils[i])
