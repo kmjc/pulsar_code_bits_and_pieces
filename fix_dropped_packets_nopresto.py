@@ -96,7 +96,7 @@ if args.stats:
     s1 = np.zeros((loop_iters, nchans))
     s2 = np.zeros((loop_iters, nchans))
     num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
-    n = np.zeros((loop_iters), dtype=np.int)
+    n = np.zeros((loop_iters), dtype=int)
 
 additional_fils = []
 if args.downsamp is not None:
@@ -128,11 +128,13 @@ for i in range(loop_iters):
     # calc stats
     if args.stats:
         msk = (spec < threshold)
-        tmp = np.ma.array(spec, mask=(msk | (spec==0)))
-        skews[i,:] = skew(tmp, axis=0, bias=False).filled(np.nan)
-        kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False).filled(np.nan)
-        s1[i,:] = tmp.sum(axis=0).filled(np.nan)
-        s2[i,:] = (tmp**2).sum(axis=0).filled(np.nan)
+        tmp = np.ma.array(spec, mask=(spec==0))
+        del spec
+        tmp.mask[mask] = True
+        skews[i,:] = skew(tmp, axis=0, bias=False)
+        kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False)
+        s1[i,:] = tmp.sum(axis=0)
+        s2[i,:] = (tmp**2).sum(axis=0)
         num_unmasked_points[i,:] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
 
