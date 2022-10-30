@@ -145,6 +145,7 @@ fil.close()
 new_fil.close()
 # save stats
 if args.stats:
+    print(f"Writing stats to {fdp_fn[:-4]}_stats.npz")
     np.savez(
         f"{fdp_fn[:-4]}_stats.npz",
         skew=skews,
