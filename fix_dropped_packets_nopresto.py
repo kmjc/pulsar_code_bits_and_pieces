@@ -9,11 +9,14 @@
 #       or the nargs='*' tries to package it in with downsamp
 #     refactored chunk_size to gulp to be consistent with my other scripts
 
+# edited this to compute some other stats too - skew, kurtosis, and the s1 and s2 for SK
+
 import numpy as np
 from presto_without_presto import sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
 import argparse
 import copy
+from scipy.stats.mstats import skew, kurtosis
 
 
 parser = argparse.ArgumentParser(
@@ -58,6 +61,12 @@ parser.add_argument(
     help="Downsampling factor/s to apply (multiple factors should be separated by spaces)",
 )
 
+parser.add_argument(
+    "--stats",
+    action='store_true',
+    help="Also calculate and save some stats: skewness, kurtosis, s1 & s2 for spectral kurtosis, number of unmasked time samples summed, total number of time samples"
+)
+
 args = parser.parse_args()
 
 header, hdrlen = sigproc.read_header(args.fn)
@@ -80,6 +89,14 @@ write_header(header, new_fil)
 print(f"Output will be written to {fdp_fn}")
 fil = open(args.fn, "rb")
 fil.seek(hdrlen)
+
+if args.stats:
+    skews = np.zeros((loop_iters, nchans))
+    kurtoses = np.zeros((loop_iters, nchans))
+    s1 = np.zeros((loop_iters, nchans))
+    s2 = np.zeros((loop_iters, nchans))
+    num_unmasked_points = np.zeros((loop_iters, nchans), dtype=np.int)
+    n = np.zeros((loop_iters), dtype=np.int)
 
 additional_fils = []
 if args.downsamp is not None:
@@ -108,6 +125,16 @@ for i in range(loop_iters):
     mask = np.where(spec < threshold)
     spec[mask] = med[mask[1]]
     new_fil.write(spec.ravel().astype(arr_dtype))
+    # calc stats
+    if args.stats:
+        tmp = np.ma.array(spec, mask=(mask | (spec==0))
+        skews[i,:] = skew(tmp, axis=0, bias=False).filled(np.nan)
+        kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False).filled(np.nan)
+        s1[i,:] = tmp.sum(axis=0).filled(np.nan)
+        s2[i,:] = (tmp**2).sum(axis=0).filled(np.nan)
+        num_unmasked_points[i,:] = (~tmp.mask).sum(axis=0)
+        n[i] = tmp.shape[0]
+
     if additional_fils:
         for i,d in enumerate(args.downsamp):
             additional_fils[i].write(spec[::d,:].ravel().astype(arr_dtype))
@@ -115,6 +142,17 @@ for i in range(loop_iters):
 
 fil.close()
 new_fil.close()
+# save stats
+if args.stats:
+    np.savez(
+        f"{fdp_fn[:-4]}_stats.npz",
+        skew=skews,
+        kurtosis=kurtoses,
+        s1=s1,
+        s2=s2,
+        num_unmasked_points=num_unmasked_points,
+        n=n
+    )
 if additional_fils:
     for add_fil in additional_fils:
         add_fil.close()
