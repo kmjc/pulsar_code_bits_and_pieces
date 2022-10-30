@@ -127,7 +127,7 @@ for i in range(loop_iters):
     new_fil.write(spec.ravel().astype(arr_dtype))
     # calc stats
     if args.stats:
-        tmp = np.ma.array(spec, mask=(mask | (spec==0))
+        tmp = np.ma.array(spec, mask=(mask | (spec==0)))
         skews[i,:] = skew(tmp, axis=0, bias=False).filled(np.nan)
         kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False).filled(np.nan)
         s1[i,:] = tmp.sum(axis=0).filled(np.nan)
