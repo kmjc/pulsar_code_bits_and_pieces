@@ -95,7 +95,7 @@ if args.stats:
     kurtoses = np.zeros((loop_iters, nchans))
     s1 = np.zeros((loop_iters, nchans))
     s2 = np.zeros((loop_iters, nchans))
-    num_unmasked_points = np.zeros((loop_iters, nchans), dtype=np.int)
+    num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
     n = np.zeros((loop_iters), dtype=np.int)
 
 additional_fils = []
