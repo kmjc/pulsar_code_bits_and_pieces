@@ -17,6 +17,7 @@ from sigproc_utils import get_dtype, get_nbits, write_header
 import argparse
 import copy
 from scipy.stats.mstats import skew, kurtosis
+import sys
 
 
 parser = argparse.ArgumentParser(
@@ -125,6 +126,10 @@ for i in range(loop_iters):
     mask = np.where(spec < threshold)
     spec[mask] = med[mask[1]]
     new_fil.write(spec.ravel().astype(arr_dtype))
+    if additional_fils:
+        for i,d in enumerate(args.downsamp):
+            additional_fils[i].write(spec[::d,:].ravel().astype(arr_dtype))
+
     # calc stats
     if args.stats:
         msk = (spec < threshold)
@@ -137,10 +142,6 @@ for i in range(loop_iters):
         s2[i,:] = (tmp**2).sum(axis=0)
         num_unmasked_points[i,:] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
-
-    if additional_fils:
-        for i,d in enumerate(args.downsamp):
-            additional_fils[i].write(spec[::d,:].ravel().astype(arr_dtype))
 
 
 fil.close()
@@ -160,3 +161,5 @@ if args.stats:
 if additional_fils:
     for add_fil in additional_fils:
         add_fil.close()
+
+sys.exit(0)
