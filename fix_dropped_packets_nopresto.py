@@ -97,7 +97,6 @@ if args.stats:
     s1 = np.zeros((loop_iters, nchans))
     s2 = np.zeros((loop_iters, nchans))
     num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
-    medians = np.zeros((loop_iters, nchans))
     n = np.zeros((loop_iters), dtype=int)
 
 additional_fils = []
@@ -140,7 +139,6 @@ for i in range(loop_iters):
         kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False)
         s1[i,:] = tmp.sum(axis=0)
         s2[i,:] = (tmp**2).sum(axis=0)
-        medians[i,:] = np.ma.median(tmp, axis=0)
         num_unmasked_points[i,:] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
 
