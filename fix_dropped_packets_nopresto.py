@@ -97,6 +97,7 @@ if args.stats:
     s1 = np.zeros((loop_iters, nchans))
     s2 = np.zeros((loop_iters, nchans))
     num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
+    medians = np.zeros((loop_iters, nchans))
     n = np.zeros((loop_iters), dtype=int)
 
 additional_fils = []
@@ -127,19 +128,19 @@ for i in range(loop_iters):
     spec[mask] = med[mask[1]]
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
-        for i,d in enumerate(args.downsamp):
-            additional_fils[i].write(spec[::d,:].ravel().astype(arr_dtype))
+        for ii,d in enumerate(args.downsamp):
+            additional_fils[ii].write(spec[::d,:].ravel().astype(arr_dtype))
 
     # calc stats
     if args.stats:
-        msk = (spec < threshold)
         tmp = np.ma.array(spec, mask=(spec==0))
-        del spec
         tmp.mask[mask] = True
+        del spec
         skews[i,:] = skew(tmp, axis=0, bias=False)
         kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False)
         s1[i,:] = tmp.sum(axis=0)
         s2[i,:] = (tmp**2).sum(axis=0)
+        medians[i,:] = np.ma.median(tmp, axis=0)
         num_unmasked_points[i,:] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
 
