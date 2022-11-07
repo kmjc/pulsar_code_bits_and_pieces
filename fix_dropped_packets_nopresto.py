@@ -132,7 +132,7 @@ for i in range(loop_iters):
 
     # calc stats
     if args.stats:
-        tmp = np.ma.array(spec, mask=(spec==0))
+        tmp = np.ma.array(spec, mask=(spec==0)).astype(int)
         tmp.mask[mask] = True
         del spec
         skews[i,:] = skew(tmp, axis=0, bias=False)
