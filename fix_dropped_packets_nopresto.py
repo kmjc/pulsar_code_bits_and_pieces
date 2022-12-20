@@ -39,6 +39,12 @@ def get_fdp_mask(arr, axis=0, sigma=4.5):
     return arr < thrshold
 
 
+def tscrunch(arr, fac):
+    """Scrunch (by summing) a (nspec,nchan) array in time by <fac>
+    Returns array of shape (nspec/fac, nchan)"""
+    return arr.reshape(-1,fac,arr.shape[-1]).sum(axis=1)
+
+
 parser = argparse.ArgumentParser(
     formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     description="""Correct artefacts due to dropped packets in CHIME data.
