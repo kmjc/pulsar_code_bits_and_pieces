@@ -11,6 +11,10 @@
 
 # edited this to compute some other stats too - skew, kurtosis, and the s1 and s2 for SK
 
+# calculate medians and std for thresholding excluding any 0s in the data
+# option to calcuate fdp mask on tscrunched data
+# . . . there are too many masked arrays here, it's going to hog memory
+
 import numpy as np
 from presto_without_presto import sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
@@ -18,6 +22,20 @@ import argparse
 import copy
 from scipy.stats.mstats import skew, kurtosis
 import sys
+
+def get_fdp_mask(arr, axis=0, sigma=4.5):
+    """
+    Get a mask of where arr is < median - sigma*std
+    where the median and std have been calulates after masking out any 0s.
+    Returns a boolean array with the same shape as arr.
+
+    axis = time axis of array, e.g. for (nspec,nchan) axis=0"""
+    tmp_arr = np.ma.array(arr, mask=(arr==0))
+    meds = np.ma.median(tmp_arr, axis=axis)
+    stds = np.ma.median(tmp_arr, axis=axis)
+    del tmp_arr
+    threshold = meds - sigma*stds
+    return arr < thrshold
 
 
 parser = argparse.ArgumentParser(
@@ -56,6 +74,24 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--fdp_tscrunch",
+    type=int,
+    default=1,
+    help="""
+    With this argument
+    - the data is scrunched (summed) in time by this factor first,
+    - the dropout sections are identified based on the median and std of the scrunched data
+    - this mask is upsampled back to the original time resolution and applied to the original data
+
+    Why? With 40.96us data fdp has trouble catching all the dips. For 327.68us it's fine'.
+    Recommend using this on high-time-resolution data"""
+    # you're less likely to detect dips <fdp_tscrunch time bins in this case
+    # but a) we weren't detecting them anyway
+    # b) Shorter things will just blend into the noise
+    # c) this tends to happen on longer timescales so it's fine
+)
+
+parser.add_argument(
     "--downsamp",
     type=int,
     nargs="*",
@@ -70,6 +106,15 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+if args.fdp_tscrunch < 1:
+    raise AttributeError(f"fdp_tscrunch ({args.fdp_tscrunch}) must be >=1")
+if args.gulp % args.fdp_tscrunch:
+    print(f"Gulp {args.gulp} is not divisible by fdp_tscrunch {args.fdp_tscrunch}")
+    gulp = (int(args.gulp // args.fdp_tscrunch) + 1)*args.fdp_tscrunch
+    print(f"Gulp adjusted to {gulp}")
+else:
+    gulp = args.gulp
+
 header, hdrlen = sigproc.read_header(args.fn)
 nspecs = int(sigproc.samples_per_file(args.fn, header, hdrlen))
 nchans = header["nchans"]
@@ -80,8 +125,8 @@ if header["nifs"] != 1:
 
 
 #loop through chunks
-loop_iters = int(nspecs//args.gulp)
-if nspecs % args.gulp:
+loop_iters = int(nspecs//gulp)
+if nspecs % gulp:
     loop_iters += 1
 fn_clean = args.fn.strip('.fil')
 fdp_fn = f"{fn_clean}_fdp.fil"
@@ -114,17 +159,40 @@ if args.downsamp is not None:
 for i in range(loop_iters):
     print(f"{i+1}/{loop_iters}", end='\r', flush=True)
     spec = (
-        np.fromfile(fil, count=args.gulp*nchans, dtype=arr_dtype)
+        np.fromfile(fil, count=gulp*nchans, dtype=arr_dtype)
         .reshape(-1, nchans)
     )
     # has shape (nspec, nchans) so it plays nice with brodcasting
-    med = np.median(spec,axis=0)
-    std = np.std(spec,axis=0)
-    #set the threshold
-    threshold = med - args.thresh_sig*std
-    #find values below threshold and replace with the median
-    mask = np.where(spec < threshold)
-    spec[mask] = med[mask[1]]
+
+    mzeros = (spec == 0)
+
+    # tscrunch if necessary
+    if args.fdp_tscrunch != 1:
+        working_spec = tscrunch(spec, args.fdp_tscrunch)
+    else:
+        working_spec = spec
+
+    # get the (tscrunched) dropout mask
+    mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig
+
+    # convert mask to full time resolution if necessary, combine with zeros mask
+    if args.fdp_tscrunch != 1:
+        mtot = (np.repeat(mfdp, args.fdp_tscrunch, axis=0) | mzeros)
+    else:
+        mtot = (mfdp | mzeros)
+
+    del mfdp
+    del mzeros
+
+    # get medians to replace masked values with, not including to-be-masked values in the calculation
+    tmp = np.ma.array(spec, mask=(mtot)).astype(int)
+    meds_fullres = np.ma.median(tmp, axis=0)
+    if not args.stats:
+        del tmp
+
+    # replace masked values with the median
+    spec[mtot] = meds_fullres(np.where(mtot)[1])
+
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
         for ii,d in enumerate(args.downsamp):
@@ -132,8 +200,6 @@ for i in range(loop_iters):
 
     # calc stats
     if args.stats:
-        tmp = np.ma.array(spec, mask=(spec==0)).astype(int)
-        tmp.mask[mask] = True
         del spec
         skews[i,:] = skew(tmp, axis=0, bias=False)
         kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False)
