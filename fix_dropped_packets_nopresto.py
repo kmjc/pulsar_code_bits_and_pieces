@@ -42,7 +42,7 @@ def get_fdp_mask(arr, axis=0, sigma=4.5):
 def tscrunch(arr, fac):
     """Scrunch (by summing) a (nspec,nchan) array in time by <fac>
     Returns array of shape (nspec/fac, nchan)"""
-    return arr.reshape(-1,fac,arr.shape[-1]).sum(axis=1)
+    return arr.reshape(-1, fac, arr.shape[-1]).sum(axis=1)
 
 
 parser = argparse.ArgumentParser(
