@@ -23,6 +23,7 @@ import copy
 from scipy.stats.mstats import skew, kurtosis
 import sys
 
+
 def get_fdp_mask(arr, axis=0, sigma=4.5):
     """
     Get a mask of where arr is < median - sigma*std
@@ -30,11 +31,11 @@ def get_fdp_mask(arr, axis=0, sigma=4.5):
     Returns a boolean array with the same shape as arr.
 
     axis = time axis of array, e.g. for (nspec,nchan) axis=0"""
-    tmp_arr = np.ma.array(arr, mask=(arr==0))
+    tmp_arr = np.ma.array(arr, mask=(arr == 0))
     meds = np.ma.median(tmp_arr, axis=axis)
     stds = np.ma.median(tmp_arr, axis=axis)
     del tmp_arr
-    threshold = meds - sigma*stds
+    threshold = meds - sigma * stds
     return arr < thrshold
 
 
@@ -100,8 +101,8 @@ parser.add_argument(
 
 parser.add_argument(
     "--stats",
-    action='store_true',
-    help="Also calculate and save some stats: skewness, kurtosis, s1 & s2 for spectral kurtosis, number of unmasked time samples summed, total number of time samples"
+    action="store_true",
+    help="Also calculate and save some stats: skewness, kurtosis, s1 & s2 for spectral kurtosis, number of unmasked time samples summed, total number of time samples",
 )
 
 args = parser.parse_args()
@@ -110,7 +111,7 @@ if args.fdp_tscrunch < 1:
     raise AttributeError(f"fdp_tscrunch ({args.fdp_tscrunch}) must be >=1")
 if args.gulp % args.fdp_tscrunch:
     print(f"Gulp {args.gulp} is not divisible by fdp_tscrunch {args.fdp_tscrunch}")
-    gulp = (int(args.gulp // args.fdp_tscrunch) + 1)*args.fdp_tscrunch
+    gulp = (int(args.gulp // args.fdp_tscrunch) + 1) * args.fdp_tscrunch
     print(f"Gulp adjusted to {gulp}")
 else:
     gulp = args.gulp
@@ -124,11 +125,11 @@ if header["nifs"] != 1:
     raise AttributeError(f"Code not written to deal with unsummed polarization data")
 
 
-#loop through chunks
-loop_iters = int(nspecs//gulp)
+# loop through chunks
+loop_iters = int(nspecs // gulp)
 if nspecs % gulp:
     loop_iters += 1
-fn_clean = args.fn.strip('.fil')
+fn_clean = args.fn.strip(".fil")
 fdp_fn = f"{fn_clean}_fdp.fil"
 new_fil = open(fdp_fn, "wb")
 write_header(header, new_fil)
@@ -151,20 +152,17 @@ if args.downsamp is not None:
         print(f"Also outputting downsampled file: {add_fn}")
         additional_fils.append(open(add_fn, "wb"))
         add_header = copy.deepcopy(header)
-        add_header["tsamp"] =  header["tsamp"] * d
+        add_header["tsamp"] = header["tsamp"] * d
         if header.get("nsamples", ""):
             add_header["nsamples"] = int(header["nsamples"] // d)
         write_header(add_header, additional_fils[i])
 
 for i in range(loop_iters):
-    print(f"{i+1}/{loop_iters}", end='\r', flush=True)
-    spec = (
-        np.fromfile(fil, count=gulp*nchans, dtype=arr_dtype)
-        .reshape(-1, nchans)
-    )
+    print(f"{i+1}/{loop_iters}", end="\r", flush=True)
+    spec = np.fromfile(fil, count=gulp * nchans, dtype=arr_dtype).reshape(-1, nchans)
     # has shape (nspec, nchans) so it plays nice with brodcasting
 
-    mzeros = (spec == 0)
+    mzeros = spec == 0
 
     # tscrunch if necessary
     if args.fdp_tscrunch != 1:
@@ -173,13 +171,13 @@ for i in range(loop_iters):
         working_spec = spec
 
     # get the (tscrunched) dropout mask
-    mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig
+    mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig)
 
     # convert mask to full time resolution if necessary, combine with zeros mask
     if args.fdp_tscrunch != 1:
-        mtot = (np.repeat(mfdp, args.fdp_tscrunch, axis=0) | mzeros)
+        mtot = np.repeat(mfdp, args.fdp_tscrunch, axis=0) | mzeros
     else:
-        mtot = (mfdp | mzeros)
+        mtot = mfdp | mzeros
 
     del mfdp
     del mzeros
@@ -195,17 +193,17 @@ for i in range(loop_iters):
 
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
-        for ii,d in enumerate(args.downsamp):
-            additional_fils[ii].write(spec[::d,:].ravel().astype(arr_dtype))
+        for ii, d in enumerate(args.downsamp):
+            additional_fils[ii].write(spec[::d, :].ravel().astype(arr_dtype))
 
     # calc stats
     if args.stats:
         del spec
-        skews[i,:] = skew(tmp, axis=0, bias=False)
-        kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False)
-        s1[i,:] = tmp.sum(axis=0)
-        s2[i,:] = (tmp**2).sum(axis=0)
-        num_unmasked_points[i,:] = (~tmp.mask).sum(axis=0)
+        skews[i, :] = skew(tmp, axis=0, bias=False)
+        kurtoses[i, :] = kurtosis(tmp, axis=0, bias=False)
+        s1[i, :] = tmp.sum(axis=0)
+        s2[i, :] = (tmp**2).sum(axis=0)
+        num_unmasked_points[i, :] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
 
 
@@ -221,7 +219,7 @@ if args.stats:
         s1=s1,
         s2=s2,
         num_unmasked_points=num_unmasked_points,
-        n=n
+        n=n,
     )
 if additional_fils:
     for add_fil in additional_fils:
