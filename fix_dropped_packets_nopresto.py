@@ -36,7 +36,7 @@ def get_fdp_mask(arr, axis=0, sigma=4.5):
     stds = np.ma.median(tmp_arr, axis=axis)
     del tmp_arr
     threshold = meds - sigma * stds
-    return arr < thrshold
+    return arr < threshold
 
 
 def tscrunch(arr, fac):
@@ -144,8 +144,8 @@ fil = open(args.fn, "rb")
 fil.seek(hdrlen)
 
 if args.stats:
-    skews = np.zeros((loop_iters, nchans))
-    kurtoses = np.zeros((loop_iters, nchans))
+#    skews = np.zeros((loop_iters, nchans))
+#    kurtoses = np.zeros((loop_iters, nchans))
     s1 = np.zeros((loop_iters, nchans))
     s2 = np.zeros((loop_iters, nchans))
     num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
@@ -177,7 +177,7 @@ for i in range(loop_iters):
         working_spec = spec
 
     # get the (tscrunched) dropout mask
-    mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig)
+    mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig).data
 
     # convert mask to full time resolution if necessary, combine with zeros mask
     if args.fdp_tscrunch != 1:
@@ -195,7 +195,7 @@ for i in range(loop_iters):
         del tmp
 
     # replace masked values with the median
-    spec[mtot] = meds_fullres(np.where(mtot)[1])
+    spec[mtot] = meds_fullres[np.where(mtot)[1]]
 
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
@@ -205,8 +205,8 @@ for i in range(loop_iters):
     # calc stats
     if args.stats:
         del spec
-        skews[i, :] = skew(tmp, axis=0, bias=False)
-        kurtoses[i, :] = kurtosis(tmp, axis=0, bias=False)
+ #       skews[i, :] = skew(tmp, axis=0, bias=False)
+ #       kurtoses[i, :] = kurtosis(tmp, axis=0, bias=False)
         s1[i, :] = tmp.sum(axis=0)
         s2[i, :] = (tmp**2).sum(axis=0)
         num_unmasked_points[i, :] = (~tmp.mask).sum(axis=0)
@@ -220,8 +220,8 @@ if args.stats:
     print(f"Writing stats to {fdp_fn[:-4]}_stats.npz")
     np.savez(
         f"{fdp_fn[:-4]}_stats.npz",
-        skew=skews,
-        kurtosis=kurtoses,
+#        skew=skews,
+#        kurtosis=kurtoses,
         s1=s1,
         s2=s2,
         num_unmasked_points=num_unmasked_points,
