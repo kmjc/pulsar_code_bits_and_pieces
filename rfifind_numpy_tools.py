@@ -126,9 +126,9 @@ def write_stats_file(filename, pow_stats, avg_stats, std_stats, header):
         for variable in header_params:
             variable.tofile(fout)
 
-    pow_stats.astype(np.float32).tofile(fout)
-    avg_stats.astype(np.float32).tofile(fout)
-    std_stats.astype(np.float32).tofile(fout)
+        pow_stats.astype(np.float32).tofile(fout)
+        avg_stats.astype(np.float32).tofile(fout)
+        std_stats.astype(np.float32).tofile(fout)
 
     fout.close()
 
