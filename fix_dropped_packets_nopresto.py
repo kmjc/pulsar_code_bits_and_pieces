@@ -226,6 +226,7 @@ if args.stats:
         s2=s2,
         num_unmasked_points=num_unmasked_points,
         n=n,
+        gulp=gulp,
     )
 if additional_fils:
     for add_fil in additional_fils:
