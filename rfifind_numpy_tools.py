@@ -90,7 +90,7 @@ def write_new_mask_from(filename, maskarr, rfifind_obj, include_old=False, infst
         )
 
 
-def write_stats_file(filename, pow_stats, avg_stags, std_stats, header):
+def write_stats_file(filename, pow_stats, avg_stats, std_stats, header):
     """
     Write pow_atats, avg_stats and std_stats arrays as a rfifind .stats file
     filename: filename to write stats to (will add a .stats extension if not present)
