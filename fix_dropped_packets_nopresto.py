@@ -15,6 +15,11 @@
 # option to calcuate fdp mask on tscrunched data
 # . . . there are too many masked arrays here, it's going to hog memory
 
+# added mask "wiggle"
+# this thing is due to dropped packets and is time dependent - it starts before and finishes after it 
+# is detectable via this method
+# to overcome this also mask +-<fdp_tscrunch> time samples either side of masked range
+
 import numpy as np
 from presto_without_presto import sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
@@ -23,8 +28,7 @@ import copy
 from scipy.stats.mstats import skew, kurtosis
 import sys
 
-
-def get_fdp_mask(arr, axis=0, sigma=4.5):
+def get_fdp_mask(arr, axis=0, sigma=4.5):  #, debug=False):
     """
     Get a mask of where arr is < median - sigma*std
     where the median and std have been calulates after masking out any 0s.
@@ -33,10 +37,14 @@ def get_fdp_mask(arr, axis=0, sigma=4.5):
     axis = time axis of array, e.g. for (nspec,nchan) axis=0"""
     tmp_arr = np.ma.array(arr, mask=(arr == 0))
     meds = np.ma.median(tmp_arr, axis=axis)
-    stds = np.ma.median(tmp_arr, axis=axis)
+    stds = np.ma.std(tmp_arr, axis=axis)
     del tmp_arr
     threshold = meds - sigma * stds
-    return arr < threshold
+    out = arr < threshold
+#    if debug:
+#        print("saving things from mfdp calcs for debug")
+#        np.savez("fdp_debug_mfdp_stages.npz", tmp_arr=np.ma.array(arr, mask=(arr == 0)), meds=meds, stds=stds, threshold=threshold, out=out)
+    return out
 
 
 def tscrunch(arr, fac):
@@ -111,7 +119,26 @@ parser.add_argument(
     help="Also calculate and save some stats: skewness, kurtosis, s1 & s2 for spectral kurtosis, number of unmasked time samples summed, total number of time samples",
 )
 
+#parser.add_argument(
+#    "--debug",
+#    action='store_true',
+#    help="Output more messages for debugging purposes. Only do first gulp and output many intermediary products into fdp_debug*.npz files",
+#)
+
+parser.add_argument(
+    "-v",
+    "--verbose",
+    action='store_true',
+    help="Output more messages",
+)
+
 args = parser.parse_args()
+
+#if args.debug:
+#    args.verbose=True
+
+if args.verbose:
+    print(f"Running fdp with args:\n{args}")
 
 if args.fdp_tscrunch < 1:
     raise AttributeError(f"fdp_tscrunch ({args.fdp_tscrunch}) must be >=1")
@@ -130,12 +157,18 @@ arr_dtype = get_dtype(header["nbits"])
 if header["nifs"] != 1:
     raise AttributeError(f"Code not written to deal with unsummed polarization data")
 
+#if args.debug:
+#    print(f"Read filterbank {args.fn} header:\n{header}")
 
 # loop through chunks
 loop_iters = int(nspecs // gulp)
 if nspecs % gulp:
     loop_iters += 1
+if args.verbose:
+    print(f"Loop through in {loop_iters} iterations")
 fn_clean = args.fn.strip(".fil")
+#if args.debug:
+#    fn_clean += "_debug"
 fdp_fn = f"{fn_clean}_fdp.fil"
 new_fil = open(fdp_fn, "wb")
 write_header(header, new_fil)
@@ -150,6 +183,8 @@ if args.stats:
     s2 = np.zeros((loop_iters, nchans))
     num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
     n = np.zeros((loop_iters), dtype=int)
+    if args.verbose:
+        print(f"Initilaized stats arrays with shape {(loop_iters, nchans)}")
 
 additional_fils = []
 if args.downsamp is not None:
@@ -163,27 +198,55 @@ if args.downsamp is not None:
             add_header["nsamples"] = int(header["nsamples"] // d)
         write_header(add_header, additional_fils[i])
 
+#if args.debug:
+#    loop_iters = 1
+
 for i in range(loop_iters):
-    print(f"{i+1}/{loop_iters}", end="\r", flush=True)
+    #print(f"{i+1}/{loop_iters}", end="\r", flush=True)
+    print(f"{i+1}/{loop_iters}")
     spec = np.fromfile(fil, count=gulp * nchans, dtype=arr_dtype).reshape(-1, nchans)
     # has shape (nspec, nchans) so it plays nice with brodcasting
 
+#    if args.debug:
+#        print(f"Read data into shape {spec.shape}")
+
     mzeros = spec == 0
+#    if args.debug:
+#        print(f"number of zeros in data: {mzeros.sum()} ({mzeros.sum()/mzeros.size})")
 
     # tscrunch if necessary
     if args.fdp_tscrunch != 1:
+ #       if args.debug:
+ #           print("tscrunching by a factor of {args.fdp_tscrunch}")
         working_spec = tscrunch(spec, args.fdp_tscrunch)
     else:
         working_spec = spec
 
+#    if args.debug:
+#        print(f"working spectra of shape {working_spec.shape}")
+
     # get the (tscrunched) dropout mask
+    #mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig, debug=args.debug).data
     mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig).data
+    if args.verbose:
+        print(f"mfdp mask of shape {mfdp.shape}\nNumber masked by mfdp is {mfdp.sum()} ({mfdp.sum()/mfdp.size})")
+
+    # wiggle mfdp
+    print("wiggling fdp mask")
+    mfdp[0:-1,:] = (mfdp[0:-1,:] | mfdp[1:,:])
+    mfdp[1:,:] = (mfdp[1:,:] | mfdp[0:-1,:])
 
     # convert mask to full time resolution if necessary, combine with zeros mask
     if args.fdp_tscrunch != 1:
         mtot = np.repeat(mfdp, args.fdp_tscrunch, axis=0) | mzeros
     else:
         mtot = mfdp | mzeros
+
+    if args.verbose:
+        print(f"mtot made, of shape {mtot.shape}, mask amount {mtot.sum()} ({mtot.sum()/mtot.size} of data)")
+#    if args.debug:
+#        print("Saving spec, mzeros, working_spec, mfdp, mtot for debug to fdp_debug.npz")
+#        np.savez("fdp_debug.npz", spec=spec, working_spec=working_spec, mfdp=mfdp, mtot=mtot)
 
     del mfdp
     del mzeros
@@ -196,6 +259,10 @@ for i in range(loop_iters):
 
     # replace masked values with the median
     spec[mtot] = meds_fullres[np.where(mtot)[1]]
+
+#    if args.debug:
+#        print("saving output spectra")
+#        np.savez("fdp_debug_spec_out.npz", spec_out=spec)
 
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
@@ -211,12 +278,16 @@ for i in range(loop_iters):
         s2[i, :] = (tmp**2).sum(axis=0)
         num_unmasked_points[i, :] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
+#        if args.debug:
+#            print("Saving stats for debug")
+#            np.savez("fdp_debug_stats.npz", s1=s1[i, :], s2=s2[i, :], num_unmasked_points=num_unmasked_points[i, :], n=n[i])
+
 
 
 fil.close()
 new_fil.close()
 # save stats
-if args.stats:
+if args.stats:  # and not args.debug:
     print(f"Writing stats to {fdp_fn[:-4]}_stats.npz")
     np.savez(
         f"{fdp_fn[:-4]}_stats.npz",
