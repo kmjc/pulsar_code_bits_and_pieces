@@ -1,6 +1,3 @@
-#!/usr/bin/env python
-# coding: utf-8
-
 # ## Import stuff
 
 import numpy as np
@@ -21,6 +18,9 @@ from matplotlib.backends.backend_pdf import PdfPages
 
 from gen_utils import handle_exception
 import logging
+
+# catch uncaught exceptions and put them in log too
+sys.excepthook = handle_exception
 
 # ## Define functions
 
@@ -316,7 +316,7 @@ def cut_off_high_fraction(existing_mask, hard_thresh_chans=0.2, hard_thresh_ints
         chan_frac_threshold = 1
     chans_to_zap = np.where((frac_data_chans >= chan_frac_threshold) & (frac_data_chans != 1))[0]
     if verbose:
-        logging.info(f"Additional channels to zap: {sorted(list(set(chans_to_zap).difference(set(zapped_chans))))}")
+        logging.info(f"Channels to zap from cumulative threshold of {cumul_threshold_chans}: {sorted(list(set(chans_to_zap).difference(set(zapped_chans))))}")
 
 
     sorted_fracs_int = np.sort(frac_data_ints[frac_data_ints !=1])
@@ -328,7 +328,7 @@ def cut_off_high_fraction(existing_mask, hard_thresh_chans=0.2, hard_thresh_ints
         int_frac_threshold = 1
     ints_to_zap = np.where((frac_data_ints >= int_frac_threshold) & (frac_data_ints != 1))[0]
     if verbose:
-        logging.info(f"Additional intervals to zap: {sorted(list(set(ints_to_zap).difference(set(zapped_ints))))}")
+        logging.info(f"Intervals to zap from cumulative threshold of {cumul_threshold_ints}: {sorted(list(set(ints_to_zap).difference(set(zapped_ints))))}")
 
     if plot_diagnostics:
         show_plot = False
@@ -903,16 +903,13 @@ parser.add_argument(
     default=logging.INFO,
 )
 
-
 # args = parser.parse_args(args_in)
 args = parser.parse_args()
-logging.info("rfi_pipeline initialized with arguments:")
-logging.info(args)
 
 if args.log is not None:
     logging.basicConfig(
         filename=args.log,
-        filemode="w",
+        filemode="a",
         format="%(asctime)s %(levelname)s:%(message)s",
         datefmt="%d-%b-%y %H:%M:%S",
         level=args.loglevel,
@@ -925,6 +922,8 @@ else:
         stream=sys.stdout,
     )
 
+logging.info("rfi_pipeline initialized with arguments:")
+logging.info(args)
 
 maskfile = args.maskfile
 extra_stats_fn = args.extra_stats_file
@@ -1090,7 +1089,7 @@ if 2 in opts:
     figtmp, axtmp = plt.subplots()
     zapints_med_means_time_mask = iqrm_of_median_of_means(means.data, working_mask_exstats, r_int, ax=axtmp, to_return="array")
     output_plot(figtmp, pdf=p)
-    logging.info("zapping intervals", zapints_med_means_time_mask)
+    logging.info(f"zapping intervals: {zapints_med_means_time_mask}")
     med_means_time_mask = np.zeros_like(working_mask)
     med_means_time_mask[zapints_med_means_time_mask,:] = True
     med_means_time_mask_exstats = np.zeros_like(working_mask_exstats)
@@ -1253,7 +1252,7 @@ if 6 in opts:
 
     # do an iterative medain+5*std cut on the residuals
     t = (std_of_means - std_of_means_runningmed)
-    std_of_avg_chan_mask = reject_pm_sigma_iteration(t.data, t.mask, verbose=False, plot=False, positive_only=True)
+    std_of_avg_chan_mask = reject_pm_sigma_iteration(t.data, t.mask, plot=False, positive_only=True)
     std_of_avg_mask_exstats = np.tile(std_of_avg_chan_mask, reps=(working_mask_exstats.shape[0],1))
     std_of_avg_mask = np.tile(std_of_avg_chan_mask, reps=(working_mask.shape[0],1))
 
@@ -1310,4 +1309,8 @@ if 6 in opts:
 logging.info("\nWrapping up")
 wrap_up(working_mask, working_mask_exstats, rfimask, means, var, p, outfilename, infstats_too=(not args.overwrite))
 logging.info("Done")
+
+# test to make sure logging's working even if unexpected error raised
+print(gvgjh)
+
 sys.exit(0)
