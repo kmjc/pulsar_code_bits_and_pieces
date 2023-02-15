@@ -621,7 +621,7 @@ def reject_pm_sigma_iteration(arr1d, init_mask, thresh=5, plot=False, positive_o
     for c in np.where(condit):
         working_mask[c] = True
 
-    return reject_pm_sigma_iteration(arr1d, working_mask, thresh=thresh, verbose=verbose, plot=plot, positive_only=positive_only, iteration=iteration+1, prev_hits=all_hits)
+    return reject_pm_sigma_iteration(arr1d, working_mask, thresh=thresh, plot=plot, positive_only=positive_only, iteration=iteration+1, prev_hits=all_hits)
 
 
 
