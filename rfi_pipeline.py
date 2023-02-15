@@ -1310,7 +1310,4 @@ logging.info("\nWrapping up")
 wrap_up(working_mask, working_mask_exstats, rfimask, means, var, p, outfilename, infstats_too=(not args.overwrite))
 logging.info("Done")
 
-# test to make sure logging's working even if unexpected error raised
-print(gvgjh)
-
 sys.exit(0)
