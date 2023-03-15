@@ -11,6 +11,15 @@
 
 # edited this to compute some other stats too - skew, kurtosis, and the s1 and s2 for SK
 
+# calculate medians and std for thresholding excluding any 0s in the data
+# option to calcuate fdp mask on tscrunched data
+# . . . there are too many masked arrays here, it's going to hog memory
+
+# added mask "wiggle"
+# this thing is due to dropped packets and is time dependent - it starts before and finishes after it 
+# is detectable via this method
+# to overcome this also mask +-<fdp_tscrunch> time samples either side of masked range
+
 import numpy as np
 from presto_without_presto import sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
@@ -18,6 +27,30 @@ import argparse
 import copy
 from scipy.stats.mstats import skew, kurtosis
 import sys
+
+def get_fdp_mask(arr, axis=0, sigma=4.5):  #, debug=False):
+    """
+    Get a mask of where arr is < median - sigma*std
+    where the median and std have been calulates after masking out any 0s.
+    Returns a boolean array with the same shape as arr.
+
+    axis = time axis of array, e.g. for (nspec,nchan) axis=0"""
+    tmp_arr = np.ma.array(arr, mask=(arr == 0))
+    meds = np.ma.median(tmp_arr, axis=axis)
+    stds = np.ma.std(tmp_arr, axis=axis)
+    del tmp_arr
+    threshold = meds - sigma * stds
+    out = arr < threshold
+#    if debug:
+#        print("saving things from mfdp calcs for debug")
+#        np.savez("fdp_debug_mfdp_stages.npz", tmp_arr=np.ma.array(arr, mask=(arr == 0)), meds=meds, stds=stds, threshold=threshold, out=out)
+    return out
+
+
+def tscrunch(arr, fac):
+    """Scrunch (by summing) a (nspec,nchan) array in time by <fac>
+    Returns array of shape (nspec/fac, nchan)"""
+    return arr.reshape(-1, fac, arr.shape[-1]).sum(axis=1)
 
 
 parser = argparse.ArgumentParser(
@@ -56,6 +89,24 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--fdp_tscrunch",
+    type=int,
+    default=1,
+    help="""
+    With this argument
+    - the data is scrunched (summed) in time by this factor first,
+    - the dropout sections are identified based on the median and std of the scrunched data
+    - this mask is upsampled back to the original time resolution and applied to the original data
+
+    Why? With 40.96us data fdp has trouble catching all the dips. For 327.68us it's fine'.
+    Recommend using this on high-time-resolution data"""
+    # you're less likely to detect dips <fdp_tscrunch time bins in this case
+    # but a) we weren't detecting them anyway
+    # b) Shorter things will just blend into the noise
+    # c) this tends to happen on longer timescales so it's fine
+)
+
+parser.add_argument(
     "--downsamp",
     type=int,
     nargs="*",
@@ -64,11 +115,39 @@ parser.add_argument(
 
 parser.add_argument(
     "--stats",
+    action="store_true",
+    help="Also calculate and save some stats: skewness, kurtosis, s1 & s2 for spectral kurtosis, number of unmasked time samples summed, total number of time samples",
+)
+
+#parser.add_argument(
+#    "--debug",
+#    action='store_true',
+#    help="Output more messages for debugging purposes. Only do first gulp and output many intermediary products into fdp_debug*.npz files",
+#)
+
+parser.add_argument(
+    "-v",
+    "--verbose",
     action='store_true',
-    help="Also calculate and save some stats: skewness, kurtosis, s1 & s2 for spectral kurtosis, number of unmasked time samples summed, total number of time samples"
+    help="Output more messages",
 )
 
 args = parser.parse_args()
+
+#if args.debug:
+#    args.verbose=True
+
+if args.verbose:
+    print(f"Running fdp with args:\n{args}")
+
+if args.fdp_tscrunch < 1:
+    raise AttributeError(f"fdp_tscrunch ({args.fdp_tscrunch}) must be >=1")
+if args.gulp % args.fdp_tscrunch:
+    print(f"Gulp {args.gulp} is not divisible by fdp_tscrunch {args.fdp_tscrunch}")
+    gulp = (int(args.gulp // args.fdp_tscrunch) + 1) * args.fdp_tscrunch
+    print(f"Gulp adjusted to {gulp}")
+else:
+    gulp = args.gulp
 
 header, hdrlen = sigproc.read_header(args.fn)
 nspecs = int(sigproc.samples_per_file(args.fn, header, hdrlen))
@@ -78,12 +157,18 @@ arr_dtype = get_dtype(header["nbits"])
 if header["nifs"] != 1:
     raise AttributeError(f"Code not written to deal with unsummed polarization data")
 
+#if args.debug:
+#    print(f"Read filterbank {args.fn} header:\n{header}")
 
-#loop through chunks
-loop_iters = int(nspecs//args.gulp)
-if nspecs % args.gulp:
+# loop through chunks
+loop_iters = int(nspecs // gulp)
+if nspecs % gulp:
     loop_iters += 1
-fn_clean = args.fn.strip('.fil')
+if args.verbose:
+    print(f"Loop through in {loop_iters} iterations")
+fn_clean = args.fn.strip(".fil")
+#if args.debug:
+#    fn_clean += "_debug"
 fdp_fn = f"{fn_clean}_fdp.fil"
 new_fil = open(fdp_fn, "wb")
 write_header(header, new_fil)
@@ -92,12 +177,14 @@ fil = open(args.fn, "rb")
 fil.seek(hdrlen)
 
 if args.stats:
-    skews = np.zeros((loop_iters, nchans))
-    kurtoses = np.zeros((loop_iters, nchans))
+#    skews = np.zeros((loop_iters, nchans))
+#    kurtoses = np.zeros((loop_iters, nchans))
     s1 = np.zeros((loop_iters, nchans))
     s2 = np.zeros((loop_iters, nchans))
     num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
     n = np.zeros((loop_iters), dtype=int)
+    if args.verbose:
+        print(f"Initilaized stats arrays with shape {(loop_iters, nchans)}")
 
 additional_fils = []
 if args.downsamp is not None:
@@ -106,56 +193,111 @@ if args.downsamp is not None:
         print(f"Also outputting downsampled file: {add_fn}")
         additional_fils.append(open(add_fn, "wb"))
         add_header = copy.deepcopy(header)
-        add_header["tsamp"] =  header["tsamp"] * d
+        add_header["tsamp"] = header["tsamp"] * d
         if header.get("nsamples", ""):
             add_header["nsamples"] = int(header["nsamples"] // d)
         write_header(add_header, additional_fils[i])
 
+#if args.debug:
+#    loop_iters = 1
+
 for i in range(loop_iters):
-    print(f"{i+1}/{loop_iters}", end='\r', flush=True)
-    spec = (
-        np.fromfile(fil, count=args.gulp*nchans, dtype=arr_dtype)
-        .reshape(-1, nchans)
-    )
+    #print(f"{i+1}/{loop_iters}", end="\r", flush=True)
+    print(f"{i+1}/{loop_iters}")
+    spec = np.fromfile(fil, count=gulp * nchans, dtype=arr_dtype).reshape(-1, nchans)
     # has shape (nspec, nchans) so it plays nice with brodcasting
-    med = np.median(spec,axis=0)
-    std = np.std(spec,axis=0)
-    #set the threshold
-    threshold = med - args.thresh_sig*std
-    #find values below threshold and replace with the median
-    mask = np.where(spec < threshold)
-    spec[mask] = med[mask[1]]
+
+#    if args.debug:
+#        print(f"Read data into shape {spec.shape}")
+
+    mzeros = spec == 0
+#    if args.debug:
+#        print(f"number of zeros in data: {mzeros.sum()} ({mzeros.sum()/mzeros.size})")
+
+    # tscrunch if necessary
+    if args.fdp_tscrunch != 1:
+ #       if args.debug:
+ #           print("tscrunching by a factor of {args.fdp_tscrunch}")
+        working_spec = tscrunch(spec, args.fdp_tscrunch)
+    else:
+        working_spec = spec
+
+#    if args.debug:
+#        print(f"working spectra of shape {working_spec.shape}")
+
+    # get the (tscrunched) dropout mask
+    #mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig, debug=args.debug).data
+    mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig).data
+    if args.verbose:
+        print(f"mfdp mask of shape {mfdp.shape}\nNumber masked by mfdp is {mfdp.sum()} ({mfdp.sum()/mfdp.size})")
+
+    # wiggle mfdp
+    print("wiggling fdp mask")
+    mfdp[0:-1,:] = (mfdp[0:-1,:] | mfdp[1:,:])
+    mfdp[1:,:] = (mfdp[1:,:] | mfdp[0:-1,:])
+
+    # convert mask to full time resolution if necessary, combine with zeros mask
+    if args.fdp_tscrunch != 1:
+        mtot = np.repeat(mfdp, args.fdp_tscrunch, axis=0) | mzeros
+    else:
+        mtot = mfdp | mzeros
+
+    if args.verbose:
+        print(f"mtot made, of shape {mtot.shape}, mask amount {mtot.sum()} ({mtot.sum()/mtot.size} of data)")
+#    if args.debug:
+#        print("Saving spec, mzeros, working_spec, mfdp, mtot for debug to fdp_debug.npz")
+#        np.savez("fdp_debug.npz", spec=spec, working_spec=working_spec, mfdp=mfdp, mtot=mtot)
+
+    del mfdp
+    del mzeros
+
+    # get medians to replace masked values with, not including to-be-masked values in the calculation
+    tmp = np.ma.array(spec, mask=(mtot)).astype(int)
+    meds_fullres = np.ma.median(tmp, axis=0)
+    if not args.stats:
+        del tmp
+
+    # replace masked values with the median
+    spec[mtot] = meds_fullres[np.where(mtot)[1]]
+
+#    if args.debug:
+#        print("saving output spectra")
+#        np.savez("fdp_debug_spec_out.npz", spec_out=spec)
+
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
-        for ii,d in enumerate(args.downsamp):
-            additional_fils[ii].write(spec[::d,:].ravel().astype(arr_dtype))
+        for ii, d in enumerate(args.downsamp):
+            additional_fils[ii].write(spec[::d, :].ravel().astype(arr_dtype))
 
     # calc stats
     if args.stats:
-        tmp = np.ma.array(spec, mask=(spec==0)).astype(int)
-        tmp.mask[mask] = True
         del spec
-        skews[i,:] = skew(tmp, axis=0, bias=False)
-        kurtoses[i,:] = kurtosis(tmp, axis=0, bias=False)
-        s1[i,:] = tmp.sum(axis=0)
-        s2[i,:] = (tmp**2).sum(axis=0)
-        num_unmasked_points[i,:] = (~tmp.mask).sum(axis=0)
+ #       skews[i, :] = skew(tmp, axis=0, bias=False)
+ #       kurtoses[i, :] = kurtosis(tmp, axis=0, bias=False)
+        s1[i, :] = tmp.sum(axis=0)
+        s2[i, :] = (tmp**2).sum(axis=0)
+        num_unmasked_points[i, :] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
+#        if args.debug:
+#            print("Saving stats for debug")
+#            np.savez("fdp_debug_stats.npz", s1=s1[i, :], s2=s2[i, :], num_unmasked_points=num_unmasked_points[i, :], n=n[i])
+
 
 
 fil.close()
 new_fil.close()
 # save stats
-if args.stats:
+if args.stats:  # and not args.debug:
     print(f"Writing stats to {fdp_fn[:-4]}_stats.npz")
     np.savez(
         f"{fdp_fn[:-4]}_stats.npz",
-        skew=skews,
-        kurtosis=kurtoses,
+#        skew=skews,
+#        kurtosis=kurtoses,
         s1=s1,
         s2=s2,
         num_unmasked_points=num_unmasked_points,
-        n=n
+        n=n,
+        gulp=gulp,
     )
 if additional_fils:
     for add_fil in additional_fils:
