@@ -947,7 +947,9 @@ logging.info(f"New mask will be written to: {outfilename}")
 if args.show:
     p = None
 else:
-    p = PdfPages("rfipipeline_plots" + optstr + ".pdf")
+    plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")] + optstr + ".pdf"
+    p = PdfPages(plotfname)
+    logging.info(f"Plots will be written to {plotfname}")
 
 opts = [int(x) for x in args.option.split(",")]
 opt_dict = {
