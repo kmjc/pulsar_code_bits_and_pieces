@@ -145,7 +145,9 @@ def reshape_extra_stats_mask(rfimask_shape, msk, fdp_gulp, ptsperint):
                 return tmp[:-1,:]
             else:
                 raise AttributeError(f"odd shape problem:\noriginal {msk.shape}, upsampled to {(upsample_fac)}, trying to match {rfimask_shape}")
-
+        else:
+            return tmp
+                
 def reshape_rfifind_mask(extra_stats_shape, msk, fdp_gulp, ptsperint):
     """
     reshape mask derived from rfifind stats to match <extra_stats_shape>
