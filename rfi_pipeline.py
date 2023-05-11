@@ -1195,13 +1195,13 @@ if 3 in opts:
     plot_masked_channels_of_med(gsk_d_estimate_masked, gsk_med_nomask_chans, ax=ax2[0])
     ax2[0].set_title("gsk")
 
-    plot_masked_channels_of_med(rfimask.pow_stats, gsk_med_nomask_chans, ax=ax2[1])
+    plot_masked_channels_of_med(np.ma.array(rfimask.pow_stats, mask=working_mask), gsk_med_nomask_chans, ax=ax2[1])
     ax2[1].set_title("pow_stats")
 
-    plot_masked_channels_of_med(means.data, gsk_med_nomask_chans, ax=ax2[2])
+    plot_masked_channels_of_med(np.ma.array(means.data, mask=working_mask_exstats), gsk_med_nomask_chans, ax=ax2[2])
     ax2[2].set_title("means")
 
-    plot_masked_channels_of_med(var.data, gsk_med_nomask_chans, ax=ax2[3])
+    plot_masked_channels_of_med(np.ma.array(var.data, mask=working_mask_exstats), gsk_med_nomask_chans, ax=ax2[3])
     ax2[3].set_title("var")
     ax2[3].set_xlabel("channel")
 
