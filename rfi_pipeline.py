@@ -1138,17 +1138,6 @@ if 1 in opts:
 
 
 
-    if masked_frac(tmp_working_mask) >= args.problem_frac:
-        logging.info("Something went wrong at stage 1, making summary plots and skipping this step")
-
-        make_summary_plots(mask, mask_exstats, rfifind_obj, means, var, p, title_insert="ERROR stage 1")
-    else:
-        working_mask = tmp_working_mask
-        working_mask_exstats = tmp_working_mask_exstats
-        del tmp_working_mask
-        del tmp_working_mask_exstats
-
-
 
 
 
