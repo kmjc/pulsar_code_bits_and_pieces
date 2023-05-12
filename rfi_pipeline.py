@@ -48,34 +48,40 @@ def write_mask_and_ignorechans(mask, outname, rfifind_obj, infstats_too=True):
     logging.info(f"Writing ignorechans to {ignorechans_fname}")
     with open(ignorechans_fname, "w") as fignore:
         fignore.write(np_ignorechans_to_presto_string(get_ignorechans_from_mask(mask)))
-    logging.info(f"Writing base mask to {outname}")
+    logging.info(f"Writing mask to {outname}")
     write_new_mask_from(outname, mask, rfifind_obj, infstats_too=infstats_too)
 
 def wrap_up(mask, mask_exstats, rfifind_obj, means, var, pdf, outfilename, infstats_too):
     logging.info(f"Fraction of data masked: {masked_frac(mask)}")
     write_mask_and_ignorechans(mask, outfilename, rfifind_obj, infstats_too=infstats_too)
-    logging.info(f"Written mask to {outfilename}")
 
+    logging.info(f"Making summary plots")
+    make_summary_plots(mask, mask_exstats, rfifind_obj, means, var, pdf, title_insert="final")
+
+    if pdf is not None:
+        logging.info("Writing pdf")
+        pdf.close()
+    logging.info("Done")
+
+
+def make_summary_plots(mask, mask_exstats, rfifind_obj, means, var, pdf, title_insert=""):
+    """Plot the mask, and the masked pow_stats, means, and var"""
     figtmp, axtmp = plt.subplots()
     plot_mask(mask, ax=axtmp)
-    figtmp.suptitle("final mask")
+    figtmp.suptitle(f"{title_insert} mask")
     output_plot(figtmp, pdf=p)
 
     figtmp, axtmp = plot_map_plus_sums(rfifind_obj.pow_stats, mask=mask, returnplt=True)
-    figtmp.suptitle("final mask - pow_stats")
-    output_plot(figtmp, pdf=p)
+    figtmp.suptitle(f"{title_insert} pow_stats")
+    output_plot(figtmp, pdf=pdf)
 
     figtmp, axtmp = plot_map_plus_sums(means.data, mask=mask_exstats, returnplt=True)
-    figtmp.suptitle("final mask - means")
-    output_plot(figtmp, pdf=p)
+    figtmp.suptitle(f"{title_insert} means")
+    output_plot(figtmp, pdf=pdf)
 
     figtmp, axtmp = plot_map_plus_sums(var.data, mask=mask_exstats, returnplt=True)
-    figtmp.suptitle("final mask - var")
-    output_plot(figtmp, pdf=p)
-
-    if pdf is not None:
-        p.close()
-    logging.info("Done")
+    figtmp.suptitle(f"{title_insert} var")
+    output_plot(figtmp, pdf=pdf)
 
 
 # https://www.tutorialspoint.com/how-to-make-a-histogram-with-bins-of-equal-area-in-matplotlib
@@ -739,7 +745,7 @@ def plot_map_plus_sums(stat, mask=None, reduction_function=np.ma.median, returnp
     else:
         plt.show()
 
-def plot_masked_channels_of_med(thing, channels, ax=None, sig_lims=[3,3]):
+def plot_masked_channels_of_med(thing, channels, ax=None):  #, sig_lims=[3,3]):
     """
     plt the median of <thing> (shape (nint, nchan)) along axis 0
     and highlight <channels>
@@ -753,13 +759,13 @@ def plot_masked_channels_of_med(thing, channels, ax=None, sig_lims=[3,3]):
         fig, ax = plt.subplots()
     ax.plot(np.arange(nchan), med_thing, "+")
     ax.plot(np.array(list(channels)), med_thing[np.array(list(channels))], "x")
-    unmasked_channels = set(range(nchan)).difference(set(channels))
-    get_limits_from  = med_thing[np.array(list(unmasked_channels))]
-    md = np.ma.median(get_limits_from)
-    std = np.ma.std(get_limits_from)
-    lo = min([md-sig_lims[0]*std, get_limits_from.min()])
-    hi = max([md+sig_lims[1]*std, get_limits_from.max()])
-    ax.set_ylim(lo,hi)
+    #unmasked_channels = set(range(nchan)).difference(set(channels))
+    #get_limits_from  = med_thing[np.array(list(unmasked_channels))]
+    #md = np.ma.median(get_limits_from)
+    #std = np.ma.std(get_limits_from)
+    #lo = min([md-sig_lims[0]*std, get_limits_from.min()])
+    #hi = max([md+sig_lims[1]*std, get_limits_from.max()])
+    #ax.set_ylim(lo,hi)
 
 def plot_mask(mask, ax=None):
     if ax is None:
@@ -767,6 +773,28 @@ def plot_mask(mask, ax=None):
     ax.pcolormesh(mask.T)
     ax.set_ylabel("channel")
     ax.set_xlabel("interval")
+
+
+def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exstats, threshold, rfimask, means, var, pdf, stage=None):
+    """
+    Check if adding add_mask to old_mask means the masking fraction goes above the <threshold> 
+    If it does:
+        plot summary plots which will hopefully show what went wrong
+        return the old masks
+    If it doesn't:
+        return (old_mask | add_mask), (old_mask_exstats | add_mask_exstats)
+    
+    """
+    zap_frac = masked_frac(old_mask | add_mask)
+    if  zap_frac >= threshold:
+        logging.warning(f"{stage}: zaps {zap_frac} of data, which is over the problem threshold, plotting summary and skipping")
+        logging.info(f"{stage}: working maask unchanged")
+        make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
+        return old_mask, old_mask_exstats
+    else:
+        logging.info(f"{stage}: zaps {zap_frac} of data")
+        logging.info(f"{stage}: updating working mask")
+        return (old_mask | add_mask), (old_mask_exstats | add_mask_exstats)
 
 
 # ## Stuff that needs to be input to the code
@@ -892,6 +920,13 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--problem_frac",
+    type=float,
+    default=0.7,
+    help="If masking fraction goes above this threshold then there is a problem, skip whatever step did this"
+)
+
+parser.add_argument(
     "--log", type=str, help="name of file to write log to", default=None
 )
 
@@ -949,7 +984,11 @@ logging.info(f"New mask will be written to: {outfilename}")
 if args.show:
     p = None
 else:
-    plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")] + optstr + ".pdf"
+
+    plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")]
+    if optstr not in plotfname:
+        plotfname += f"_{optstr}"
+    plotfname += ".pdf"
     p = PdfPages(plotfname)
     logging.info(f"Plots will be written to {plotfname}")
 
@@ -1045,8 +1084,26 @@ if 0 in opts:
     working_mask_exstats = working_mask_exstats | base_mask_exstats
     logging.info(f"0: working mask zaps {masked_frac(working_mask)} of data")
 
+    if masked_frac(working_mask) >= args.problem_frac:
+        logging.info("Something went wrong at stage 0, making summary plots and exiting")
+        M = np.ma.array(M, mask=working_mask_exstats)
+        s1 = np.ma.array(s1, mask=working_mask_exstats)
+        s2 = np.ma.array(s2, mask=working_mask_exstats)
+
+        # try estimating shape parameter from the mean and std
+        means = s1/M
+        var = (s2 - s1**2/M)/M
+        make_summary_plots(working_mask, working_mask_exstats, rfimask, means, var, p, title_insert="ERROR stage 0")
+        if p is not None:
+            logging.info("Writing pdf")
+            p.close()
+        logging.error("Something went horribly wrong at stage 0")
+        sys.exit(1)
+
+
     del base_mask
     del base_mask_exstats
+
 
 
 # ### Now have base_mask should be using as minimum input for all other steps
@@ -1077,13 +1134,15 @@ if 1 in opts:
     #fig02.suptitle("steps stats")
     #output_plot(fig02, pdf=p)
 
-    logging.info("1: updating working mask")
-    working_mask = working_mask | step_mask
-    working_mask_exstats = working_mask_exstats | step_mask_exstats
-    logging.info(f"+1: working mask zaps {masked_frac(working_mask)} of data")
+    working_mask, working_mask_exstats = check_mask_and_continue(working_mask, working_mask_exstats, step_mask, step_mask_exstats, args.problem_frac, rfimask, means, var, p, stage=1)
 
     del step_mask
     del step_mask_exstats
+
+
+
+
+
 
 
 # ### Look for outlier intervals, via running iqrm on the median of the means in that interval
@@ -1099,10 +1158,12 @@ if 2 in opts:
     med_means_time_mask_exstats = np.zeros_like(working_mask_exstats)
     med_means_time_mask_exstats[zapints_med_means_time_mask,:] = True
 
-    logging.info("2: updating working mask")
-    working_mask = working_mask | med_means_time_mask
-    working_mask_exstats = working_mask_exstats | med_means_time_mask_exstats
-    logging.info(f"+2: working mask zaps {masked_frac(working_mask)} of data")
+    working_mask, working_mask_exstats = check_mask_and_continue(
+        working_mask, working_mask_exstats, 
+        med_means_time_mask, med_means_time_mask_exstats, 
+        args.problem_frac, rfimask, means, var, p, 
+        stage=2,
+    )
 
     del med_means_time_mask
     del med_means_time_mask_exstats
@@ -1116,6 +1177,10 @@ if 3 in opts or 4 in opts or 5 in opts:
     gsk_d_estimate = ((M * delta + 1) / (M - 1)) * (M * (s2 / s1**2) - 1)
     gsk_d_estimate_masked = np.ma.array(gsk_d_estimate, mask=working_mask_exstats)
     gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
+
+    figgsk, axgsk = plot_map_plus_sums(gsk_d_estimate_masked.data, gsk_d_estimate_masked.mask, returnplt=True)
+    figgsk.suptitle("GSK statistic")
+    output_plot(figgsk, pdf=p)
 
 
 # ## channel mask - iqrm on the median of the gsk
@@ -1137,23 +1202,25 @@ if 3 in opts:
     plot_masked_channels_of_med(gsk_d_estimate_masked, gsk_med_nomask_chans, ax=ax2[0])
     ax2[0].set_title("gsk")
 
-    plot_masked_channels_of_med(rfimask.pow_stats, gsk_med_nomask_chans, ax=ax2[1])
+    plot_masked_channels_of_med(np.ma.array(rfimask.pow_stats, mask=working_mask), gsk_med_nomask_chans, ax=ax2[1])
     ax2[1].set_title("pow_stats")
 
-    plot_masked_channels_of_med(means.data, gsk_med_nomask_chans, ax=ax2[2])
+    plot_masked_channels_of_med(np.ma.array(means.data, mask=working_mask_exstats), gsk_med_nomask_chans, ax=ax2[2])
     ax2[2].set_title("means")
 
-    plot_masked_channels_of_med(var.data, gsk_med_nomask_chans, ax=ax2[3])
+    plot_masked_channels_of_med(np.ma.array(var.data, mask=working_mask_exstats), gsk_med_nomask_chans, ax=ax2[3])
     ax2[3].set_title("var")
     ax2[3].set_xlabel("channel")
 
     fig2.suptitle("iqrm on median of gsk - channel mask")
     output_plot(fig2, pdf=p)
 
-    logging.info("3: updating working mask")
-    working_mask = working_mask | gsk_chan_mask
-    working_mask_exstats = working_mask_exstats | gsk_chan_mask_exstats
-    logging.info(f"+3: working mask zaps {masked_frac(working_mask)} of data")
+    working_mask, working_mask_exstats = check_mask_and_continue(
+        working_mask, working_mask_exstats, 
+        gsk_chan_mask, gsk_chan_mask_exstats, 
+        args.problem_frac, rfimask, means, var, p, 
+        stage=3,
+    )
 
     del gsk_chan_mask
     del gsk_chan_mask_exstats
@@ -1179,11 +1246,13 @@ if 4 in opts:
     fig3.suptitle("2D iqrm means looking for bad channels (referenced against working mask before option 4)")
     output_plot(fig3, pdf=p)
 
-    logging.info("4: updating working mask")
-    working_mask = working_mask | m_iqrm_means_freq_nomask
-    working_mask_exstats = working_mask_exstats | m_iqrm_means_freq_nomask_exstats
-    logging.info(f"+4: working mask zaps {masked_frac(working_mask)} of data")
-
+    working_mask, working_mask_exstats = check_mask_and_continue(
+        working_mask, working_mask_exstats, 
+        m_iqrm_means_freq_nomask, m_iqrm_means_freq_nomask_exstats, 
+        args.problem_frac, rfimask, means, var, p, 
+        stage=4,
+    )
+    
     del m_iqrm_means_freq_nomask
     del m_iqrm_means_freq_nomask_exstats
 
@@ -1197,10 +1266,12 @@ if 5 in opts:
     fig4.suptitle("2D iqrm means looking for bad intervals (referenced against working mask before option 4)")
     output_plot(fig4, pdf=p)
 
-    logging.info("5: updating working mask")
-    working_mask = working_mask | m_iqrm_means_time_nomask
-    working_mask_exstats = working_mask_exstats | m_iqrm_means_time_nomask_exstats
-    logging.info(f"+5: working mask zaps {masked_frac(working_mask)} of data")
+    working_mask, working_mask_exstats = check_mask_and_continue(
+        working_mask, working_mask_exstats, 
+        m_iqrm_means_time_nomask, m_iqrm_means_time_nomask_exstats, 
+        args.problem_frac, rfimask, means, var, p, 
+        stage=5,
+    )
 
     del m_iqrm_means_time_nomask
     del m_iqrm_means_time_nomask_exstats
@@ -1223,10 +1294,12 @@ if 4 in opts or 5 in opts:
     output_plot(fig5, pdf=p)
     output_plot(fig6, pdf=p)
 
-    logging.info("hf: updating working mask")
-    working_mask = working_mask | hf
-    working_mask_exstats = working_mask_exstats | hf_exstats
-    logging.info(f"+hf: working mask zaps {masked_frac(working_mask)} of data")
+    working_mask, working_mask_exstats = check_mask_and_continue(
+        working_mask, working_mask_exstats, 
+        hf, hf_exstats, 
+        args.problem_frac, rfimask, means, var, p, 
+        stage="post4/5",
+    )
 
     del hf
     del hf_exstats
@@ -1285,10 +1358,12 @@ if 6 in opts:
 #        plt.plot(tmp_means[:,i])
 #        plt.show()
 
-    logging.info("6: updating working mask")
-    working_mask = working_mask | std_of_avg_mask
-    working_mask_exstats = working_mask_exstats | std_of_avg_mask_exstats
-    logging.info(f"+6: working mask zaps {masked_frac(working_mask)} of data")
+    working_mask, working_mask_exstats = check_mask_and_continue(
+        working_mask, working_mask_exstats, 
+        std_of_avg_mask, std_of_avg_mask_exstats, 
+        args.problem_frac, rfimask, means, var, p, 
+        stage=6,
+    )
 
     del std_of_avg_mask
     del std_of_avg_mask_exstats
@@ -1312,6 +1387,5 @@ if 6 in opts:
 
 logging.info("\nWrapping up")
 wrap_up(working_mask, working_mask_exstats, rfimask, means, var, p, outfilename, infstats_too=(not args.overwrite))
-logging.info("Done")
 
 sys.exit(0)
