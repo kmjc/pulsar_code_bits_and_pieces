@@ -746,7 +746,7 @@ def plot_map_plus_sums(stat, mask=None, reduction_function=np.ma.median, returnp
     else:
         plt.show()
 
-def plot_masked_channels_of_med(thing, channels, ax=None, sig_lims=[3,3]):
+def plot_masked_channels_of_med(thing, channels, ax=None):  #, sig_lims=[3,3]):
     """
     plt the median of <thing> (shape (nint, nchan)) along axis 0
     and highlight <channels>
@@ -760,13 +760,13 @@ def plot_masked_channels_of_med(thing, channels, ax=None, sig_lims=[3,3]):
         fig, ax = plt.subplots()
     ax.plot(np.arange(nchan), med_thing, "+")
     ax.plot(np.array(list(channels)), med_thing[np.array(list(channels))], "x")
-    unmasked_channels = set(range(nchan)).difference(set(channels))
-    get_limits_from  = med_thing[np.array(list(unmasked_channels))]
-    md = np.ma.median(get_limits_from)
-    std = np.ma.std(get_limits_from)
-    lo = min([md-sig_lims[0]*std, get_limits_from.min()])
-    hi = max([md+sig_lims[1]*std, get_limits_from.max()])
-    ax.set_ylim(lo,hi)
+    #unmasked_channels = set(range(nchan)).difference(set(channels))
+    #get_limits_from  = med_thing[np.array(list(unmasked_channels))]
+    #md = np.ma.median(get_limits_from)
+    #std = np.ma.std(get_limits_from)
+    #lo = min([md-sig_lims[0]*std, get_limits_from.min()])
+    #hi = max([md+sig_lims[1]*std, get_limits_from.max()])
+    #ax.set_ylim(lo,hi)
 
 def plot_mask(mask, ax=None):
     if ax is None:
