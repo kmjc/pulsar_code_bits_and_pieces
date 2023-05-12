@@ -48,13 +48,12 @@ def write_mask_and_ignorechans(mask, outname, rfifind_obj, infstats_too=True):
     logging.info(f"Writing ignorechans to {ignorechans_fname}")
     with open(ignorechans_fname, "w") as fignore:
         fignore.write(np_ignorechans_to_presto_string(get_ignorechans_from_mask(mask)))
-    logging.info(f"Writing base mask to {outname}")
+    logging.info(f"Writing mask to {outname}")
     write_new_mask_from(outname, mask, rfifind_obj, infstats_too=infstats_too)
 
 def wrap_up(mask, mask_exstats, rfifind_obj, means, var, pdf, outfilename, infstats_too):
     logging.info(f"Fraction of data masked: {masked_frac(mask)}")
     write_mask_and_ignorechans(mask, outfilename, rfifind_obj, infstats_too=infstats_too)
-    logging.info(f"Written mask to {outfilename}")
 
     logging.info(f"Making summary plots")
     make_summary_plots(mask, mask_exstats, rfifind_obj, means, var, pdf, title_insert="final")
@@ -985,7 +984,11 @@ logging.info(f"New mask will be written to: {outfilename}")
 if args.show:
     p = None
 else:
-    plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")] + optstr + ".pdf"
+
+    plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")]
+    if optstr not in plotfname:
+        plotfname += optstr
+    plotfname += ".pdf"
     p = PdfPages(plotfname)
     logging.info(f"Plots will be written to {plotfname}")
 
@@ -1384,6 +1387,5 @@ if 6 in opts:
 
 logging.info("\nWrapping up")
 wrap_up(working_mask, working_mask_exstats, rfimask, means, var, p, outfilename, infstats_too=(not args.overwrite))
-logging.info("Done")
 
 sys.exit(0)
