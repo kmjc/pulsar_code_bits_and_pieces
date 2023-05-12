@@ -492,7 +492,7 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, maxoverfac=1.5):
             raise RuntimeError(
                 f"No possible gulp sizes found between mingulp ({mingulp}) and maxoverfac*desired_gulp ({maxoverfac}*{desired_gulp}={maxoverfac*desired_gulp})"
             )
-        logging.debug(f"{ipg_over_maxDT.size} gulps found between mingulp ({mingulp}) and maxoverfac*desired_gulp ({maxoverfac}*{desired_gulp}={maxoverfac*desired_gulp}):\n{ipg_over_maxDT}")
+        logging.debug(f"{ipg_over_maxDT.size} gulps found between mingulp ({mingulp}) and maxoverfac*desired_gulp ({maxoverfac}*{desired_gulp}={maxoverfac*desired_gulp}):\n{ipg_over_maxDT*ptsperint}")
 
         # number of time samples in final read
         leftovers = np.array([nsamples % (ptsperint * ipg) for ipg in ipg_over_maxDT])
