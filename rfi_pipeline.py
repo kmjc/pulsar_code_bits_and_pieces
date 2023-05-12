@@ -987,7 +987,7 @@ else:
 
     plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")]
     if optstr not in plotfname:
-        plotfname += optstr
+        plotfname += f"_{optstr}"
     plotfname += ".pdf"
     p = PdfPages(plotfname)
     logging.info(f"Plots will be written to {plotfname}")
