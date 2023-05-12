@@ -790,7 +790,7 @@ def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exsta
     if  zap_frac >= threshold:
         logging.warning(f"{stage}: zaps {zap_frac} of data, which is over the problem threshold, plotting summary and skipping")
         logging.info(f"{stage}: working maask unchanged")
-        make_summary_plot(new_mask, new_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
+        make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
         return old_mask, old_mask_exstats
     else:
         logging.info(f"{stage}: zaps {zap_frac} of data")
@@ -1091,9 +1091,9 @@ if 0 in opts:
         means = s1/M
         var = (s2 - s1**2/M)/M
         make_summary_plots(working_mask, working_mask_exstats, rfimask, means, var, p, title_insert="ERROR stage 0")
-        if pdf is not None:
+        if p is not None:
             logging.info("Writing pdf")
-            pdf.close()
+            p.close()
         logging.error("Something went horribly wrong at stage 0")
         sys.exit(1)
 
