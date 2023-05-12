@@ -487,7 +487,7 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, maxoverfac=1.5):
             )
         
         # cut off anything over maxoverfac * desired_gulp
-        ipg_over_maxDT = ipg_over_maxDT[ipg_over_maxDT < maxoverfac*desired_gulp]
+        ipg_over_maxDT = ipg_over_maxDT[ipg_over_maxDT < maxoverfac*desired_gulp/ptsperint]
         if ipg_over_maxDT.size == 0:
             raise RuntimeError(
                 f"No possible gulp sizes found between mingulp ({mingulp}) and maxoverfac*desired_gulp ({maxoverfac}*{desired_gulp}={maxoverfac*desired_gulp})"
