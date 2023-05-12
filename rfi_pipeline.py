@@ -1175,7 +1175,7 @@ if 3 in opts or 4 in opts or 5 in opts:
     gsk_d_estimate_masked = np.ma.array(gsk_d_estimate, mask=working_mask_exstats)
     gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
 
-    figgsk, axgsk = plot_map_plus_sums(gsk_d_estimate_masked.data, gsk_d_estimate_masked.mask, axis=ax02, returnplt=True)
+    figgsk, axgsk = plot_map_plus_sums(gsk_d_estimate_masked.data, gsk_d_estimate_masked.mask, axis=axgsk, returnplt=True)
     figgsk.suptitle("GSK statistic")
     output_plot(figgsk, pdf=p)
 
