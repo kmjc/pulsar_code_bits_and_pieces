@@ -452,7 +452,17 @@ def approx_size_shifted_arrays(data, maxDT):
     return 2 * prev_sz + mid_sz + end_sz
 
 
-def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
+def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp, maxoverfac=1.5):
+    """
+    Get a compatible gulp size.
+    Must be a multiple of ptsperint
+    
+    The last intake will likely be fewer samples than the gulp. If this is less than maxDT then it gets cutt off
+    This function therefore tries to choose a gulp near to the desired_gulp for which the last intake is >maxDT
+
+    maxoverfac assumes that the desired_gulp is motivated by RAM and going too far above it will cause an OOM
+    gulps greater than maxoverfac * desired_gulp will not be considered
+    """
     if mingulp == 0:  # DM = 0 case
         gulp = (int(desired_gulp // ptsperint) + 1) * ptsperint
         return gulp, 0
@@ -475,6 +485,14 @@ def get_gulp(nsamples, ptsperint, maxDT, mingulp, desired_gulp):
             raise RuntimeError(
                 f"No possible gulp sizes over mingulp in {all_intspergulp*ptsperint}"
             )
+        
+        # cut off anything over maxoverfac * desired_gulp
+        ipg_over_maxDT = ipg_over_maxDT[ipg_over_maxDT < maxoverfac*desired_gulp/ptsperint]
+        if ipg_over_maxDT.size == 0:
+            raise RuntimeError(
+                f"No possible gulp sizes found between mingulp ({mingulp}) and maxoverfac*desired_gulp ({maxoverfac}*{desired_gulp}={maxoverfac*desired_gulp})"
+            )
+        logging.debug(f"{ipg_over_maxDT.size} gulps found between mingulp ({mingulp}) and maxoverfac*desired_gulp ({maxoverfac}*{desired_gulp}={maxoverfac*desired_gulp}):\n{ipg_over_maxDT*ptsperint}")
 
         # number of time samples in final read
         leftovers = np.array([nsamples % (ptsperint * ipg) for ipg in ipg_over_maxDT])
