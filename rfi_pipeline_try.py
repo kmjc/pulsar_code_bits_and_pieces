@@ -983,7 +983,8 @@ if args.ignorechans == "":
 else:
     ignorechans = [int(x) for x in args.ignorechans.split(",")]
 
-optstr="".join(args.option.split(","))
+#optstr="".join(args.option.split(","))
+optstr="try0123456"
 if args.overwrite:
     outfilename = args.maskfile
 elif args.outfilename is None:
@@ -1003,7 +1004,11 @@ else:
     p = PdfPages(plotfname)
     logging.info(f"Plots will be written to {plotfname}")
 
-opts = [int(x) for x in args.option.split(",")]
+#opts = [int(x) for x in args.option.split(",")]
+logging.info("Running trial rfipipeline - will run all stages and plot results")
+logging.info("Stages 0,1,2 will be run in sequency and the results used as the initial mask for 3,4,5 individually")
+opts = [0,1,2,3,4,5,6]
+
 opt_dict = {
     0: "basic processing: ignorechans, anywhere the std is 0, where the number of unmasked points is < set threshold, the rfifind mask, a high fraction cut",
     1: "cutting channels which have steps in them (detected via a cumsum)",
@@ -1050,10 +1055,6 @@ r_int = rfimask.nint/rfac
 
 working_mask = np.zeros_like(rfimask.mask)
 working_mask_exstats = np.zeros_like(M, dtype=bool)
-
-logging.info("Running trial rfipipeline - will run all stages and plot results")
-logging.info("Stages 0,1,2 will be run in sequency and the results used as the initial mask for 3,4,5 individually")
-opts = [0,1,2,3,4,5,6]
 
 if 0 in opts:
     # ### std_stats==0 mask
