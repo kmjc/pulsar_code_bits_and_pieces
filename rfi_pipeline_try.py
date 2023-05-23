@@ -202,7 +202,7 @@ def get_zeros_mask_alt(rfifind_obj, ignorechans=[], verbose=False, plot_diagnost
     if plot_diagnostics:
         if ax is None:
             fig, ax = plt.subplots()
-        ax.pcolormesh(np.ma.array(tmp, mask=working_mask).T)
+        ax.imshow(np.ma.array(tmp, mask=working_mask).T, aspect='auto', origin='lower')
         ax.set_xlabel("int")
         ax.set_ylabel("chan")
         ax.set_title("Plot of where std_stats==0, masked by the ignorechans")
@@ -421,7 +421,7 @@ def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_p
             if m > thresh:
                 figtmp, axtmp = plt.subplots(2,1)
                 stat_tmp = stat[:,max(0,c-10):min(c+10,stat.shape[1])]
-                axtmp[1].pcolormesh(stat_tmp.T, vmin=stat_tmp.min(), vmax=stat_tmp.max())
+                axtmp[1].imshow(stat_tmp.T, vmin=stat_tmp.min(), vmax=stat_tmp.max(), aspect='auto', origin='lower')
                 axtmp[1].axhline(min(10,c), c='red')
                 figtmp.suptitle(f"{c}: {dary_step.max()}")
                 axtmp[0].plot(dary)
@@ -640,7 +640,7 @@ plt.rcParams['figure.figsize'] = [12, 8]
 
 def plot_stat_map(stat, axis=None, mask=None, **plot_kwargs):
     nint, nchan = stat.shape
-    grids = np.meshgrid(np.arange(nint + 1), np.arange(nchan + 1), indexing='ij')
+    # grids = np.meshgrid(np.arange(nint + 1), np.arange(nchan + 1), indexing='ij')
     # for some WEIRD reason passing in the grids introduces a bunch of artifacts
     # sure not real as when zoom in they disappear/some are still there but much smaller than 1 int/chan
     # tried passing in centers and shading='nearest' and they're still there
@@ -649,6 +649,11 @@ def plot_stat_map(stat, axis=None, mask=None, **plot_kwargs):
     # BUT some bright single channel stuff you then can't see.
     # So I think he renderer is upping the resolution or something odd and it's producing weirdness
     # could not find a solution so using the thing that means I don't freak out that the data is terrible and lose half a day
+    # UPDATE: also get with pcolormesh :( 
+        # apparently this issue has a 10+year history and is really hard to fix 
+        # https://stackoverflow.com/questions/27092991/white-lines-in-matplotlibs-pcolor
+        # https://github.com/matplotlib/matplotlib/issues/1188
+        # trying switching to imshow
 
     if type(mask) != np.ndarray:
         to_plot = stat
@@ -657,14 +662,14 @@ def plot_stat_map(stat, axis=None, mask=None, **plot_kwargs):
 
     if axis == None:
         #im = plt.pcolormesh(grids[0], grids[1], to_plot, shading='flat', **plot_kwargs)
-        im = plt.pcolormesh(to_plot.T, **plot_kwargs)
+        im = plt.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
         plt.xlabel="interval"
         plt.ylabel="channel"
         plt.colorbar(im)
         plt.show()
     else:
         #im = axis.pcolormesh(grids[0], grids[1], to_plot, shading='flat', **plot_kwargs)
-        im = axis.pcolormesh(to_plot.T, **plot_kwargs)
+        im = axis.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
         plt.colorbar(im, ax=axis)
         return axis
 
@@ -771,7 +776,7 @@ def plot_masked_channels_of_med(thing, channels, ax=None):  #, sig_lims=[3,3]):
 def plot_mask(mask, ax=None):
     if ax is None:
         fig, ax = plt.subplots()
-    ax.pcolormesh(mask.T)
+    ax.imshow(mask.T, aspect='auto', origin='lower')
     ax.set_ylabel("channel")
     ax.set_xlabel("interval")
 
@@ -799,7 +804,7 @@ def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exsta
     else:
         logging.info(f"{stage}: zaps {zap_frac} of data")
         if always_plot_summary:
-            make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"Summary stage {stage}")
+            make_summary_plots((add_mask|old_mask), (add_mask_exstats|old_mask_exstats), rfimask, means, var, pdf, title_insert=f"Summary stage {stage}")
         if noupdate:
             logging.info(f"{stage}: NOT updating working mask - ran with noupdate")
             return old_mask, old_mask_exstats
@@ -1085,7 +1090,7 @@ if 0 in opts:
     output_plot(fig01, pdf=p)
 
     fig1, ax1 = plt.subplots()
-    ax1.pcolormesh(base_mask.T)
+    ax1.imshow(base_mask.T, aspect='auto', origin='lower')
     fig1.suptitle("base mask: std_stats==0, large fraction of masked data within an interval, rfifind mask")
     output_plot(fig1, pdf=p)
 
@@ -1241,7 +1246,7 @@ if 4 in opts:
 
 
     fig3, ax3 = plt.subplots()
-    ax3.pcolormesh((m_iqrm_means_freq_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T)
+    ax3.imshow((m_iqrm_means_freq_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T, aspect='auto', origin='lower')
     fig3.suptitle("2D iqrm means looking for bad channels (referenced against working mask before option 4)")
     output_plot(fig3, pdf=p)
 
@@ -1263,7 +1268,7 @@ if 5 in opts:
     m_iqrm_means_time_nomask = reshape_extra_stats_mask(rfimask.pow_stats.shape, m_iqrm_means_time_nomask_exstats, extra_stats_gulp, rfimask.ptsperint)
 
     fig4, ax4 = plt.subplots()
-    ax4.pcolormesh((m_iqrm_means_time_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T)
+    ax4.imshow((m_iqrm_means_time_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T, aspect='auto', origin='lower')
     fig4.suptitle("2D iqrm means looking for bad intervals (referenced against working mask before option 4)")
     output_plot(fig4, pdf=p)
 
