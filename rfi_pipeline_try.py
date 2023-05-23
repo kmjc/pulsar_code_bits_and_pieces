@@ -1088,11 +1088,9 @@ if 0 in opts:
     base_mask = base_mask | rfimask.mask
     logging.info(f"+rfifind mask  masks out {masked_frac(base_mask)} of data")
 
-    #fig00, ax00 = plt.subplots(2,2,sharex='col')
     fig01, ax01 = plt.subplots(1,2)
     mcut = cut_off_high_fraction(base_mask, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=True, ax=None, axhard=ax01) #, debug=True)
     base_mask = base_mask | mcut
-    output_plot(fig00, pdf=p)
     output_plot(fig01, pdf=p)
 
     fig1, ax1 = plt.subplots()
