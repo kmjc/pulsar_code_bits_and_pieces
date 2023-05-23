@@ -420,8 +420,9 @@ def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_p
             ms.append(m)
             if m > thresh:
                 figtmp, axtmp = plt.subplots(2,1)
-                axtmp[1].pcolormesh(stat[:,max(0,c-10):min(c+10,stat.shape[1])].T)
-                axtmp[1].axhline(10, c='red')
+                stat_tmp = stat[:,max(0,c-10):min(c+10,stat.shape[1])]
+                axtmp[1].pcolormesh(stat_tmp.T, vmin=stat_tmp.min(), vmax=stat_tmp.max())
+                axtmp[1].axhline(min(10,c), c='red')
                 figtmp.suptitle(f"{c}: {dary_step.max()}")
                 axtmp[0].plot(dary)
                 axtmp[0].plot(rescale(dary_step, dary), c='orange')
