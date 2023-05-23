@@ -1486,6 +1486,7 @@ maskdict = {
 }
 
 combos = [
+    ["0+1+2"]
     ["0+1+2", "3"],
     ["0+1+2", "6"],
     ["0+1+2", "4"],
@@ -1506,8 +1507,9 @@ tmp = dict()
 for combo in combos:
     descr = "+".join(combo)
     mask = maskdict[combo[0]]
-    for other_mask_key in combo[1:]:
-        mask = (mask | maskdict[other_mask_key])
+    if len(combo) > 1:
+        for other_mask_key in combo[1:]:
+            mask = (mask | maskdict[other_mask_key])
 
     add_stats = []
     for thing in [means, var, gsk_d_estimate_masked]:
