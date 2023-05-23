@@ -311,6 +311,12 @@ def cut_off_high_fraction(existing_mask, hard_thresh_chans=0.2, hard_thresh_ints
     nzapped_ints = len(set(zapped_ints).union(set(ints_to_zap_hard)))
     nzapped_chans = len(set(zapped_chans).union(set(chans_to_zap_hard)))
     logging.debug(f"after hard nzapped_chans={nzapped_chans}, nzapped_ints={nzapped_ints}")
+
+    # If don't need to do the cumulative cut, exit early
+    if cumul_threshold_chans == 1 and cumul_threshold_ints == 1:
+        logging.info("Not running cumulative cut as both thresholds are set to 1")
+        return fracs_mask_hard
+    
     frac_data_chans = ((existing_mask|fracs_mask_hard).sum(axis=0) - nzapped_ints)/(nint - nzapped_ints)
     frac_data_ints = ((existing_mask|fracs_mask_hard).sum(axis=1) - nzapped_chans)/(nchan - nzapped_chans)
 
@@ -1082,9 +1088,9 @@ if 0 in opts:
     base_mask = base_mask | rfimask.mask
     logging.info(f"+rfifind mask  masks out {masked_frac(base_mask)} of data")
 
-    fig00, ax00 = plt.subplots(2,2,sharex='col')
+    #fig00, ax00 = plt.subplots(2,2,sharex='col')
     fig01, ax01 = plt.subplots(1,2)
-    mcut = cut_off_high_fraction(base_mask, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=True, ax=ax00, axhard=ax01) #, debug=True)
+    mcut = cut_off_high_fraction(base_mask, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=True, ax=None, axhard=ax01) #, debug=True)
     base_mask = base_mask | mcut
     output_plot(fig00, pdf=p)
     output_plot(fig01, pdf=p)
