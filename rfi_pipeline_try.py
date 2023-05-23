@@ -1304,8 +1304,6 @@ if 4 in opts:
         stage="highfrac 4",
         always_plot_summary=True,
         noupdate=True,
-        always_plot_summary=True,
-        noupdate=True,
     )
 
     del hf
