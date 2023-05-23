@@ -1334,8 +1334,6 @@ if 5 in opts:
         stage="highfrac 5",
         always_plot_summary=True,
         noupdate=True,
-        always_plot_summary=True,
-        noupdate=True,
     )
 
     del hf
@@ -1365,8 +1363,6 @@ if 4 in opts and 5 in opts:
         hf, hf_exstats, 
         args.problem_frac, rfimask, means, var, p, 
         stage="highfrac 4&5",
-        always_plot_summary=True,
-        noupdate=True,
         always_plot_summary=True,
         noupdate=True,
     )
