@@ -1454,6 +1454,10 @@ if 6 in opts:
 #print("Changing to correct shape")
 #final_mask = reshape_extra_stats_mask(rfimask.pow_stats.shape, (pre_final_mask|high_frac_fin), extra_stats_gulp, rfimask.ptsperint)
 
+if p is not None:
+    logging.info("Writing pdf")
+    p.close()
+    
 logging.info("")
 logging.info("SUMMARY")
 
@@ -1491,7 +1495,7 @@ for combo in combos:
     descr = "+".join(combo)
     mask = maskdict[combo[0]]
     for other_mask_key in combo[1:]:
-        mask = (mask | maskdict[combo[other_mask_key]])
+        mask = (mask | maskdict[other_mask_key])
 
     add_stats = []
     for thing in [means, var, gsk_d_estimate_masked]:
@@ -1516,8 +1520,5 @@ logging.info("Note don't combine other things with 6 as that's pretty sensistive
 # ### Wrapping up
 logging.info("\nWrapping up")
 logging.info("Not writing mask up")
-if p is not None:
-    logging.info("Writing pdf")
-    p.close()
 logging.info("Done")
 sys.exit(0)
