@@ -202,7 +202,7 @@ def get_zeros_mask_alt(rfifind_obj, ignorechans=[], verbose=False, plot_diagnost
     if plot_diagnostics:
         if ax is None:
             fig, ax = plt.subplots()
-        ax.pcolormesh(np.ma.array(tmp, mask=working_mask).T)
+        ax.imshow(np.ma.array(tmp, mask=working_mask).T, aspect='auto', origin='lower')
         ax.set_xlabel("int")
         ax.set_ylabel("chan")
         ax.set_title("Plot of where std_stats==0, masked by the ignorechans")
@@ -311,6 +311,12 @@ def cut_off_high_fraction(existing_mask, hard_thresh_chans=0.2, hard_thresh_ints
     nzapped_ints = len(set(zapped_ints).union(set(ints_to_zap_hard)))
     nzapped_chans = len(set(zapped_chans).union(set(chans_to_zap_hard)))
     logging.debug(f"after hard nzapped_chans={nzapped_chans}, nzapped_ints={nzapped_ints}")
+
+    # If don't need to do the cumulative cut, exit early
+    if cumul_threshold_chans == 1 and cumul_threshold_ints == 1:
+        logging.info("Not running cumulative cut as both thresholds are set to 1")
+        return fracs_mask_hard
+    
     frac_data_chans = ((existing_mask|fracs_mask_hard).sum(axis=0) - nzapped_ints)/(nint - nzapped_ints)
     frac_data_ints = ((existing_mask|fracs_mask_hard).sum(axis=1) - nzapped_chans)/(nchan - nzapped_chans)
 
@@ -412,7 +418,7 @@ def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_p
 
     for c in np.arange(stat.shape[1]):
         if c not in ignorechans and not stat.mask[:,c].all():
-            dary = stat[:,c]
+            dary = copy.deepcopy(stat[:,c])
             dary -= np.average(stat[:,c])
             dary_step = -np.ma.cumsum(dary)
             m = dary_step.max()
@@ -420,8 +426,9 @@ def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_p
             ms.append(m)
             if m > thresh:
                 figtmp, axtmp = plt.subplots(2,1)
-                axtmp[1].pcolormesh(stat[:,max(0,c-10):min(c+10,stat.shape[1])].T)
-                axtmp[1].axhline(10, c='red')
+                stat_tmp = stat[:,max(0,c-10):min(c+10,stat.shape[1])]
+                axtmp[1].imshow(stat_tmp.T, vmin=stat_tmp.min(), vmax=stat_tmp.max(), aspect='auto', origin='lower')
+                axtmp[1].axhline(min(10,c), c='red')
                 figtmp.suptitle(f"{c}: {dary_step.max()}")
                 axtmp[0].plot(dary)
                 axtmp[0].plot(rescale(dary_step, dary), c='orange')
@@ -639,7 +646,7 @@ plt.rcParams['figure.figsize'] = [12, 8]
 
 def plot_stat_map(stat, axis=None, mask=None, **plot_kwargs):
     nint, nchan = stat.shape
-    grids = np.meshgrid(np.arange(nint + 1), np.arange(nchan + 1), indexing='ij')
+    # grids = np.meshgrid(np.arange(nint + 1), np.arange(nchan + 1), indexing='ij')
     # for some WEIRD reason passing in the grids introduces a bunch of artifacts
     # sure not real as when zoom in they disappear/some are still there but much smaller than 1 int/chan
     # tried passing in centers and shading='nearest' and they're still there
@@ -648,6 +655,11 @@ def plot_stat_map(stat, axis=None, mask=None, **plot_kwargs):
     # BUT some bright single channel stuff you then can't see.
     # So I think he renderer is upping the resolution or something odd and it's producing weirdness
     # could not find a solution so using the thing that means I don't freak out that the data is terrible and lose half a day
+    # UPDATE: also get with pcolormesh :( 
+        # apparently this issue has a 10+year history and is really hard to fix 
+        # https://stackoverflow.com/questions/27092991/white-lines-in-matplotlibs-pcolor
+        # https://github.com/matplotlib/matplotlib/issues/1188
+        # trying switching to imshow
 
     if type(mask) != np.ndarray:
         to_plot = stat
@@ -656,14 +668,14 @@ def plot_stat_map(stat, axis=None, mask=None, **plot_kwargs):
 
     if axis == None:
         #im = plt.pcolormesh(grids[0], grids[1], to_plot, shading='flat', **plot_kwargs)
-        im = plt.pcolormesh(to_plot.T, **plot_kwargs)
+        im = plt.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
         plt.xlabel="interval"
         plt.ylabel="channel"
         plt.colorbar(im)
         plt.show()
     else:
         #im = axis.pcolormesh(grids[0], grids[1], to_plot, shading='flat', **plot_kwargs)
-        im = axis.pcolormesh(to_plot.T, **plot_kwargs)
+        im = axis.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
         plt.colorbar(im, ax=axis)
         return axis
 
@@ -770,12 +782,12 @@ def plot_masked_channels_of_med(thing, channels, ax=None):  #, sig_lims=[3,3]):
 def plot_mask(mask, ax=None):
     if ax is None:
         fig, ax = plt.subplots()
-    ax.pcolormesh(mask.T)
+    ax.imshow(mask.T, aspect='auto', origin='lower')
     ax.set_ylabel("channel")
     ax.set_xlabel("interval")
 
 
-def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exstats, threshold, rfimask, means, var, pdf, stage=None):
+def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exstats, threshold, rfimask, means, var, pdf, stage=None, always_plot_summary=False, noupdate=False):
     """
     Check if adding add_mask to old_mask means the masking fraction goes above the <threshold> 
     If it does:
@@ -783,6 +795,10 @@ def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exsta
         return the old masks
     If it doesn't:
         return (old_mask | add_mask), (old_mask_exstats | add_mask_exstats)
+
+    if noupdate then don't update the maske even if the mask fraction is below the threshold
+
+    if always_plot_summary then alway plot things even in masked fraction is over the threshold
     
     """
     zap_frac = masked_frac(old_mask | add_mask)
@@ -793,8 +809,14 @@ def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exsta
         return old_mask, old_mask_exstats
     else:
         logging.info(f"{stage}: zaps {zap_frac} of data")
-        logging.info(f"{stage}: updating working mask")
-        return (old_mask | add_mask), (old_mask_exstats | add_mask_exstats)
+        if always_plot_summary:
+            make_summary_plots((add_mask|old_mask), (add_mask_exstats|old_mask_exstats), rfimask, means, var, pdf, title_insert=f"Summary stage {stage}")
+        if noupdate:
+            logging.info(f"{stage}: NOT updating working mask - ran with noupdate")
+            return old_mask, old_mask_exstats
+        else:
+            logging.info(f"{stage}: updating working mask")
+            return (old_mask | add_mask), (old_mask_exstats | add_mask_exstats)
 
 
 # ## Stuff that needs to be input to the code
@@ -1063,15 +1085,13 @@ if 0 in opts:
     base_mask = base_mask | rfimask.mask
     logging.info(f"+rfifind mask  masks out {masked_frac(base_mask)} of data")
 
-    fig00, ax00 = plt.subplots(2,2,sharex='col')
     fig01, ax01 = plt.subplots(1,2)
-    mcut = cut_off_high_fraction(base_mask, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=True, ax=ax00, axhard=ax01) #, debug=True)
+    mcut = cut_off_high_fraction(base_mask, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=True, ax=None, axhard=ax01) #, debug=True)
     base_mask = base_mask | mcut
-    output_plot(fig00, pdf=p)
     output_plot(fig01, pdf=p)
 
     fig1, ax1 = plt.subplots()
-    ax1.pcolormesh(base_mask.T)
+    ax1.imshow(base_mask.T, aspect='auto', origin='lower')
     fig1.suptitle("base mask: std_stats==0, large fraction of masked data within an interval, rfifind mask")
     output_plot(fig1, pdf=p)
 
@@ -1099,7 +1119,6 @@ if 0 in opts:
             p.close()
         logging.error("Something went horribly wrong at stage 0")
         sys.exit(1)
-
 
     del base_mask
     del base_mask_exstats
@@ -1140,11 +1159,6 @@ if 1 in opts:
     del step_mask_exstats
 
 
-
-
-
-
-
 # ### Look for outlier intervals, via running iqrm on the median of the means in that interval
 
 if 2 in opts:
@@ -1169,9 +1183,14 @@ if 2 in opts:
     del med_means_time_mask_exstats
 
 
-# ## Make gsk
 
-if 3 in opts or 4 in opts or 5 in opts:
+# ## channel mask - iqrm on the median of the gsk
+
+# This is an overzap but the best thing I've found, that doesn't require too much tuning.
+# (see how it performs on other pointings too!)
+
+if 3 in opts:
+    # ## Make gsk
     logging.info("\nMaking the generalized spectral kurtosis statistic, estimating d from means**2/var")
     delta = means**2/var
     gsk_d_estimate = ((M * delta + 1) / (M - 1)) * (M * (s2 / s1**2) - 1)
@@ -1182,13 +1201,6 @@ if 3 in opts or 4 in opts or 5 in opts:
     figgsk.suptitle("GSK statistic")
     output_plot(figgsk, pdf=p)
 
-
-# ## channel mask - iqrm on the median of the gsk
-
-# This is an overzap but the best thing I've found, that doesn't require too much tuning.
-# (see how it performs on other pointings too!)
-
-if 3 in opts:
     logging.info("\n3: Getting outlier channels, running iqrm on the median of the gsk")
     gsk_med_nomask_chans = get_iqrm_chans(gsk_d_estimate_masked.data, None, rfac=rfac, size_fill=1, out='set',).difference(set(ignorechans))
 
@@ -1242,7 +1254,7 @@ if 4 in opts:
 
 
     fig3, ax3 = plt.subplots()
-    ax3.pcolormesh((m_iqrm_means_freq_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T)
+    ax3.imshow((m_iqrm_means_freq_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T, aspect='auto', origin='lower')
     fig3.suptitle("2D iqrm means looking for bad channels (referenced against working mask before option 4)")
     output_plot(fig3, pdf=p)
 
@@ -1262,7 +1274,7 @@ if 5 in opts:
     m_iqrm_means_time_nomask = reshape_extra_stats_mask(rfimask.pow_stats.shape, m_iqrm_means_time_nomask_exstats, extra_stats_gulp, rfimask.ptsperint)
 
     fig4, ax4 = plt.subplots()
-    ax4.pcolormesh((m_iqrm_means_time_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T)
+    ax4.imshow((m_iqrm_means_time_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T, aspect='auto', origin='lower')
     fig4.suptitle("2D iqrm means looking for bad intervals (referenced against working mask before option 4)")
     output_plot(fig4, pdf=p)
 
