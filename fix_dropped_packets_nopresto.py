@@ -179,8 +179,6 @@ fil.seek(hdrlen)
 if args.stats:
 #    skews = np.zeros((loop_iters, nchans))
 #    kurtoses = np.zeros((loop_iters, nchans))
-    mad = np.zeros((loop_iters, nchans))
-    medians = np.zeros((loop_iters, nchans))
     s1 = np.zeros((loop_iters, nchans))
     s2 = np.zeros((loop_iters, nchans))
     num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
@@ -281,8 +279,6 @@ for i in range(loop_iters):
         s2[i, :] = (tmp**2).sum(axis=0)
         num_unmasked_points[i, :] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
-        medians[i,:] = meds_fullres
-        mad[i,:] = np.ma.median(np.abs(tmp - meds_fullres), axis=0)
 #        if args.debug:
 #            print("Saving stats for debug")
 #            np.savez("fdp_debug_stats.npz", s1=s1[i, :], s2=s2[i, :], num_unmasked_points=num_unmasked_points[i, :], n=n[i])
@@ -303,8 +299,6 @@ if args.stats:  # and not args.debug:
         num_unmasked_points=num_unmasked_points,
         n=n,
         gulp=gulp,
-        medians=medians,
-        mad=mad,
     )
 if additional_fils:
     for add_fil in additional_fils:
