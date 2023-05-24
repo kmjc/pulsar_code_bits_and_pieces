@@ -20,6 +20,9 @@
 # is detectable via this method
 # to overcome this also mask +-<fdp_tscrunch> time samples either side of masked range
 
+# add logging
+# add handle_exception
+
 import numpy as np
 from presto_without_presto import sigproc
 from sigproc_utils import get_dtype, get_nbits, write_header
@@ -27,6 +30,11 @@ import argparse
 import copy
 from scipy.stats.mstats import skew, kurtosis
 import sys
+from gen_utils import handle_exception
+import logging
+
+# log unhandled exception
+sys.excepthook = handle_exception
 
 def get_fdp_mask(arr, axis=0, sigma=4.5):  #, debug=False):
     """
@@ -126,26 +134,49 @@ parser.add_argument(
 #)
 
 parser.add_argument(
+    "--log", type=str, help="name of file to write log to", default=None
+)
+
+parser.add_argument(
     "-v",
     "--verbose",
-    action='store_true',
-    help="Output more messages",
+    help="Increase logging level to debug",
+    action="store_const",
+    dest="loglevel",
+    const=logging.DEBUG,
+    default=logging.INFO,
 )
+
 
 args = parser.parse_args()
 
-#if args.debug:
-#    args.verbose=True
+if args.log is not None:
+    logging.basicConfig(
+        filename=args.log,
+        filemode="w",
+        format="%(asctime)s %(levelname)s:%(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
+        level=args.loglevel,
+    )
+else:
+    logging.basicConfig(
+        format="%(asctime)s %(levelname)s:%(message)s",
+        datefmt="%d-%b-%y %H:%M:%S",
+        level=args.loglevel,
+        stream=sys.stdout,
+    )
 
-if args.verbose:
-    print(f"Running fdp with args:\n{args}")
+
+
+
+logging.info(f"Running fdp with args:\n{args}")
 
 if args.fdp_tscrunch < 1:
     raise AttributeError(f"fdp_tscrunch ({args.fdp_tscrunch}) must be >=1")
 if args.gulp % args.fdp_tscrunch:
-    print(f"Gulp {args.gulp} is not divisible by fdp_tscrunch {args.fdp_tscrunch}")
+    logging.info(f"Gulp {args.gulp} is not divisible by fdp_tscrunch {args.fdp_tscrunch}")
     gulp = (int(args.gulp // args.fdp_tscrunch) + 1) * args.fdp_tscrunch
-    print(f"Gulp adjusted to {gulp}")
+    logging.info(f"Gulp adjusted to {gulp}")
 else:
     gulp = args.gulp
 
@@ -157,22 +188,20 @@ arr_dtype = get_dtype(header["nbits"])
 if header["nifs"] != 1:
     raise AttributeError(f"Code not written to deal with unsummed polarization data")
 
-#if args.debug:
-#    print(f"Read filterbank {args.fn} header:\n{header}")
+logging.debug(f"Read filterbank {args.fn} header:\n{header}")
 
 # loop through chunks
 loop_iters = int(nspecs // gulp)
 if nspecs % gulp:
     loop_iters += 1
-if args.verbose:
-    print(f"Loop through in {loop_iters} iterations")
+logging.info(f"Loop through in {loop_iters} iterations")
 fn_clean = args.fn.strip(".fil")
 #if args.debug:
 #    fn_clean += "_debug"
 fdp_fn = f"{fn_clean}_fdp.fil"
 new_fil = open(fdp_fn, "wb")
 write_header(header, new_fil)
-print(f"Output will be written to {fdp_fn}")
+logging.info(f"Output will be written to {fdp_fn}")
 fil = open(args.fn, "rb")
 fil.seek(hdrlen)
 
@@ -183,14 +212,14 @@ if args.stats:
     s2 = np.zeros((loop_iters, nchans))
     num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
     n = np.zeros((loop_iters), dtype=int)
-    if args.verbose:
-        print(f"Initilaized stats arrays with shape {(loop_iters, nchans)}")
+
+    logging.debug(f"Initilaized stats arrays with shape {(loop_iters, nchans)}")
 
 additional_fils = []
 if args.downsamp is not None:
     for i, d in enumerate(args.downsamp):
         add_fn = f"{fn_clean}_fdp_t{d}.fil"
-        print(f"Also outputting downsampled file: {add_fn}")
+        logging.info(f"Also outputting downsampled file: {add_fn}")
         additional_fils.append(open(add_fn, "wb"))
         add_header = copy.deepcopy(header)
         add_header["tsamp"] = header["tsamp"] * d
@@ -202,37 +231,31 @@ if args.downsamp is not None:
 #    loop_iters = 1
 
 for i in range(loop_iters):
-    #print(f"{i+1}/{loop_iters}", end="\r", flush=True)
-    print(f"{i+1}/{loop_iters}")
+    logging.info(f"{i+1}/{loop_iters}")
     spec = np.fromfile(fil, count=gulp * nchans, dtype=arr_dtype).reshape(-1, nchans)
     # has shape (nspec, nchans) so it plays nice with brodcasting
 
-#    if args.debug:
-#        print(f"Read data into shape {spec.shape}")
+    logging.debug(f"Read data into shape {spec.shape}")
 
     mzeros = spec == 0
-#    if args.debug:
-#        print(f"number of zeros in data: {mzeros.sum()} ({mzeros.sum()/mzeros.size})")
+    logging.debug(f"number of zeros in data: {mzeros.sum()} ({mzeros.sum()/mzeros.size})")
 
     # tscrunch if necessary
     if args.fdp_tscrunch != 1:
- #       if args.debug:
- #           print("tscrunching by a factor of {args.fdp_tscrunch}")
+        logging.info("tscrunching by a factor of {args.fdp_tscrunch} when searching for drops")
         working_spec = tscrunch(spec, args.fdp_tscrunch)
     else:
         working_spec = spec
 
-#    if args.debug:
-#        print(f"working spectra of shape {working_spec.shape}")
+    logging.debug(f"working spectra of shape {working_spec.shape}")
 
     # get the (tscrunched) dropout mask
     #mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig, debug=args.debug).data
     mfdp = get_fdp_mask(working_spec, axis=0, sigma=args.thresh_sig).data
-    if args.verbose:
-        print(f"mfdp mask of shape {mfdp.shape}\nNumber masked by mfdp is {mfdp.sum()} ({mfdp.sum()/mfdp.size})")
+    logging.debug(f"mfdp mask of shape {mfdp.shape}\nNumber masked by mfdp is {mfdp.sum()} ({mfdp.sum()/mfdp.size})")
 
     # wiggle mfdp
-    print("wiggling fdp mask")
+    logging.debug("wiggling fdp mask")
     mfdp[0:-1,:] = (mfdp[0:-1,:] | mfdp[1:,:])
     mfdp[1:,:] = (mfdp[1:,:] | mfdp[0:-1,:])
 
@@ -242,8 +265,7 @@ for i in range(loop_iters):
     else:
         mtot = mfdp | mzeros
 
-    if args.verbose:
-        print(f"mtot made, of shape {mtot.shape}, mask amount {mtot.sum()} ({mtot.sum()/mtot.size} of data)")
+    logging.debug(f"mtot made, of shape {mtot.shape}, mask amount {mtot.sum()} ({mtot.sum()/mtot.size} of data)")
 #    if args.debug:
 #        print("Saving spec, mzeros, working_spec, mfdp, mtot for debug to fdp_debug.npz")
 #        np.savez("fdp_debug.npz", spec=spec, working_spec=working_spec, mfdp=mfdp, mtot=mtot)
@@ -278,17 +300,13 @@ for i in range(loop_iters):
         s2[i, :] = (tmp**2).sum(axis=0)
         num_unmasked_points[i, :] = (~tmp.mask).sum(axis=0)
         n[i] = tmp.shape[0]
-#        if args.debug:
-#            print("Saving stats for debug")
-#            np.savez("fdp_debug_stats.npz", s1=s1[i, :], s2=s2[i, :], num_unmasked_points=num_unmasked_points[i, :], n=n[i])
-
 
 
 fil.close()
 new_fil.close()
 # save stats
 if args.stats:  # and not args.debug:
-    print(f"Writing stats to {fdp_fn[:-4]}_stats.npz")
+    logging.info(f"Writing stats to {fdp_fn[:-4]}_stats.npz")
     np.savez(
         f"{fdp_fn[:-4]}_stats.npz",
 #        skew=skews,
