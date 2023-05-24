@@ -54,6 +54,9 @@ else:
         stream=sys.stdout,
     )
 
+# log unhandled exception
+sys.excepthook = handle_exception
+
 logging.info(f"Processing {args.filename}")
 
 with open(f"{args.filename}.yaml", "r") as fin:
