@@ -418,7 +418,7 @@ def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_p
 
     for c in np.arange(stat.shape[1]):
         if c not in ignorechans and not stat.mask[:,c].all():
-            dary = stat[:,c]
+            dary = copy.deepcopy(stat[:,c])
             dary -= np.average(stat[:,c])
             dary_step = -np.ma.cumsum(dary)
             m = dary_step.max()
