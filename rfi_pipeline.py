@@ -459,7 +459,7 @@ def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_p
 
 # ### iqrm
 
-def run_iqrm_2D(data, mask, axis, r, size_fill=3):
+def run_iqrm_2D(data, mask, axis, r, size_fill=3, ignorechans=[]):
     """Run iqrm on 1d slices of 2d data,
     axis means which direction to take the slice
     aka if data is shape (nint, nchan):
@@ -467,6 +467,8 @@ def run_iqrm_2D(data, mask, axis, r, size_fill=3):
         axis=0 menas for each channel, run iqrm looking for outlier intervals
 
     size_fill = factor to use for fill_value, med + <size_fill> * (max-med)
+
+    ignorechans: channels to ignore, only used if axis=1
     """
     a0,a1 = data.shape
     out = np.zeros((a0,a1), dtype=bool)
@@ -479,7 +481,7 @@ def run_iqrm_2D(data, mask, axis, r, size_fill=3):
 
     if axis == 1:
         for i in range(a0):
-            out[i,:], v = iqrm_mask(use[i,:], r)
+            out[i,:], v = iqrm_mask(use[i,:], r, ignorechans=ignorechans)
 
     if axis == 0:
         for j in range(a1):
@@ -505,7 +507,7 @@ def get_fill_value(masked_statistic, factor, mode="max-med"):
         logging.error("Invalid option for mode, must be one of ['max', 'max-med', 'med']")
 
 
-def get_iqrm_chans(stat, mask, out='mask', rfac=8, flip=False, reduction_function=np.ma.median, size_fill=3, fill_mode="max-med"):
+def get_iqrm_chans(stat, mask, out='mask', rfac=8, flip=False, reduction_function=np.ma.median, size_fill=3, fill_mode="max-med", ignorechans=[]):
     """
     Mask channels based on (nint, nchan) stat passed in operated upon by <reduction_function> along the interval axis(=0)
 
@@ -547,7 +549,7 @@ def get_iqrm_chans(stat, mask, out='mask', rfac=8, flip=False, reduction_functio
 
     #plt.plot(use.filled(fill_value))
 
-    iqmask_stdavg, v = iqrm_mask(use.filled(fill_value), radius=r)
+    iqmask_stdavg, v = iqrm_mask(use.filled(fill_value), radius=r, ignorechans=ignorechans)
 
     chanset = set(np.where(iqmask_stdavg)[0])
     if out == 'set':
@@ -1061,7 +1063,7 @@ r_int = rfimask.nint/rfac
 
 working_mask = np.zeros_like(rfimask.mask)
 working_mask_exstats = np.zeros_like(M, dtype=bool)
-
+working_ignorechans = ignorechans
 
 
 if 0 in opts:
@@ -1120,6 +1122,8 @@ if 0 in opts:
         logging.error("Something went horribly wrong at stage 0")
         sys.exit(1)
 
+    working_ignorechans = get_ignorechans_from_mask(working_mask)
+
     del base_mask
     del base_mask_exstats
 
@@ -1140,7 +1144,7 @@ var = (s2 - s1**2/M)/M
 
 if 1 in opts:
     logging.info("\nGetting channels with steps")
-    step_chans_to_zap, cs, ms = get_step_chans(means, ignorechans=get_ignorechans_from_mask(working_mask_exstats), thresh=30, return_stats=True, output_pdf=p)
+    step_chans_to_zap, cs, ms = get_step_chans(means, ignorechans=working_ignorechans, thresh=30, return_stats=True, output_pdf=p)
     step_mask_exstats = np.zeros_like(means.mask)
     step_mask = np.zeros_like(rfimask.pow_stats, dtype=bool)
     for cc in step_chans_to_zap:
@@ -1154,6 +1158,7 @@ if 1 in opts:
     #output_plot(fig02, pdf=p)
 
     working_mask, working_mask_exstats = check_mask_and_continue(working_mask, working_mask_exstats, step_mask, step_mask_exstats, args.problem_frac, rfimask, means, var, p, stage=1)
+    working_ignorechans = get_ignorechans_from_mask(working_mask)
 
     del step_mask
     del step_mask_exstats
@@ -1202,7 +1207,7 @@ if 3 in opts:
     output_plot(figgsk, pdf=p)
 
     logging.info("\n3: Getting outlier channels, running iqrm on the median of the gsk")
-    gsk_med_nomask_chans = get_iqrm_chans(gsk_d_estimate_masked.data, None, rfac=rfac, size_fill=1, out='set',).difference(set(ignorechans))
+    gsk_med_nomask_chans = get_iqrm_chans(gsk_d_estimate_masked.data, None, rfac=rfac, size_fill=1, out='set', ignorechans=working_ignorechans).difference(set(ignorechans))
 
     gsk_chan_mask = np.zeros_like(working_mask, dtype=bool)
     gsk_chan_mask_exstats = np.zeros_like(working_mask_exstats, dtype=bool)
@@ -1233,6 +1238,7 @@ if 3 in opts:
         args.problem_frac, rfimask, means, var, p, 
         stage=3,
     )
+    working_ignorechans = get_ignorechans_from_mask(working_mask)
 
     del gsk_chan_mask
     del gsk_chan_mask_exstats
