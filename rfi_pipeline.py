@@ -911,7 +911,7 @@ parser.add_argument(
     5 = running iqrm in 2D on the means, along the freq axis (looking for outlier intervals in each channels)
     ~ if run either 4/5/both there will be a high fraction cut here ~
     6 = cut channels where the std of the means in each channel is high
-    7 = cut channels where the median of the rfifind pow_stats is high 
+    7 = cut channels where the median of the rfifind pow_stats is high or low
         (cut is an iterative median +- 5 std, where median and std are calcualted from the central 80% of the band)
     """
 )
@@ -1046,7 +1046,8 @@ opt_dict = {
     3: "cutting outlier channels: running iqrm on the per-channel median of the generalized spectral kurtosis statistic",
     4: "running iqrm in 2D on the means, along the time axes (looking for outlier channels in each interval)",
     5: "running iqrm in 2D on the means, along the freq axis (looking for outlier intervals in each channels)",
-    6: "cut channels where the std of the means in each channel is high"
+    6: "cut channels where the std of the means in each channel is high",
+    7: "cut channels where the median of the rfifind pow_stats is high or low",
 }
 logging.info(f"Options selected:")
 for x in opts:
