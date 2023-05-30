@@ -912,7 +912,7 @@ parser.add_argument(
     ~ if run either 4/5/both there will be a high fraction cut here ~
     6 = cut channels where the std of the means in each channel is high
     7 = cut channels where the median of the rfifind pow_stats is high or low
-        (cut is an iterative median +- 5 std, where median and std are calcualted from the central 80% of the band)
+        (cut is an iterative median +- 5 std, where median and std are calcualted from the central 80%% of the band)
     """
 )
 
