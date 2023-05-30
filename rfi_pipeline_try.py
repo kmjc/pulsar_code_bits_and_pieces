@@ -606,11 +606,29 @@ def iqrm_of_median_of_means(means_data, mask, r, to_return="mask", plot=True, ax
 # nope I take it back, iqrm zaps more than it needs to!
 
 # this is less necessary now I have get_step_chans, but still good!
-def reject_pm_sigma_iteration(arr1d, init_mask, thresh=5, plot=False, positive_only=False, iteration=0, prev_hits=np.array([9E9])):
+def reject_pm_sigma_iteration(arr1d, init_mask, thresh=5, plot=False, positive_only=False, iteration=0, prev_hits=np.array([9E9]), middle80=False):
+    """
+    Iteravely reject points more than <thresh>*std from the median
+
+    positive_only=True: only reject points over median + <thresh>*std
+    middle80=True: calculate the median and std based on the middle 80% of arr1d
+        (e.g. ignoring 10% at each edge of the band)
+    
+    Don't pass in these arguments, they're so it iterates:
+    iteration
+    prev_hits
+    """
     tmp = np.ma.array(arr1d, mask=init_mask)
     working_mask = copy.deepcopy(init_mask)
-    md = np.ma.median(tmp)
-    sig = np.ma.std(tmp)
+
+    nchans = tmp.shape[0]
+    if middle80:
+        slc = slice(round(0.1*nchans), round(0.9*nchans)+1)
+    else:
+        slc = slice(None, None)
+
+    md = np.ma.median(tmp[slc])
+    sig = np.ma.std(tmp[slc])
 
     lo_lim = md - thresh*sig
     hi_lim = md + thresh*sig
@@ -639,6 +657,8 @@ def reject_pm_sigma_iteration(arr1d, init_mask, thresh=5, plot=False, positive_o
         working_mask[c] = True
 
     return reject_pm_sigma_iteration(arr1d, working_mask, thresh=thresh, plot=plot, positive_only=positive_only, iteration=iteration+1, prev_hits=all_hits)
+
+    
 
 
 
@@ -879,7 +899,7 @@ parser.add_argument(
 parser.add_argument(
     "--option",
     type=str,
-    default="0,1,2,3,4,6",
+    default="0,1,2,3,4,6,7",
     help="""Which masking options to use. Comma separated string, will be run from 0 up regardless of order passed in.
     *Highly* recommend always including 0.
     Default is '0,1,2,3,4,6'
@@ -891,6 +911,8 @@ parser.add_argument(
     5 = running iqrm in 2D on the means, along the freq axis (looking for outlier intervals in each channels)
     ~ if run either 4/5/both there will be a high fraction cut here ~
     6 = cut channels where the std of the means in each channel is high
+    7 = cut channels where the median of the rfifind pow_stats is high or low
+        (cut is an iterative median +- 5 std, where median and std are calcualted from the central 80% of the band)
     """
 )
 
@@ -997,7 +1019,7 @@ else:
     ignorechans = [int(x) for x in args.ignorechans.split(",")]
 
 #optstr="".join(args.option.split(","))
-optstr="try0123456"
+optstr="try01234567"
 if args.overwrite:
     outfilename = args.maskfile
 elif args.outfilename is None:
@@ -1019,8 +1041,8 @@ else:
 
 #opts = [int(x) for x in args.option.split(",")]
 logging.info("Running trial rfipipeline - will run all stages and plot results")
-logging.info("Stages 0,1,2 will be run in sequency and the results used as the initial mask for 3,4,5 individually")
-opts = [0,1,2,3,4,5,6]
+logging.info("Stages 0,1,2 will be run in sequency and the results used as the initial mask for 3,4,5,6,7 individually")
+opts = [0,1,2,3,4,5,6,7]
 
 opt_dict = {
     0: "basic processing: ignorechans, anywhere the std is 0, where the number of unmasked points is < set threshold, the rfifind mask, a high fraction cut",
@@ -1029,7 +1051,8 @@ opt_dict = {
     3: "cutting outlier channels: running iqrm on the per-channel median of the generalized spectral kurtosis statistic",
     4: "running iqrm in 2D on the means, along the time axes (looking for outlier channels in each interval)",
     5: "running iqrm in 2D on the means, along the freq axis (looking for outlier intervals in each channels)",
-    6: "cut channels where the std of the means in each channel is high"
+    6: "cut channels where the std of the means in each channel is high",
+    7: "cut channels where the median of the rfifind pow_stats is high or low",
 }
 logging.info(f"Options selected:")
 for x in opts:
@@ -1457,6 +1480,35 @@ if 6 in opts:
     del std_of_avg_mask
     m6_exstats = std_of_avg_mask_exstats
 
+if 7 in opts:
+    logging.info("\n7:Looking for channels where the median power is unusually high or low")
+    tmp_pows = np.ma.array(rfimask.pow_stats, mask=working_mask)
+    t = np.ma.median(tmp_pows, axis=0)
+
+    # do an iterative medain+5*std cut, where median and std calculated from the middel 80% of the band
+    med_of_pow_chan_mask = reject_pm_sigma_iteration(t.data, t.mask, plot=False, positive_only=False, middle80=True)
+    med_of_pow_mask_exstats = np.tile(med_of_pow_chan_mask, reps=(working_mask_exstats.shape[0],1))
+    med_of_pow_mask = np.tile(med_of_pow_chan_mask, reps=(working_mask.shape[0],1))
+
+    fig8, ax8 = plt.subplots()
+    ax8.plot(t, "x")
+    ax8.plot(np.ma.array(t.data, mask=(t.mask|med_of_pow_chan_mask)), "+")
+    ax8.set_title("median of pow_stats showing which have been masked")
+
+    output_plot(fig8, pdf=p)
+
+    working_mask, working_mask_exstats = check_mask_and_continue(
+        working_mask, working_mask_exstats, 
+        med_of_pow_mask, med_of_pow_mask_exstats, 
+        args.problem_frac, rfimask, means, var, p, 
+        stage=7,
+        always_plot_summary=True,
+        noupdate=True,
+    )
+    
+    m7_exstats = med_of_pow_mask_exstats
+    del med_of_pow_mask
+
 
 #print(f"Doing high fraction cut on mask before finalizing")
 #pre_final_mask = (working_mask|std_of_avg_mask)
@@ -1487,12 +1539,15 @@ maskdict = {
     "5hf": m5hf_exstats,
     "45hf": m45hf_exstats,
     "6": m6_exstats,
+    "7": m7_exstats,
 
 }
 
 combos = [
     ["0+1+2"],
     ["0+1+2", "6"],
+    ["0+1+2", "7"],
+    ["0+1+2", "6", "7"],
     ["0+1+2", "3"],
     ["0+1+2", "4"],
     ["0+1+2", "4", "4hf"],
