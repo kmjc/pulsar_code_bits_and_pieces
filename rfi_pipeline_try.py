@@ -1203,7 +1203,7 @@ if 3 in opts:
     output_plot(figgsk, pdf=p)
 
     logging.info("\n3: Getting outlier channels, running iqrm on the median of the gsk")
-    gsk_med_nomask_chans = get_iqrm_chans(gsk_d_estimate_masked.data, None, rfac=rfac, size_fill=1, out='set', ignorechans=working_ignorechans).difference(set(ignorechans))
+    gsk_med_nomask_chans = get_iqrm_chans(gsk_d_estimate_masked, None, rfac=rfac, size_fill=1, out='set', ignorechans=working_ignorechans).difference(set(ignorechans))
 
     gsk_chan_mask = np.zeros_like(working_mask, dtype=bool)
     gsk_chan_mask_exstats = np.zeros_like(working_mask_exstats, dtype=bool)
