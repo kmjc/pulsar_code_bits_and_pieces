@@ -611,24 +611,30 @@ def reject_pm_sigma_iteration(arr1d, init_mask, thresh=5, plot=False, positive_o
     Iteravely reject points more than <thresh>*std from the median
 
     positive_only=True: only reject points over median + <thresh>*std
-    middle80=True: calculate the median and std based on the middle 80% of arr1d
-        (e.g. ignoring 10% at each edge of the band)
+    middle80=True: only do this process on the middle 80% of arr1d
+        (i.e. ignoring 10% at each edge of the band)
     
     Don't pass in these arguments, they're so it iterates:
     iteration
     prev_hits
     """
-    tmp = np.ma.array(arr1d, mask=init_mask)
+    tmp0 = np.ma.array(arr1d, mask=init_mask)
     working_mask = copy.deepcopy(init_mask)
 
-    nchans = tmp.shape[0]
+    nchans = tmp0.shape[0]
     if middle80:
         slc = slice(round(0.1*nchans), round(0.9*nchans)+1)
     else:
         slc = slice(None, None)
 
-    md = np.ma.median(tmp[slc])
-    sig = np.ma.std(tmp[slc])
+    md = np.ma.median(tmp0[slc])
+    sig = np.ma.std(tmp0[slc])
+
+    tmp = copy.deepcopy(tmp0)
+    if middle80:
+        tmp[:round(0.1*nchans)+1] = md
+        tmp[round(0.9*nchans):] = md
+    
 
     lo_lim = md - thresh*sig
     hi_lim = md + thresh*sig
@@ -656,7 +662,7 @@ def reject_pm_sigma_iteration(arr1d, init_mask, thresh=5, plot=False, positive_o
     for c in np.where(condit):
         working_mask[c] = True
 
-    return reject_pm_sigma_iteration(arr1d, working_mask, thresh=thresh, plot=plot, positive_only=positive_only, iteration=iteration+1, prev_hits=all_hits)
+    return reject_pm_sigma_iteration(arr1d, working_mask, thresh=thresh, plot=plot, positive_only=positive_only, iteration=iteration+1, prev_hits=all_hits, middle80=middle80)
 
     
 
