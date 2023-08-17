@@ -578,7 +578,7 @@ def iqrm_of_median_of_means(means_data, mask, r, to_return="mask", plot=True, ax
     if to_return not in ["array", "set", "mask", "int_mask"]:
         raise AttributeError(f"to_return ({to_return}) must be one of 'array', set', 'mask', 'int_mask'")
     thing = np.ma.median(np.ma.array(means_data, mask=mask), axis=1)
-    q, v = iqrm_mask(thing, radius=r_int)
+    q, v = iqrm_mask(thing, radius=r)
     if plot:
         if ax is None:
             figtmp, ax = plt.subplots()
@@ -993,474 +993,476 @@ parser.add_argument(
 )
 
 # args = parser.parse_args(args_in)
-args = parser.parse_args()
-
-if args.log is not None:
-    logging.basicConfig(
-        filename=args.log,
-        filemode="a",
-        format="%(asctime)s %(levelname)s:%(message)s",
-        datefmt="%d-%b-%y %H:%M:%S",
-        level=args.loglevel,
-    )
-else:
-    logging.basicConfig(
-        format="%(asctime)s %(levelname)s:%(message)s",
-        datefmt="%d-%b-%y %H:%M:%S",
-        level=args.loglevel,
-        stream=sys.stdout,
-    )
-
-logging.info("rfi_pipeline initialized with arguments:")
-logging.info(args)
-
-maskfile = args.maskfile
-extra_stats_fn = args.extra_stats_file
-rfac = args.rfac
-m_frac_threshold = args.m_frac_threshold
-
-if args.ignorechans == "":
-    ignorechans = []
-else:
-    ignorechans = [int(x) for x in args.ignorechans.split(",")]
-
-optstr="".join(args.option.split(","))
-if args.overwrite:
-    outfilename = args.maskfile
-elif args.outfilename is None:
-    outfilename = maskfile[:maskfile.rfind("_rfifind.mask")] + "_" + optstr + "_rfifind.mask"
-else:
-    outfilename = args.outfilename
-logging.info(f"New mask will be written to: {outfilename}")
-
-if args.show:
-    p = None
-else:
-
-    plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")]
-    if optstr not in plotfname:
-        plotfname += f"_{optstr}"
-    plotfname += ".pdf"
-    p = PdfPages(plotfname)
-    logging.info(f"Plots will be written to {plotfname}")
-
-opts = [int(x) for x in args.option.split(",")]
-opt_dict = {
-    0: "basic processing: ignorechans, anywhere the std is 0, where the number of unmasked points is < set threshold, the rfifind mask, a high fraction cut",
-    1: "cutting channels which have steps in them (detected via a cumsum)",
-    2: "cutting outlier intervals, running iqrm on the per-interval median of the means",
-    3: "cutting outlier channels: running iqrm on the per-channel median of the generalized spectral kurtosis statistic",
-    4: "running iqrm in 2D on the means, along the time axes (looking for outlier channels in each interval)",
-    5: "running iqrm in 2D on the means, along the freq axis (looking for outlier intervals in each channels)",
-    6: "cut channels where the std of the means in each channel is high",
-    7: "cut channels where the median of the rfifind pow_stats is high or low",
-}
-logging.info(f"Options selected:")
-for x in opts:
-    logging.info(f"\t{x}: {opt_dict[x]}")
-
-
-# ## Load files
-
-rfimask = rfifind.rfifind(maskfile)
-logging.info(f"loaded mask from {maskfile}")
-
-extra_stats = np.load(extra_stats_fn, allow_pickle=True)
-if args.dont_flip_band:
-    M = extra_stats["num_unmasked_points"][:,:]
-    s1 = extra_stats["s1"][:,:]
-    s2 = extra_stats["s2"][:,:]
-else:
-    # flip everything to presto channel convention
-    logging.info("Reversing channel order in extra stats to match presto convention")
-    M = extra_stats["num_unmasked_points"][:,::-1]
-    s1 = extra_stats["s1"][:,::-1]
-    s2 = extra_stats["s2"][:,::-1]
-
-
-N = extra_stats["n"]
-extra_stats_gulp = extra_stats["gulp"]
-
-# ## make some other parameters
-r = rfimask.nchan/rfac
-r_int = rfimask.nint/rfac
-
-
-# ## Pipeline
-
-# ### Setup initial working mask
-
-working_mask = np.zeros_like(rfimask.mask)
-working_mask_exstats = np.zeros_like(M, dtype=bool)
-working_ignorechans = ignorechans
-
 
-if 0 in opts:
-    # ### std_stats==0 mask
-    logging.info(f"Ignoring {len(ignorechans)}/{rfimask.nchan} channels")
+if __name__ == "__main__":
+    args = parser.parse_args()
+
+    if args.log is not None:
+        logging.basicConfig(
+            filename=args.log,
+            filemode="a",
+            format="%(asctime)s %(levelname)s:%(message)s",
+            datefmt="%d-%b-%y %H:%M:%S",
+            level=args.loglevel,
+        )
+    else:
+        logging.basicConfig(
+            format="%(asctime)s %(levelname)s:%(message)s",
+            datefmt="%d-%b-%y %H:%M:%S",
+            level=args.loglevel,
+            stream=sys.stdout,
+        )
+
+    logging.info("rfi_pipeline initialized with arguments:")
+    logging.info(args)
+
+    maskfile = args.maskfile
+    extra_stats_fn = args.extra_stats_file
+    rfac = args.rfac
+    m_frac_threshold = args.m_frac_threshold
+
+    if args.ignorechans == "":
+        ignorechans = []
+    else:
+        ignorechans = [int(x) for x in args.ignorechans.split(",")]
+
+    optstr="".join(args.option.split(","))
+    if args.overwrite:
+        outfilename = args.maskfile
+    elif args.outfilename is None:
+        outfilename = maskfile[:maskfile.rfind("_rfifind.mask")] + "_" + optstr + "_rfifind.mask"
+    else:
+        outfilename = args.outfilename
+    logging.info(f"New mask will be written to: {outfilename}")
+
+    if args.show:
+        p = None
+    else:
+
+        plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")]
+        if optstr not in plotfname:
+            plotfname += f"_{optstr}"
+        plotfname += ".pdf"
+        p = PdfPages(plotfname)
+        logging.info(f"Plots will be written to {plotfname}")
+
+    opts = [int(x) for x in args.option.split(",")]
+    opt_dict = {
+        0: "basic processing: ignorechans, anywhere the std is 0, where the number of unmasked points is < set threshold, the rfifind mask, a high fraction cut",
+        1: "cutting channels which have steps in them (detected via a cumsum)",
+        2: "cutting outlier intervals, running iqrm on the per-interval median of the means",
+        3: "cutting outlier channels: running iqrm on the per-channel median of the generalized spectral kurtosis statistic",
+        4: "running iqrm in 2D on the means, along the time axes (looking for outlier channels in each interval)",
+        5: "running iqrm in 2D on the means, along the freq axis (looking for outlier intervals in each channels)",
+        6: "cut channels where the std of the means in each channel is high",
+        7: "cut channels where the median of the rfifind pow_stats is high or low",
+    }
+    logging.info(f"Options selected:")
+    for x in opts:
+        logging.info(f"\t{x}: {opt_dict[x]}")
+
+
+    # ## Load files
+
+    rfimask = rfifind.rfifind(maskfile)
+    logging.info(f"loaded mask from {maskfile}")
+
+    extra_stats = np.load(extra_stats_fn, allow_pickle=True)
+    if args.dont_flip_band:
+        M = extra_stats["num_unmasked_points"][:,:]
+        s1 = extra_stats["s1"][:,:]
+        s2 = extra_stats["s2"][:,:]
+    else:
+        # flip everything to presto channel convention
+        logging.info("Reversing channel order in extra stats to match presto convention")
+        M = extra_stats["num_unmasked_points"][:,::-1]
+        s1 = extra_stats["s1"][:,::-1]
+        s2 = extra_stats["s2"][:,::-1]
+
+
+    N = extra_stats["n"]
+    extra_stats_gulp = extra_stats["gulp"]
+
+    # ## make some other parameters
+    r = rfimask.nchan/rfac
+    r_int = rfimask.nint/rfac
+
+
+    # ## Pipeline
+
+    # ### Setup initial working mask
+
+    working_mask = np.zeros_like(rfimask.mask)
+    working_mask_exstats = np.zeros_like(M, dtype=bool)
+    working_ignorechans = ignorechans
 
-    logging.info(f"\nGetting zeros mask")
-    fig0, ax0 = plt.subplots()
-    m0 = get_zeros_mask_alt(rfimask, ignorechans=ignorechans, verbose=True, ax=ax0)
-    output_plot(fig0, pdf=p)
-
-    # ### M mask (where num_points_unmasked from fdp is under some threshold)
-    # cut off anywhere where <0.5 of the gulp was nonzero
-    mmask = (M.T < m_frac_threshold*N).T
-    # right the gulp is different for fdp and rfifind. damn. will have to record that in extra_stats
-
-    base_mask = m0|reshape_extra_stats_mask(m0.shape, mmask, extra_stats_gulp, rfimask.ptsperint)
-    logging.info(f"ignorechans, std_stats=0 and lots of 0 data alone mask out {masked_frac(base_mask)} of data")
-
-    # ### Add initial rfifind mask and do a hard threshold cut
-    base_mask = base_mask | rfimask.mask
-    logging.info(f"+rfifind mask  masks out {masked_frac(base_mask)} of data")
-
-    fig01, ax01 = plt.subplots(1,2)
-    mcut = cut_off_high_fraction(base_mask, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=True, ax=None, axhard=ax01) #, debug=True)
-    base_mask = base_mask | mcut
-    output_plot(fig01, pdf=p)
 
-    fig1, ax1 = plt.subplots()
-    ax1.imshow(base_mask.T, aspect='auto', origin='lower')
-    fig1.suptitle("base mask: std_stats==0, large fraction of masked data within an interval, rfifind mask")
-    output_plot(fig1, pdf=p)
+    if 0 in opts:
+        # ### std_stats==0 mask
+        logging.info(f"Ignoring {len(ignorechans)}/{rfimask.nchan} channels")
 
-    # update working mask
-    base_mask_exstats = reshape_rfifind_mask(M.shape, base_mask, extra_stats_gulp, rfimask.ptsperint)
-    logging.info(f"Reshaped base_mask from {base_mask.shape} to {base_mask_exstats.shape} for use with the extra stats from fdp")
+        logging.info(f"\nGetting zeros mask")
+        fig0, ax0 = plt.subplots()
+        m0 = get_zeros_mask_alt(rfimask, ignorechans=ignorechans, verbose=True, ax=ax0)
+        output_plot(fig0, pdf=p)
+
+        # ### M mask (where num_points_unmasked from fdp is under some threshold)
+        # cut off anywhere where <0.5 of the gulp was nonzero
+        mmask = (M.T < m_frac_threshold*N).T
+        # right the gulp is different for fdp and rfifind. damn. will have to record that in extra_stats
+
+        base_mask = m0|reshape_extra_stats_mask(m0.shape, mmask, extra_stats_gulp, rfimask.ptsperint)
+        logging.info(f"ignorechans, std_stats=0 and lots of 0 data alone mask out {masked_frac(base_mask)} of data")
+
+        # ### Add initial rfifind mask and do a hard threshold cut
+        base_mask = base_mask | rfimask.mask
+        logging.info(f"+rfifind mask  masks out {masked_frac(base_mask)} of data")
+
+        fig01, ax01 = plt.subplots(1,2)
+        mcut = cut_off_high_fraction(base_mask, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=True, ax=None, axhard=ax01) #, debug=True)
+        base_mask = base_mask | mcut
+        output_plot(fig01, pdf=p)
 
-    logging.info("0: updating working mask")
-    working_mask = working_mask | base_mask
-    working_mask_exstats = working_mask_exstats | base_mask_exstats
-    logging.info(f"0: working mask zaps {masked_frac(working_mask)} of data")
-
-    if masked_frac(working_mask) >= args.problem_frac:
-        logging.info("Something went wrong at stage 0, making summary plots and exiting")
-        M = np.ma.array(M, mask=working_mask_exstats)
-        s1 = np.ma.array(s1, mask=working_mask_exstats)
-        s2 = np.ma.array(s2, mask=working_mask_exstats)
+        fig1, ax1 = plt.subplots()
+        ax1.imshow(base_mask.T, aspect='auto', origin='lower')
+        fig1.suptitle("base mask: std_stats==0, large fraction of masked data within an interval, rfifind mask")
+        output_plot(fig1, pdf=p)
 
-        # try estimating shape parameter from the mean and std
-        means = s1/M
-        var = (s2 - s1**2/M)/M
-        make_summary_plots(working_mask, working_mask_exstats, rfimask, means, var, p, title_insert="ERROR stage 0")
-        if p is not None:
-            logging.info("Writing pdf")
-            p.close()
-        logging.error("Something went horribly wrong at stage 0")
-        sys.exit(1)
-
-    working_ignorechans = get_ignorechans_from_mask(working_mask)
+        # update working mask
+        base_mask_exstats = reshape_rfifind_mask(M.shape, base_mask, extra_stats_gulp, rfimask.ptsperint)
+        logging.info(f"Reshaped base_mask from {base_mask.shape} to {base_mask_exstats.shape} for use with the extra stats from fdp")
+
+        logging.info("0: updating working mask")
+        working_mask = working_mask | base_mask
+        working_mask_exstats = working_mask_exstats | base_mask_exstats
+        logging.info(f"0: working mask zaps {masked_frac(working_mask)} of data")
+
+        if masked_frac(working_mask) >= args.problem_frac:
+            logging.info("Something went wrong at stage 0, making summary plots and exiting")
+            M = np.ma.array(M, mask=working_mask_exstats)
+            s1 = np.ma.array(s1, mask=working_mask_exstats)
+            s2 = np.ma.array(s2, mask=working_mask_exstats)
+
+            # try estimating shape parameter from the mean and std
+            means = s1/M
+            var = (s2 - s1**2/M)/M
+            make_summary_plots(working_mask, working_mask_exstats, rfimask, means, var, p, title_insert="ERROR stage 0")
+            if p is not None:
+                logging.info("Writing pdf")
+                p.close()
+            logging.error("Something went horribly wrong at stage 0")
+            sys.exit(1)
+
+        working_ignorechans = get_ignorechans_from_mask(working_mask)
+
+        del base_mask
+        del base_mask_exstats
 
-    del base_mask
-    del base_mask_exstats
+
+
+    # ### Now have base_mask should be using as minimum input for all other steps
 
+    M = np.ma.array(M, mask=working_mask_exstats)
+    s1 = np.ma.array(s1, mask=working_mask_exstats)
+    s2 = np.ma.array(s2, mask=working_mask_exstats)
 
+    # try estimating shape parameter from the mean and std
+    means = s1/M
+    var = (s2 - s1**2/M)/M
+
+
+    # ### Steps mask
+
+    if 1 in opts:
+        logging.info("\nGetting channels with steps")
+        step_chans_to_zap, cs, ms = get_step_chans(means, ignorechans=working_ignorechans, thresh=30, return_stats=True, output_pdf=p)
+        step_mask_exstats = np.zeros_like(means.mask)
+        step_mask = np.zeros_like(rfimask.pow_stats, dtype=bool)
+        for cc in step_chans_to_zap:
+            step_mask_exstats[:,cc] = True
+            step_mask[:,cc] = True
+        logging.info(f"channels to zap: {step_chans_to_zap}\n")
+        #fig02, ax02 = plt.subplots()
+        #ax02.plot(cs, ms, "x-")
+        #ax02.set_ylim(0, 10)
+        #fig02.suptitle("steps stats")
+        #output_plot(fig02, pdf=p)
 
-# ### Now have base_mask should be using as minimum input for all other steps
+        working_mask, working_mask_exstats = check_mask_and_continue(working_mask, working_mask_exstats, step_mask, step_mask_exstats, args.problem_frac, rfimask, means, var, p, stage=1)
+        working_ignorechans = get_ignorechans_from_mask(working_mask)
 
-M = np.ma.array(M, mask=working_mask_exstats)
-s1 = np.ma.array(s1, mask=working_mask_exstats)
-s2 = np.ma.array(s2, mask=working_mask_exstats)
+        del step_mask
+        del step_mask_exstats
 
-# try estimating shape parameter from the mean and std
-means = s1/M
-var = (s2 - s1**2/M)/M
-
-
-# ### Steps mask
-
-if 1 in opts:
-    logging.info("\nGetting channels with steps")
-    step_chans_to_zap, cs, ms = get_step_chans(means, ignorechans=working_ignorechans, thresh=30, return_stats=True, output_pdf=p)
-    step_mask_exstats = np.zeros_like(means.mask)
-    step_mask = np.zeros_like(rfimask.pow_stats, dtype=bool)
-    for cc in step_chans_to_zap:
-        step_mask_exstats[:,cc] = True
-        step_mask[:,cc] = True
-    logging.info(f"channels to zap: {step_chans_to_zap}\n")
-    #fig02, ax02 = plt.subplots()
-    #ax02.plot(cs, ms, "x-")
-    #ax02.set_ylim(0, 10)
-    #fig02.suptitle("steps stats")
-    #output_plot(fig02, pdf=p)
 
-    working_mask, working_mask_exstats = check_mask_and_continue(working_mask, working_mask_exstats, step_mask, step_mask_exstats, args.problem_frac, rfimask, means, var, p, stage=1)
-    working_ignorechans = get_ignorechans_from_mask(working_mask)
+    # ### Look for outlier intervals, via running iqrm on the median of the means in that interval
 
-    del step_mask
-    del step_mask_exstats
-
-
-# ### Look for outlier intervals, via running iqrm on the median of the means in that interval
-
-if 2 in opts:
-    logging.info("\n2: Getting outlier intervals: iqrm on the median(axis=1) of the means")
-    figtmp, axtmp = plt.subplots()
-    zapints_med_means_time_mask = iqrm_of_median_of_means(means.data, working_mask_exstats, r_int, ax=axtmp, to_return="array")
-    output_plot(figtmp, pdf=p)
-    logging.info(f"zapping intervals: {zapints_med_means_time_mask}")
-    med_means_time_mask = np.zeros_like(working_mask)
-    med_means_time_mask[zapints_med_means_time_mask,:] = True
-    med_means_time_mask_exstats = np.zeros_like(working_mask_exstats)
-    med_means_time_mask_exstats[zapints_med_means_time_mask,:] = True
-
-    working_mask, working_mask_exstats = check_mask_and_continue(
-        working_mask, working_mask_exstats, 
-        med_means_time_mask, med_means_time_mask_exstats, 
-        args.problem_frac, rfimask, means, var, p, 
-        stage=2,
-    )
-
-    del med_means_time_mask
-    del med_means_time_mask_exstats
-
-
-
-# ## channel mask - iqrm on the median of the gsk
-
-# This is an overzap but the best thing I've found, that doesn't require too much tuning.
-# (see how it performs on other pointings too!)
-
-if 3 in opts:
-    # ## Make gsk
-    logging.info("\nMaking the generalized spectral kurtosis statistic, estimating d from means**2/var")
-    delta = means**2/var
-    gsk_d_estimate = ((M * delta + 1) / (M - 1)) * (M * (s2 / s1**2) - 1)
-    gsk_d_estimate_masked = np.ma.array(gsk_d_estimate, mask=working_mask_exstats)
-    gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
-
-    figgsk, axgsk = plot_map_plus_sums(gsk_d_estimate_masked.data, gsk_d_estimate_masked.mask, returnplt=True)
-    figgsk.suptitle("GSK statistic")
-    output_plot(figgsk, pdf=p)
-
-    logging.info("\n3: Getting outlier channels, running iqrm on the median of the gsk")
-    gsk_med_nomask_chans = get_iqrm_chans(gsk_d_estimate_masked, None, rfac=rfac, size_fill=1, out='set', ignorechans=working_ignorechans).difference(set(ignorechans))
-
-    gsk_chan_mask = np.zeros_like(working_mask, dtype=bool)
-    gsk_chan_mask_exstats = np.zeros_like(working_mask_exstats, dtype=bool)
-    for chan in gsk_med_nomask_chans:
-        gsk_chan_mask[:,chan] = True
-        gsk_chan_mask_exstats[:,chan] = True
-
-    fig2, ax2 = plt.subplots(4,1,sharex="col", figsize=(12,36))
-    plot_masked_channels_of_med(gsk_d_estimate_masked, gsk_med_nomask_chans, ax=ax2[0])
-    ax2[0].set_title("gsk")
-
-    plot_masked_channels_of_med(np.ma.array(rfimask.pow_stats, mask=working_mask), gsk_med_nomask_chans, ax=ax2[1])
-    ax2[1].set_title("pow_stats")
-
-    plot_masked_channels_of_med(np.ma.array(means.data, mask=working_mask_exstats), gsk_med_nomask_chans, ax=ax2[2])
-    ax2[2].set_title("means")
-
-    plot_masked_channels_of_med(np.ma.array(var.data, mask=working_mask_exstats), gsk_med_nomask_chans, ax=ax2[3])
-    ax2[3].set_title("var")
-    ax2[3].set_xlabel("channel")
-
-    fig2.suptitle("iqrm on median of gsk - channel mask")
-    output_plot(fig2, pdf=p)
-
-    working_mask, working_mask_exstats = check_mask_and_continue(
-        working_mask, working_mask_exstats, 
-        gsk_chan_mask, gsk_chan_mask_exstats, 
-        args.problem_frac, rfimask, means, var, p, 
-        stage=3,
-    )
-    working_ignorechans = get_ignorechans_from_mask(working_mask)
-
-    del gsk_chan_mask
-    del gsk_chan_mask_exstats
-
-
-# ### 2D iqrms
-
-fig03,ax03 = plot_map_plus_sums(means.data, mask=working_mask_exstats, returnplt=True)
-fig03.suptitle("means, before 2D iqrm")
-output_plot(fig03, pdf=p)
-
-if 4 in opts or 5 in opts:
-    working_mask_exstats_pre2d = copy.deepcopy(working_mask_exstats)
-
-if 4 in opts:
-    logging.info(f"\n4: Running 2D iqrm on the means, stepping through intervals, looking for bad channels")
-    m_iqrm_means_freq_nomask_exstats = run_iqrm_2D(means.data, None, 1, r, size_fill=1)
-    m_iqrm_means_freq_nomask = reshape_extra_stats_mask(rfimask.pow_stats.shape, m_iqrm_means_freq_nomask_exstats, extra_stats_gulp, rfimask.ptsperint)
-
-
-    fig3, ax3 = plt.subplots()
-    ax3.imshow((m_iqrm_means_freq_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T, aspect='auto', origin='lower')
-    fig3.suptitle("2D iqrm means looking for bad channels (referenced against working mask before option 4)")
-    output_plot(fig3, pdf=p)
-
-    working_mask, working_mask_exstats = check_mask_and_continue(
-        working_mask, working_mask_exstats, 
-        m_iqrm_means_freq_nomask, m_iqrm_means_freq_nomask_exstats, 
-        args.problem_frac, rfimask, means, var, p, 
-        stage=4,
-    )
-    
-    del m_iqrm_means_freq_nomask
-    del m_iqrm_means_freq_nomask_exstats
-
-if 5 in opts:
-    logging.info(f"\n5: Running 2D iqrm on the means, stepping through channels, looking for bad intervals")
-    m_iqrm_means_time_nomask_exstats = run_iqrm_2D(means.data, None, 0, r_int, size_fill=1)
-    m_iqrm_means_time_nomask = reshape_extra_stats_mask(rfimask.pow_stats.shape, m_iqrm_means_time_nomask_exstats, extra_stats_gulp, rfimask.ptsperint)
-
-    fig4, ax4 = plt.subplots()
-    ax4.imshow((m_iqrm_means_time_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T, aspect='auto', origin='lower')
-    fig4.suptitle("2D iqrm means looking for bad intervals (referenced against working mask before option 4)")
-    output_plot(fig4, pdf=p)
-
-    working_mask, working_mask_exstats = check_mask_and_continue(
-        working_mask, working_mask_exstats, 
-        m_iqrm_means_time_nomask, m_iqrm_means_time_nomask_exstats, 
-        args.problem_frac, rfimask, means, var, p, 
-        stage=5,
-    )
-
-    del m_iqrm_means_time_nomask
-    del m_iqrm_means_time_nomask_exstats
-
-if 4 in opts or 5 in opts:
-    logging.info("\nAs ran 4/5 doing a high fraction cut")
-    # get high fraction of 2d iqrm which was looking for bad intervals
-    fig5, ax5 = plt.subplots(2,2,sharex='col')
-    fig6, ax6 = plt.subplots(1,2)
-    hf_exstats = cut_off_high_fraction(
-        (working_mask_exstats),
-        cumul_threshold_chans=0.99,
-        cumul_threshold_ints=0.99,
-        ax=ax5,
-        axhard=ax6,
-    )
-    hf = reshape_extra_stats_mask(rfimask.pow_stats.shape, hf_exstats, extra_stats_gulp, rfimask.ptsperint)
-
-    fig5.suptitle("high fraction cut of working mask post-4&5")
-    output_plot(fig5, pdf=p)
-    output_plot(fig6, pdf=p)
-
-    working_mask, working_mask_exstats = check_mask_and_continue(
-        working_mask, working_mask_exstats, 
-        hf, hf_exstats, 
-        args.problem_frac, rfimask, means, var, p, 
-        stage="post4/5",
-    )
-
-    del hf
-    del hf_exstats
-
-
-# ### eliminate channels where the std of the mean is high
-# Operate on the std of the means in each channel. Take the running median, then statistic working with is the original - the running median. (do not take the abs since if the std is lower than the running average that's fine and we don't care)
-# iqrm doesn't work great here, had to tune the threshold to 12 to stop it from overzapping.
-# I guess that threshold might work well for all obs and be generic but I doubt it
-#
-# Iterating a cut based of the median + thresh x sigma works better in this instance (with `reject_pm_sigma_iteration`)
-
-if 6 in opts:
-    logging.info("\n6:Looking for channels where the means have a high standard deviation")
-    tmp_means = np.ma.array(means.data, mask=working_mask_exstats)
-
-    # take std of means in each channel
-    std_of_means = np.ma.std(tmp_means, axis=0)
-    # take a running median of this
-    std_of_means_runningmed = generic_filter(std_of_means.filled(fill_value=np.nan), np.nanmedian, size=(32), mode='nearest')
-
-    # plot to check running median is ok
-    fig7, ax7 = plt.subplots(3, 1, figsize=(12,27))  #(4, 1, figsize=(12,36))
-    ax7[0].plot(std_of_means)
-    ax7[0].plot(std_of_means_runningmed)
-    ax7[0].set_title("std of means + running median")
-
-    # do an iterative medain+5*std cut on the residuals
-    t = (std_of_means - std_of_means_runningmed)
-    std_of_avg_chan_mask = reject_pm_sigma_iteration(t.data, t.mask, plot=False, positive_only=True)
-    std_of_avg_mask_exstats = np.tile(std_of_avg_chan_mask, reps=(working_mask_exstats.shape[0],1))
-    std_of_avg_mask = np.tile(std_of_avg_chan_mask, reps=(working_mask.shape[0],1))
-
-    ax7[1].plot(t, "x")
-    ax7[1].plot(np.ma.array(t.data, mask=(t.mask|std_of_avg_chan_mask)), "+")
-    ax7[1].set_title("std of means showing which have been masked")
-
-    # plot the zapped channels
-    ax7[2].plot(tmp_means[:,std_of_avg_chan_mask])
-    ax7[2].set_title("means of channels zapped in this process")
-
-    # plot unzapped channels
-    #msk = copy.deepcopy(working_mask)
-    #msk[:,std_of_avg_chan_mask] = True
-
-    #thing = np.ma.array(means.data, mask=msk)
-    #ax7[3].plot(thing)
-    #ax7[3].set_title("means of all unzapped channels")
-    #fig7.suptitle("std of means")
-    output_plot(fig7, pdf=p)
-
-# plot individual zapped channels
-#for i in np.where(std_of_avg_chan_mask)[0]:
-#    if tmp_means[:,i].sum():
-#        print(i)
-#        plt.plot(tmp_means[:,i])
-#        plt.show()
-
-    working_mask, working_mask_exstats = check_mask_and_continue(
-        working_mask, working_mask_exstats, 
-        std_of_avg_mask, std_of_avg_mask_exstats, 
-        args.problem_frac, rfimask, means, var, p, 
-        stage=6,
-    )
-
-    del std_of_avg_mask
-    del std_of_avg_mask_exstats
-
-
-if 7 in opts:
-    logging.info("\n7:Looking for channels where the median power is unusually high or low")
-    tmp_pows = np.ma.array(rfimask.pow_stats, mask=working_mask)
-    t = np.ma.median(tmp_pows, axis=0)
-
-    # do an iterative medain+5*std cut, where median and std calculated from the middel 80% of the band
-    med_of_pow_chan_mask = reject_pm_sigma_iteration(t.data, t.mask, plot=False, positive_only=False, middle80=True)
-    med_of_pow_mask_exstats = np.tile(med_of_pow_chan_mask, reps=(working_mask_exstats.shape[0],1))
-    med_of_pow_mask = np.tile(med_of_pow_chan_mask, reps=(working_mask.shape[0],1))
-
-    fig8, ax8 = plt.subplots()
-    ax8.plot(t, "x")
-    ax8.plot(np.ma.array(t.data, mask=(t.mask|med_of_pow_chan_mask)), "+")
-    ax8.set_title("median of pow_stats showing which have been masked")
-
-    output_plot(fig8, pdf=p)
-
-    working_mask, working_mask_exstats = check_mask_and_continue(
-        working_mask, working_mask_exstats, 
-        med_of_pow_mask, med_of_pow_mask_exstats, 
-        args.problem_frac, rfimask, means, var, p, 
-        stage=7,
-    )
-    
-    del med_of_pow_mask_exstats
-    del med_of_pow_mask
-
-
-#print(f"Doing high fraction cut on mask before finalizing")
-#pre_final_mask = (working_mask|std_of_avg_mask)
-#fig8, ax8 = plt.subplots(2,2,sharex='col')
-#fig9, ax9 = plt.subplots(1,2)
-#high_frac_fin = cut_off_high_fraction(pre_final_mask, cumul_threshold_chans=0.99, cumul_threshold_ints=0.99, ax=ax8, axhard=ax9)
-#fig8.suptitle("Final mask high fraction cut")
-#output_plot(fig8, pdf=p)
-#output_plot(fig9, pdf=p)
-
-# change shape back!
-#print("Changing to correct shape")
-#final_mask = reshape_extra_stats_mask(rfimask.pow_stats.shape, (pre_final_mask|high_frac_fin), extra_stats_gulp, rfimask.ptsperint)
-
-
-# ### Wrapping up
-
-logging.info("\nWrapping up")
-wrap_up(working_mask, working_mask_exstats, rfimask, means, var, p, outfilename, infstats_too=(not args.overwrite))
-
-sys.exit(0)
+    if 2 in opts:
+        logging.info("\n2: Getting outlier intervals: iqrm on the median(axis=1) of the means")
+        figtmp, axtmp = plt.subplots()
+        zapints_med_means_time_mask = iqrm_of_median_of_means(means.data, working_mask_exstats, r_int, ax=axtmp, to_return="array")
+        output_plot(figtmp, pdf=p)
+        logging.info(f"zapping intervals: {zapints_med_means_time_mask}")
+        med_means_time_mask = np.zeros_like(working_mask)
+        med_means_time_mask[zapints_med_means_time_mask,:] = True
+        med_means_time_mask_exstats = np.zeros_like(working_mask_exstats)
+        med_means_time_mask_exstats[zapints_med_means_time_mask,:] = True
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            med_means_time_mask, med_means_time_mask_exstats, 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=2,
+        )
+
+        del med_means_time_mask
+        del med_means_time_mask_exstats
+
+
+
+    # ## channel mask - iqrm on the median of the gsk
+
+    # This is an overzap but the best thing I've found, that doesn't require too much tuning.
+    # (see how it performs on other pointings too!)
+
+    if 3 in opts:
+        # ## Make gsk
+        logging.info("\nMaking the generalized spectral kurtosis statistic, estimating d from means**2/var")
+        delta = means**2/var
+        gsk_d_estimate = ((M * delta + 1) / (M - 1)) * (M * (s2 / s1**2) - 1)
+        gsk_d_estimate_masked = np.ma.array(gsk_d_estimate, mask=working_mask_exstats)
+        gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
+
+        figgsk, axgsk = plot_map_plus_sums(gsk_d_estimate_masked.data, gsk_d_estimate_masked.mask, returnplt=True)
+        figgsk.suptitle("GSK statistic")
+        output_plot(figgsk, pdf=p)
+
+        logging.info("\n3: Getting outlier channels, running iqrm on the median of the gsk")
+        gsk_med_nomask_chans = get_iqrm_chans(gsk_d_estimate_masked, None, rfac=rfac, size_fill=1, out='set', ignorechans=working_ignorechans).difference(set(ignorechans))
+
+        gsk_chan_mask = np.zeros_like(working_mask, dtype=bool)
+        gsk_chan_mask_exstats = np.zeros_like(working_mask_exstats, dtype=bool)
+        for chan in gsk_med_nomask_chans:
+            gsk_chan_mask[:,chan] = True
+            gsk_chan_mask_exstats[:,chan] = True
+
+        fig2, ax2 = plt.subplots(4,1,sharex="col", figsize=(12,36))
+        plot_masked_channels_of_med(gsk_d_estimate_masked, gsk_med_nomask_chans, ax=ax2[0])
+        ax2[0].set_title("gsk")
+
+        plot_masked_channels_of_med(np.ma.array(rfimask.pow_stats, mask=working_mask), gsk_med_nomask_chans, ax=ax2[1])
+        ax2[1].set_title("pow_stats")
+
+        plot_masked_channels_of_med(np.ma.array(means.data, mask=working_mask_exstats), gsk_med_nomask_chans, ax=ax2[2])
+        ax2[2].set_title("means")
+
+        plot_masked_channels_of_med(np.ma.array(var.data, mask=working_mask_exstats), gsk_med_nomask_chans, ax=ax2[3])
+        ax2[3].set_title("var")
+        ax2[3].set_xlabel("channel")
+
+        fig2.suptitle("iqrm on median of gsk - channel mask")
+        output_plot(fig2, pdf=p)
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            gsk_chan_mask, gsk_chan_mask_exstats, 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=3,
+        )
+        working_ignorechans = get_ignorechans_from_mask(working_mask)
+
+        del gsk_chan_mask
+        del gsk_chan_mask_exstats
+
+
+    # ### 2D iqrms
+
+    fig03,ax03 = plot_map_plus_sums(means.data, mask=working_mask_exstats, returnplt=True)
+    fig03.suptitle("means, before 2D iqrm")
+    output_plot(fig03, pdf=p)
+
+    if 4 in opts or 5 in opts:
+        working_mask_exstats_pre2d = copy.deepcopy(working_mask_exstats)
+
+    if 4 in opts:
+        logging.info(f"\n4: Running 2D iqrm on the means, stepping through intervals, looking for bad channels")
+        m_iqrm_means_freq_nomask_exstats = run_iqrm_2D(means.data, None, 1, r, size_fill=1)
+        m_iqrm_means_freq_nomask = reshape_extra_stats_mask(rfimask.pow_stats.shape, m_iqrm_means_freq_nomask_exstats, extra_stats_gulp, rfimask.ptsperint)
+
+
+        fig3, ax3 = plt.subplots()
+        ax3.imshow((m_iqrm_means_freq_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T, aspect='auto', origin='lower')
+        fig3.suptitle("2D iqrm means looking for bad channels (referenced against working mask before option 4)")
+        output_plot(fig3, pdf=p)
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            m_iqrm_means_freq_nomask, m_iqrm_means_freq_nomask_exstats, 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=4,
+        )
+        
+        del m_iqrm_means_freq_nomask
+        del m_iqrm_means_freq_nomask_exstats
+
+    if 5 in opts:
+        logging.info(f"\n5: Running 2D iqrm on the means, stepping through channels, looking for bad intervals")
+        m_iqrm_means_time_nomask_exstats = run_iqrm_2D(means.data, None, 0, r_int, size_fill=1)
+        m_iqrm_means_time_nomask = reshape_extra_stats_mask(rfimask.pow_stats.shape, m_iqrm_means_time_nomask_exstats, extra_stats_gulp, rfimask.ptsperint)
+
+        fig4, ax4 = plt.subplots()
+        ax4.imshow((m_iqrm_means_time_nomask_exstats.astype(int) - working_mask_exstats_pre2d.astype(int)).T, aspect='auto', origin='lower')
+        fig4.suptitle("2D iqrm means looking for bad intervals (referenced against working mask before option 4)")
+        output_plot(fig4, pdf=p)
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            m_iqrm_means_time_nomask, m_iqrm_means_time_nomask_exstats, 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=5,
+        )
+
+        del m_iqrm_means_time_nomask
+        del m_iqrm_means_time_nomask_exstats
+
+    if 4 in opts or 5 in opts:
+        logging.info("\nAs ran 4/5 doing a high fraction cut")
+        # get high fraction of 2d iqrm which was looking for bad intervals
+        fig5, ax5 = plt.subplots(2,2,sharex='col')
+        fig6, ax6 = plt.subplots(1,2)
+        hf_exstats = cut_off_high_fraction(
+            (working_mask_exstats),
+            cumul_threshold_chans=0.99,
+            cumul_threshold_ints=0.99,
+            ax=ax5,
+            axhard=ax6,
+        )
+        hf = reshape_extra_stats_mask(rfimask.pow_stats.shape, hf_exstats, extra_stats_gulp, rfimask.ptsperint)
+
+        fig5.suptitle("high fraction cut of working mask post-4&5")
+        output_plot(fig5, pdf=p)
+        output_plot(fig6, pdf=p)
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            hf, hf_exstats, 
+            args.problem_frac, rfimask, means, var, p, 
+            stage="post4/5",
+        )
+
+        del hf
+        del hf_exstats
+
+
+    # ### eliminate channels where the std of the mean is high
+    # Operate on the std of the means in each channel. Take the running median, then statistic working with is the original - the running median. (do not take the abs since if the std is lower than the running average that's fine and we don't care)
+    # iqrm doesn't work great here, had to tune the threshold to 12 to stop it from overzapping.
+    # I guess that threshold might work well for all obs and be generic but I doubt it
+    #
+    # Iterating a cut based of the median + thresh x sigma works better in this instance (with `reject_pm_sigma_iteration`)
+
+    if 6 in opts:
+        logging.info("\n6:Looking for channels where the means have a high standard deviation")
+        tmp_means = np.ma.array(means.data, mask=working_mask_exstats)
+
+        # take std of means in each channel
+        std_of_means = np.ma.std(tmp_means, axis=0)
+        # take a running median of this
+        std_of_means_runningmed = generic_filter(std_of_means.filled(fill_value=np.nan), np.nanmedian, size=(32), mode='nearest')
+
+        # plot to check running median is ok
+        fig7, ax7 = plt.subplots(3, 1, figsize=(12,27))  #(4, 1, figsize=(12,36))
+        ax7[0].plot(std_of_means)
+        ax7[0].plot(std_of_means_runningmed)
+        ax7[0].set_title("std of means + running median")
+
+        # do an iterative medain+5*std cut on the residuals
+        t = (std_of_means - std_of_means_runningmed)
+        std_of_avg_chan_mask = reject_pm_sigma_iteration(t.data, t.mask, plot=False, positive_only=True)
+        std_of_avg_mask_exstats = np.tile(std_of_avg_chan_mask, reps=(working_mask_exstats.shape[0],1))
+        std_of_avg_mask = np.tile(std_of_avg_chan_mask, reps=(working_mask.shape[0],1))
+
+        ax7[1].plot(t, "x")
+        ax7[1].plot(np.ma.array(t.data, mask=(t.mask|std_of_avg_chan_mask)), "+")
+        ax7[1].set_title("std of means showing which have been masked")
+
+        # plot the zapped channels
+        ax7[2].plot(tmp_means[:,std_of_avg_chan_mask])
+        ax7[2].set_title("means of channels zapped in this process")
+
+        # plot unzapped channels
+        #msk = copy.deepcopy(working_mask)
+        #msk[:,std_of_avg_chan_mask] = True
+
+        #thing = np.ma.array(means.data, mask=msk)
+        #ax7[3].plot(thing)
+        #ax7[3].set_title("means of all unzapped channels")
+        #fig7.suptitle("std of means")
+        output_plot(fig7, pdf=p)
+
+    # plot individual zapped channels
+    #for i in np.where(std_of_avg_chan_mask)[0]:
+    #    if tmp_means[:,i].sum():
+    #        print(i)
+    #        plt.plot(tmp_means[:,i])
+    #        plt.show()
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            std_of_avg_mask, std_of_avg_mask_exstats, 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=6,
+        )
+
+        del std_of_avg_mask
+        del std_of_avg_mask_exstats
+
+
+    if 7 in opts:
+        logging.info("\n7:Looking for channels where the median power is unusually high or low")
+        tmp_pows = np.ma.array(rfimask.pow_stats, mask=working_mask)
+        t = np.ma.median(tmp_pows, axis=0)
+
+        # do an iterative medain+5*std cut, where median and std calculated from the middel 80% of the band
+        med_of_pow_chan_mask = reject_pm_sigma_iteration(t.data, t.mask, plot=False, positive_only=False, middle80=True)
+        med_of_pow_mask_exstats = np.tile(med_of_pow_chan_mask, reps=(working_mask_exstats.shape[0],1))
+        med_of_pow_mask = np.tile(med_of_pow_chan_mask, reps=(working_mask.shape[0],1))
+
+        fig8, ax8 = plt.subplots()
+        ax8.plot(t, "x")
+        ax8.plot(np.ma.array(t.data, mask=(t.mask|med_of_pow_chan_mask)), "+")
+        ax8.set_title("median of pow_stats showing which have been masked")
+
+        output_plot(fig8, pdf=p)
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            med_of_pow_mask, med_of_pow_mask_exstats, 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=7,
+        )
+        
+        del med_of_pow_mask_exstats
+        del med_of_pow_mask
+
+
+    #print(f"Doing high fraction cut on mask before finalizing")
+    #pre_final_mask = (working_mask|std_of_avg_mask)
+    #fig8, ax8 = plt.subplots(2,2,sharex='col')
+    #fig9, ax9 = plt.subplots(1,2)
+    #high_frac_fin = cut_off_high_fraction(pre_final_mask, cumul_threshold_chans=0.99, cumul_threshold_ints=0.99, ax=ax8, axhard=ax9)
+    #fig8.suptitle("Final mask high fraction cut")
+    #output_plot(fig8, pdf=p)
+    #output_plot(fig9, pdf=p)
+
+    # change shape back!
+    #print("Changing to correct shape")
+    #final_mask = reshape_extra_stats_mask(rfimask.pow_stats.shape, (pre_final_mask|high_frac_fin), extra_stats_gulp, rfimask.ptsperint)
+
+
+    # ### Wrapping up
+
+    logging.info("\nWrapping up")
+    wrap_up(working_mask, working_mask_exstats, rfimask, means, var, p, outfilename, infstats_too=(not args.overwrite))
+
+    sys.exit(0)
