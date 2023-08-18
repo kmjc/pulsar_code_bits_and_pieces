@@ -1718,15 +1718,28 @@ if __name__ == "__main__":
     working_mask_exstats = working_mask_exstats | base_mask_exstats
     logging.info(f"0: working mask zaps {masked_frac(working_mask)} of data")
 
+    # something really weird happens with the means and var if you make them with masked arrays. Make and mask afterwards
+    means = s1/M
+    var = (s2 - s1**2/M)/M
+
+    # make gsk here for same reason if need it
+    if 7 in opts:
+        logging.info("Making the generalized spectral kurtosis statistic for the future, estimating d from means**2/var")
+        delta = means**2/var
+        gsk_d_estimate = ((M * delta + 1) / (M - 1)) * (M * (s2 / s1**2) - 1)
+        gsk_d_estimate_masked = np.ma.array(gsk_d_estimate, mask=base_mask_exstats)
+        gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
+
+    # ### Now have base_mask should be using as minimum input for all other steps
+    M = np.ma.array(M, mask=base_mask_exstats)
+    s1 = np.ma.array(s1, mask=base_mask_exstats)
+    s2 = np.ma.array(s2, mask=base_mask_exstats)
+    means = np.ma.array(means, mask=base_mask_exstats)
+    var = np.ma.array(var, mask=base_mask_exstats)
+
     if masked_frac(working_mask) >= args.problem_frac:
         logging.info("Something went wrong at stage 0, making summary plots and exiting")
-        M = np.ma.array(M, mask=working_mask_exstats)
-        s1 = np.ma.array(s1, mask=working_mask_exstats)
-        s2 = np.ma.array(s2, mask=working_mask_exstats)
 
-        # try estimating shape parameter from the mean and std
-        means = s1/M
-        var = (s2 - s1**2/M)/M
         make_summary_plots(working_mask, working_mask_exstats, rfimask, means, var, p, title_insert="ERROR stage 0")
         if p is not None:
             logging.info("Writing pdf")
@@ -1737,16 +1750,6 @@ if __name__ == "__main__":
     working_ignorechans = get_ignorechans_from_mask(working_mask)
     base_ignorechans = get_ignorechans_from_mask(base_mask_exstats)
 
-
-# ### Now have base_mask should be using as minimum input for all other steps
-
-    M = np.ma.array(M, mask=base_mask_exstats)
-    s1 = np.ma.array(s1, mask=base_mask_exstats)
-    s2 = np.ma.array(s2, mask=base_mask_exstats)
-
-    # try estimating shape parameter from the mean and std
-    means = s1/M
-    var = (s2 - s1**2/M)/M
 
     # plot reference plots
     logging.info("Plotting reference plots, masked by the base mask must apply + original mask from rfifind")
@@ -2051,11 +2054,8 @@ if __name__ == "__main__":
 
 
     if 7 in opts:
-        logging.info("7: Making the generalized spectral kurtosis statistic, estimating d from means**2/var")
-        delta = means**2/var
-        gsk_d_estimate = ((M * delta + 1) / (M - 1)) * (M * (s2 / s1**2) - 1)
-        gsk_d_estimate_masked = np.ma.array(gsk_d_estimate, mask=base_mask_exstats)
-        gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
+        logging.info("7: Precalculated gsk before, updating its mask")
+        gsk_d_estimate_masked.mask[base_mask_exstats] = True
 
 
         logging.info("Running 2D iqrm on -gsk and +gsk, chan-wise only")
