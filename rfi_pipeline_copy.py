@@ -2056,7 +2056,9 @@ if __name__ == "__main__":
     if 7 in opts:
         logging.info("7: Precalculated gsk before, updating its mask")
         gsk_d_estimate_masked.mask[base_mask_exstats] = True
-
+        # No idea why but iqrm_mask started failing on this when I switched to calculating gsk before the initial masking
+        # If fill array and remask it works so that's the hacky thing I'm doing
+        gsk_d_estimate_masked = np.ma.array(gsk_d_estimate_masked.filled(gsk_d_estimate_masked.mean()), mask=gsk_d_estimate_masked.mask)
 
         logging.info("Running 2D iqrm on -gsk and +gsk, chan-wise only")
         mask_gsk_2diqrm_chan1 = run_iqrm_2D(gsk_d_estimate_masked.data, gsk_d_estimate_masked.mask, 1,r, ignorechans=ignorechans, threshold=5)
@@ -2091,7 +2093,7 @@ if __name__ == "__main__":
     for opt in [1,2, 3]:
         if opt in opts:
             bs_exstats = bs_exstats|masks_exstats[opt]
-            working_mask = working_mask|mask[opt]
+            working_mask = working_mask|masks[opt]
             logging.info(f"+{opt}: {masked_frac(bs_exstats)} ({masked_frac(bs_exstats)-bs_frac})")
             bs_frac = masked_frac(bs_exstats)
     logging.info("")
@@ -2101,12 +2103,12 @@ if __name__ == "__main__":
         if opt in opts:
             logging.info(f"base+{opt}: {masked_frac(bs_exstats|masks_exstats[opt])}")
             working_mask_exstats = working_mask_exstats | masks_exstats[opt]
-            working_mask = working_mask|mask[opt]
+            working_mask = working_mask|masks[opt]
     logging.info(f"all up to this point: {masked_frac(working_mask_exstats)}")
     if 7 in opts:
         logging.info(f"+7: {masked_frac(working_mask_exstats|masks_exstats[7])}")
         working_mask_exstats = working_mask_exstats | masks_exstats[7]
-        working_mask = working_mask|mask[7]
+        working_mask = working_mask|masks[7]
     logging.info("")
     logging.info(f"base+rfifind: {masked_frac(bs_exstats|masks_exstats['rfifind'])}")
 
