@@ -911,7 +911,7 @@ def combine_posneg_negpos(posneg, negpos):
 def get_peaks_iqrm(arr, r=10, threshold=5):
     if np.ma.is_masked(arr):
         ign = list(np.where(arr.mask)[0])
-        stat = arr.data
+        stat = arr.filled(np.nan)
     else:
         ign = []
         stat=arr
@@ -1771,8 +1771,8 @@ if __name__ == "__main__":
     if 1 in opts:
         logging.info("1: Looking for bad intervals")
 
-        mask_means_2diqrm_int1 = run_iqrm_2D(means.data, base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
-        mask_means_2diqrm_int2 = run_iqrm_2D(-means.data, base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_int1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_int2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
         mask_means_2diqrm_int = mask_means_2diqrm_int1|mask_means_2diqrm_int2
 
         fig_iqrm_means_mask, ax_iqrm_means_mask = plt.subplots()
@@ -1894,7 +1894,7 @@ if __name__ == "__main__":
         logging.info(f"'highly significant' = iqrm threshold of {thresh}")
 
         thing = np.ma.std(means, axis=0)
-        q,v = iqrm_mask(thing.data, radius=r, threshold=thresh, ignorechans = np.where(thing.mask)[0])
+        q,v = iqrm_mask(thing.filled(np.nan), radius=r, threshold=thresh, ignorechans = np.where(thing.mask)[0])
         chns = [c for c in np.where(q)[0] if c not in np.where(thing.mask)[0]]
         logging.info(f"found {len(chns)} channels with an unusually high std(means):")
         logging.info(f"{chns}")
@@ -1937,12 +1937,12 @@ if __name__ == "__main__":
 
         # On means (both + and -, both time- and chan-wise)
         logging.info("On -means and +means, both int-wise and chan-wise")
-        mask_means_2diqrm_chan1 = run_iqrm_2D(means.data, base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
-        mask_means_2diqrm_chan2 = run_iqrm_2D(-means.data, base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_chan1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_chan2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
         mask_means_2diqrm_chan = mask_means_2diqrm_chan1|mask_means_2diqrm_chan2
 
-        mask_means_2diqrm_int1 = run_iqrm_2D(means.data, base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
-        mask_means_2diqrm_int2 = run_iqrm_2D(-means.data, base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_int1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_int2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
         mask_means_2diqrm_int = mask_means_2diqrm_int1|mask_means_2diqrm_int2
 
         mask_means_2diqrm = mask_means_2diqrm_chan|mask_means_2diqrm_int
@@ -1973,11 +1973,11 @@ if __name__ == "__main__":
         logging.info("4: Running 2D iqrms")
         # On var (both + and -, both time- and chan-wise)
         logging.info("On -var and +var, both int-wise and chan-wise")
-        mask_var_2diqrm_chan1 = run_iqrm_2D(var.data, base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
-        mask_var_2diqrm_int1 = run_iqrm_2D(var.data, base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_var_2diqrm_chan1 = run_iqrm_2D(var.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
+        mask_var_2diqrm_int1 = run_iqrm_2D(var.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
 
-        mask_var_2diqrm_chan2 = run_iqrm_2D(-var.data, base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
-        mask_var_2diqrm_int2 = run_iqrm_2D(-var.data, base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_var_2diqrm_chan2 = run_iqrm_2D(-var.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
+        mask_var_2diqrm_int2 = run_iqrm_2D(-var.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
 
         mask_var_2diqrm_chan = mask_var_2diqrm_chan1|mask_var_2diqrm_chan2
         mask_var_2diqrm_int = mask_var_2diqrm_int1|mask_var_2diqrm_int2
@@ -2011,8 +2011,8 @@ if __name__ == "__main__":
         logging.info("5: Running iqrm on median of pow_stats along each axis")
         pow_med_chans = np.ma.median(np.ma.array(rfimask.pow_stats, mask=base_mask), axis=0)
         pow_med_ints = np.ma.median(np.ma.array(rfimask.pow_stats, mask=base_mask), axis=1)
-        pow_chans, v = iqrm_mask(pow_med_chans.data, threshold=5, radius=r, ignorechans=np.where(pow_med_chans.mask)[0])
-        pow_ints, v = iqrm_mask(pow_med_ints.data, threshold=5, radius=r, ignorechans=np.where(pow_med_ints.mask)[0])
+        pow_chans, v = iqrm_mask(pow_med_chans.filled(np.nan), threshold=5, radius=r, ignorechans=np.where(pow_med_chans.mask)[0])
+        pow_ints, v = iqrm_mask(pow_med_ints.filled(np.nan), threshold=5, radius=r, ignorechans=np.where(pow_med_ints.mask)[0])
 
         iqrm_med_pow_mask = np.zeros_like(base_mask)
         for i, masked in enumerate(pow_chans):
@@ -2061,8 +2061,8 @@ if __name__ == "__main__":
         gsk_d_estimate_masked = np.ma.array(gsk_d_estimate_masked.filled(gsk_d_estimate_masked.mean()), mask=gsk_d_estimate_masked.mask)
 
         logging.info("Running 2D iqrm on -gsk and +gsk, chan-wise only")
-        mask_gsk_2diqrm_chan1 = run_iqrm_2D(gsk_d_estimate_masked.data, gsk_d_estimate_masked.mask, 1,r, ignorechans=ignorechans, threshold=5)
-        mask_gsk_2diqrm_chan2 = run_iqrm_2D(-gsk_d_estimate_masked.data, gsk_d_estimate_masked.mask, 1,r, ignorechans=ignorechans, threshold=5)
+        mask_gsk_2diqrm_chan1 = run_iqrm_2D(gsk_d_estimate_masked.filled(np.nan), gsk_d_estimate_masked.mask, 1,r, ignorechans=ignorechans, threshold=5)
+        mask_gsk_2diqrm_chan2 = run_iqrm_2D(-gsk_d_estimate_masked.filled(np.nan), gsk_d_estimate_masked.mask, 1,r, ignorechans=ignorechans, threshold=5)
         mask_gsk_2diqrm_chan = mask_gsk_2diqrm_chan1|mask_gsk_2diqrm_chan2
 
         fig_iqrm_gsk_mask, ax_iqrm_gsk_mask = plt.subplots()
