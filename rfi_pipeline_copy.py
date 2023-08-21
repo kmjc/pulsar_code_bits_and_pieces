@@ -486,6 +486,9 @@ def run_iqrm_2D(data, mask, axis, r, size_fill=3, ignorechans=[], threshold=3):
     if mask is None:
         mask=np.zeros_like(data, dtype=bool)
 
+    if mask.all() or np.isnan(data).all():
+        return np.ones_like(data, dtype=bool)
+
     if axis == 1:
         for i in range(a0):
             ignore = list(set(np.where(mask[i,:])[0]).union(set(ignorechans)))
