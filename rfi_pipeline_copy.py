@@ -845,9 +845,12 @@ def plot_mask_comparison(maska, maskb, title="", ax=None, returnplt=False, color
             ignorechans_mask[:,c] = True
         ax.imshow(ignorechans_mask.T, cmap=cmap2, **imshow_kwargs)
 
+
     
     if title:
-        ax.set_title(title)
+        title += " "
+    title += f"({masked_frac(maska) - masked_frac(maskb)})"
+    ax.set_title(title)
     if returnplt:
         return fig, ax
 
