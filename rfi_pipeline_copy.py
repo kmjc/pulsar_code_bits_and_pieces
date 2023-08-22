@@ -77,19 +77,19 @@ def make_summary_plots(mask, mask_exstats, rfifind_obj, means, var, pdf, title_i
     """Plot the mask, and the masked pow_stats, means, and var"""
     figtmp, axtmp = plt.subplots()
     plot_mask(mask, ax=axtmp)
-    figtmp.suptitle(f"{title_insert} mask")
+    figtmp.suptitle(f"{title_insert} mask ({masked_frac(mask):.2f})")
     output_plot(figtmp, pdf=p)
 
     figtmp, axtmp = plot_map_plus_sums(rfifind_obj.pow_stats, mask=mask, returnplt=True)
-    figtmp.suptitle(f"{title_insert} pow_stats")
+    figtmp.suptitle(f"{title_insert} pow_stats ({masked_frac(mask):.2f})")
     output_plot(figtmp, pdf=pdf)
 
     figtmp, axtmp = plot_map_plus_sums(means.data, mask=mask_exstats, returnplt=True)
-    figtmp.suptitle(f"{title_insert} means")
+    figtmp.suptitle(f"{title_insert} means ({masked_frac(mask_exstats):.2f})")
     output_plot(figtmp, pdf=pdf)
 
     figtmp, axtmp = plot_map_plus_sums(var.data, mask=mask_exstats, returnplt=True)
-    figtmp.suptitle(f"{title_insert} var")
+    figtmp.suptitle(f"{title_insert} var ({masked_frac(mask_exstats):.2f})")
     output_plot(figtmp, pdf=pdf)
 
 
