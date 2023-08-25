@@ -1299,7 +1299,7 @@ def find_prev_zero_crossing(arr, id):
                 return i
         return i
     
-def check_peaks_have_companions2(diffarr1d, high_prom=1, low_prom=0.25, debug_plots=False, more_debug_plots=False, ignore_sig_thresh=3):
+def check_peaks_have_companions2(diffarr1d, high_prom=1, low_prom=0.25, debug_plots=False, ax_debug=False, more_debug_plots=False, ignore_sig_thresh=3):
     """
     Helper function for finding steps in data.
     Meant to be run on a 1D array resulting from an np.diff
@@ -1322,7 +1322,12 @@ def check_peaks_have_companions2(diffarr1d, high_prom=1, low_prom=0.25, debug_pl
     ignore_sig_thresh=2, means don't look for companions for any peak <2 std from median
     (where median and std calculated using points within 3 std of the original data's median)
 
+    debug_plots Plots 2 axes, showing a) the +ve peaks found and the -ve peaks being searched for companions and 
+                                      b) the -ve peaks found and the +ve peaks being searched for companions
+    ax_debug is the axes on which to plot these, (2,1) recommended, but at minimum ax_debug[0] and ax_debug[1] must be valid.
+
     more_debug_plots passes in to is_there_a_peak
+    (. . . using debug_plots=True, more_debug_plots=True AND passing in someting to ax_debug will probably do weird things)
 
 
     If all peaks have companions this function returns:
@@ -1347,7 +1352,10 @@ def check_peaks_have_companions2(diffarr1d, high_prom=1, low_prom=0.25, debug_pl
     peaks_neg_lowerprom, props = find_peaks(-tmparr, prominence=low_prom)
 
     if debug_plots:
-        fig, ax = plt.subplots(2,1)
+        if ax_debug is None:
+            fig, ax = plt.subplots(2,1)
+        else:
+            ax = ax_debug
         ax[0].plot(tmparr)
         for x in peaks_pos:
             ax[0].axvline(x, c='red')
@@ -1361,7 +1369,8 @@ def check_peaks_have_companions2(diffarr1d, high_prom=1, low_prom=0.25, debug_pl
         for x in peaks_pos_lowerprom:
             ax[1].axvline(x, c='red')
         ax[1].set_title("Negative peaks, looking for companions in +ve peaks")
-        plt.show()
+        if ax_debug is None:
+            plt.show()
 
     # compute median and std only taking points within 3std of the median
     # use this to filter out some initial peaks likely don't care about
