@@ -1939,10 +1939,7 @@ if __name__ == "__main__":
 
     if 4 in opts:
         # Run some iqrms
-        logging.info("3: Running 2D iqrms")
-
-        # On means (both + and -, both time- and chan-wise)
-        logging.info("On -means and +means, both int-wise and chan-wise")
+        logging.info("4: Running 2D iqrms on -means and +means, both int-wise and chan-wise")
         mask_means_2diqrm_chan1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
         mask_means_2diqrm_chan2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
         mask_means_2diqrm_chan = mask_means_2diqrm_chan1|mask_means_2diqrm_chan2
@@ -1976,7 +1973,7 @@ if __name__ == "__main__":
 
 
     if 5 in opts:
-        logging.info("4: Running 2D iqrms")
+        logging.info("5: Running 2D iqrms")
         # On var (both + and -, both time- and chan-wise)
         logging.info("On -var and +var, both int-wise and chan-wise")
         mask_var_2diqrm_chan1 = run_iqrm_2D(var.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
@@ -2014,7 +2011,7 @@ if __name__ == "__main__":
 
     if 6 in opts:
         # On pow
-        logging.info("5: Running iqrm on median of pow_stats along each axis")
+        logging.info("6: Running iqrm on median of pow_stats along each axis")
         pow_med_chans = np.ma.median(np.ma.array(rfimask.pow_stats, mask=base_mask), axis=0)
         pow_med_ints = np.ma.median(np.ma.array(rfimask.pow_stats, mask=base_mask), axis=1)
         pow_chans, v = iqrm_mask(pow_med_chans.filled(np.nan), threshold=5, radius=r, ignorechans=np.where(pow_med_chans.mask)[0])
