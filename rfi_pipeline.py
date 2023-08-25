@@ -1838,22 +1838,29 @@ if __name__ == "__main__":
                 if has_step:
                     logging.info(f"{c}: iqrm found potential step")
                     grad = np.gradient(means[:,c])
-                    condit, pk, slc, medstd = check_peaks_have_companions2(grad, high_prom=1, low_prom=0.25, debug_plots=False, ignore_sig_thresh=3)
+                    fig_comp_debug, ax_comp_debug = plt.subplots(2,1)
+                    condit, pk, slc, medstd = check_peaks_have_companions2(grad, high_prom=1, low_prom=0.25, debug_plots=True, ax_debug=ax_comp_debug, ignore_sig_thresh=3)
                     
                     fig_title += f" companion_test:{not condit}"
                     if not condit:
                         logging.info("companion test says YES")
+                        plt.close(fig_comp_debug)
                         ax_step_iqrm[0].plot(tmpx[slc], means[slc,c], c='orange')
                         ax_step_iqrm[0].axvline(pk, c='orange')
                         ax_step_iqrm[1].plot(tmpx[slc], grad[slc], c='orange')
                         ax_step_iqrm[1].axvline(pk, c='orange')
                         chans_w_step.append(c)
+                        fig_step_iqrm.suptitle(fig_title)
+                        output_plot(fig_step_iqrm, pdf=p)
+                        
                     else:
                         logging.info("companion test says NO")
+                        # also show debug
+                        fig_step_iqrm.suptitle(fig_title)
+                        fig_comp_debug.suptitle(f"{c}: companion debug plot")
+                        output_plot(fig_step_iqrm, pdf=p)
+                        output_plot(fig_comp_debug, pdf=p)
 
-
-                fig_step_iqrm.suptitle(fig_title)
-                output_plot(fig_step_iqrm, pdf=p)
                 
         logging.info(f"Found channels with steps: {chans_w_step}")
 
