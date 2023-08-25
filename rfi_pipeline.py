@@ -1496,9 +1496,9 @@ parser.add_argument(
 parser.add_argument(
     "--option",
     type=str,
-    default="1,2,3,4,5,6",
+    default="1,2,3,4,5,6,8",
     help="""Which masking options to use. Comma separated string, will be run from 0 up regardless of order passed in.
-    Default is '1,2,3,4,5,6'
+    Default is '1,2,3,4,5,6,8'
 
     Alway included: basic processing: ignorechans, anywhere the std is 0, where the number of unmasked points is < set threshold,
     1: bad ints: do an interval high fraction cut on a 2D iqrm run on the means, aka flag intervals which are bad for many channels,
@@ -1508,6 +1508,7 @@ parser.add_argument(
     5: a 2D iqrm run on the variance, both looking for bad intervals and bad channels,
     6: first a 1D iqrm on the medians (along both axes) then a 2D iqrm run on the pow_stats,
     7: a 2D iqrm run on the generarlized spectral kurtosis statistic, looking for bad channels only,
+    8: a high fraction cut. The threshold for the channels is varied so at most it masks an additional 0.1% of the data,
     """
 )
 
@@ -1645,6 +1646,7 @@ if __name__ == "__main__":
         5: "a 2D iqrm run on the variance, both looking for bad intervals and bad channels",
         6: "first a 1D iqrm on the medians (along both axes) then a 2D iqrm run on the pow_stats",
         7: "a 2D iqrm run on the generarlized spectral kurtosis statistic, looking for bad channels only",
+        8: "a high fraction cut. The threshold for the channels is varied so at most it masks an additional 0.1% of the data",
     }
     logging.info(f"Options selected:")
     for x in opts:
@@ -1682,14 +1684,6 @@ if __name__ == "__main__":
     masks = {'rfifind': rfimask.mask}
     masks_exstats = {'rfifind': reshape_rfifind_mask(M.shape, rfimask.mask, extra_stats_gulp, rfimask.ptsperint)}
 
-    # ### Setup initial working mask
-
-    working_mask = np.zeros_like(rfimask.mask)
-    working_mask_exstats = np.zeros_like(M, dtype=bool)
-    working_ignorechans = ignorechans
-    base_ignorechans = ignorechans
-
-
     # Stage 0 is non-optional
     # ### std_stats==0 mask
     logging.info(f"Ignoring {len(ignorechans)}/{rfimask.nchan} channels")
@@ -1725,13 +1719,7 @@ if __name__ == "__main__":
     # fig1.suptitle("base mask: std_stats==0, large fraction of masked data within an interval, rfifind mask")
     # output_plot(fig1, pdf=p)
 
-    # update working mask
-    
-    
-    logging.info("0: updating working mask")
-    working_mask = working_mask | base_mask
-    working_mask_exstats = working_mask_exstats | base_mask_exstats
-    logging.info(f"0: working mask zaps {masked_frac(working_mask)} of data")
+    logging.info(f"0: base mask zaps {masked_frac(base_mask)} of data")
 
     # something really weird happens with the means and var if you make them with masked arrays. Make and mask afterwards
     means = s1/M
@@ -1752,17 +1740,16 @@ if __name__ == "__main__":
     means = np.ma.array(means, mask=base_mask_exstats)
     var = np.ma.array(var, mask=base_mask_exstats)
 
-    if masked_frac(working_mask) >= args.problem_frac:
+    if masked_frac(base_mask) >= args.problem_frac:
         logging.info("Something went wrong at stage 0, making summary plots and exiting")
 
-        make_summary_plots(working_mask, working_mask_exstats, rfimask, means, var, p, title_insert="ERROR stage 0")
+        make_summary_plots(base_mask, base_mask_exstats, rfimask, means, var, p, title_insert="ERROR stage 0")
         if p is not None:
             logging.info("Writing pdf")
             p.close()
         logging.error("Something went horribly wrong at stage 0")
         sys.exit(1)
 
-    working_ignorechans = get_ignorechans_from_mask(working_mask)
     base_ignorechans = get_ignorechans_from_mask(base_mask_exstats)
 
 
@@ -1786,8 +1773,8 @@ if __name__ == "__main__":
     if 1 in opts:
         logging.info("1: Looking for bad intervals")
 
-        mask_means_2diqrm_int1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
-        mask_means_2diqrm_int2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_int1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=base_ignorechans, threshold=5)
+        mask_means_2diqrm_int2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=base_ignorechans, threshold=5)
         mask_means_2diqrm_int = mask_means_2diqrm_int1|mask_means_2diqrm_int2
 
         fig_iqrm_means_mask, ax_iqrm_means_mask = plt.subplots()
@@ -1859,16 +1846,16 @@ if __name__ == "__main__":
                         ax_step_iqrm[1].plot(tmpx[slc], grad[slc], c='orange')
                         ax_step_iqrm[1].axvline(pk, c='orange')
                         chans_w_step.append(c)
-                        fig_step_iqrm.suptitle(fig_title)
-                        output_plot(fig_step_iqrm, pdf=p)
                         
                     else:
                         logging.info("companion test says NO")
-                        # also show debug
-                        fig_step_iqrm.suptitle(fig_title)
-                        fig_comp_debug.suptitle(f"{c}: companion debug plot")
-                        output_plot(fig_step_iqrm, pdf=p)
-                        output_plot(fig_comp_debug, pdf=p)
+
+                fig_step_iqrm.suptitle(fig_title)
+                output_plot(fig_step_iqrm, pdf=p)
+                if has_step and condit:
+                    fig_comp_debug.suptitle(f"{c}: companion test debug plot")
+                    output_plot(fig_comp_debug, pdf=p)
+
 
                 
         logging.info(f"Found channels with steps: {chans_w_step}")
@@ -1916,7 +1903,7 @@ if __name__ == "__main__":
         logging.info(f"'highly significant' = iqrm threshold of {thresh}")
 
         thing = np.ma.std(means, axis=0)
-        q,v = iqrm_mask(thing.filled(np.nan), radius=r, threshold=thresh, ignorechans = np.where(thing.mask)[0])
+        q,v = iqrm_mask(thing.filled(np.nan), radius=r, threshold=thresh, ignorechans=np.where(thing.mask)[0])
         chns = [c for c in np.where(q)[0] if c not in np.where(thing.mask)[0]]
         logging.info(f"found {len(chns)} channels with an unusually high std(means):")
         logging.info(f"{chns}")
@@ -1945,23 +1932,26 @@ if __name__ == "__main__":
             base_mask, base_mask_exstats, 
             mask_outlier_std, mask_outlier_std_exstats, 
             args.problem_frac, rfimask, means, var, p, 
-            stage=2,
+            stage=3,
         )
         base_ignorechans = get_ignorechans_from_mask(base_mask_exstats)
 
         means.mask = base_mask_exstats
         var.mask = base_mask_exstats
 
+    working_mask_exstats = copy.deepcopy(base_mask_exstats)
+    working_mask = copy.deepcopy(base_mask)
+
 
     if 4 in opts:
         # Run some iqrms
         logging.info("4: Running 2D iqrms on -means and +means, both int-wise and chan-wise")
-        mask_means_2diqrm_chan1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
-        mask_means_2diqrm_chan2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_chan1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 1,r, ignorechans=base_ignorechans, threshold=5)
+        mask_means_2diqrm_chan2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 1,r, ignorechans=base_ignorechans, threshold=5)
         mask_means_2diqrm_chan = mask_means_2diqrm_chan1|mask_means_2diqrm_chan2
 
-        mask_means_2diqrm_int1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
-        mask_means_2diqrm_int2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_means_2diqrm_int1 = run_iqrm_2D(means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=base_ignorechans, threshold=5)
+        mask_means_2diqrm_int2 = run_iqrm_2D(-means.filled(np.nan), base_mask_exstats, 0,r, ignorechans=base_ignorechans, threshold=5)
         mask_means_2diqrm_int = mask_means_2diqrm_int1|mask_means_2diqrm_int2
 
         mask_means_2diqrm = mask_means_2diqrm_chan|mask_means_2diqrm_int
@@ -1980,6 +1970,13 @@ if __name__ == "__main__":
         output_plot(fig_iqrm_means, pdf=p)
         logging.info(f"masks {masked_frac(mask_means_2diqrm|base_mask_exstats)}")
 
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            masks[4], masks_exstats[4], 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=4,
+        )
+
         del mask_means_2diqrm_chan1
         del mask_means_2diqrm_int1
         del mask_means_2diqrm_chan2
@@ -1992,11 +1989,11 @@ if __name__ == "__main__":
         logging.info("5: Running 2D iqrms")
         # On var (both + and -, both time- and chan-wise)
         logging.info("On -var and +var, both int-wise and chan-wise")
-        mask_var_2diqrm_chan1 = run_iqrm_2D(var.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
-        mask_var_2diqrm_int1 = run_iqrm_2D(var.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_var_2diqrm_chan1 = run_iqrm_2D(var.filled(np.nan), base_mask_exstats, 1,r, ignorechans=base_ignorechans, threshold=5)
+        mask_var_2diqrm_int1 = run_iqrm_2D(var.filled(np.nan), base_mask_exstats, 0,r, ignorechans=base_ignorechans, threshold=5)
 
-        mask_var_2diqrm_chan2 = run_iqrm_2D(-var.filled(np.nan), base_mask_exstats, 1,r, ignorechans=ignorechans, threshold=5)
-        mask_var_2diqrm_int2 = run_iqrm_2D(-var.filled(np.nan), base_mask_exstats, 0,r, ignorechans=ignorechans, threshold=5)
+        mask_var_2diqrm_chan2 = run_iqrm_2D(-var.filled(np.nan), base_mask_exstats, 1,r, ignorechans=base_ignorechans, threshold=5)
+        mask_var_2diqrm_int2 = run_iqrm_2D(-var.filled(np.nan), base_mask_exstats, 0,r, ignorechans=base_ignorechans, threshold=5)
 
         mask_var_2diqrm_chan = mask_var_2diqrm_chan1|mask_var_2diqrm_chan2
         mask_var_2diqrm_int = mask_var_2diqrm_int1|mask_var_2diqrm_int2
@@ -2016,6 +2013,13 @@ if __name__ == "__main__":
         fig_iqrm_var.suptitle("Var post-2D-iqrm")
         output_plot(fig_iqrm_var, pdf=p)
         logging.info(f"masks {masked_frac(mask_var_2diqrm|base_mask_exstats)}")
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            masks[5], masks_exstats[5], 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=5,
+        )
 
         del mask_var_2diqrm_chan1
         del mask_var_2diqrm_int1
@@ -2044,8 +2048,8 @@ if __name__ == "__main__":
         fig_iqrm_med_pow.suptitle("pow_stats masked by base + iqrm 1D on medians along both axes")
 
         logging.info("5: Running 2D iqrm on pow_stats both int-wise and chan-wise")
-        mask_pow_2diqrm_chan = run_iqrm_2D(rfimask.pow_stats, (base_mask|iqrm_med_pow_mask), 1,r, ignorechans=ignorechans, threshold=5)
-        mask_pow_2diqrm_int = run_iqrm_2D(rfimask.pow_stats, (base_mask|iqrm_med_pow_mask), 0,r, ignorechans=ignorechans, threshold=5)
+        mask_pow_2diqrm_chan = run_iqrm_2D(rfimask.pow_stats, (base_mask|iqrm_med_pow_mask), 1,r, ignorechans=base_ignorechans, threshold=5)
+        mask_pow_2diqrm_int = run_iqrm_2D(rfimask.pow_stats, (base_mask|iqrm_med_pow_mask), 0,r, ignorechans=base_ignorechans, threshold=5)
 
         fig_iqrm_pow_mask, ax_iqrm_pow_mask = plt.subplots(2,1)
         plot_mask_comparison(mask_pow_2diqrm_chan, base_mask, title="iqrm_2D_pow (bad chans) - iqrm_1D_pow_on_medians", ax=ax_iqrm_pow_mask[0])
@@ -2062,6 +2066,13 @@ if __name__ == "__main__":
         mask_pow_iqrm_combo_exstats = reshape_rfifind_mask(M.shape, mask_pow_iqrm_combo, extra_stats_gulp, rfimask.ptsperint)
         masks[6] = mask_pow_iqrm_combo
         masks_exstats[6] = mask_pow_iqrm_combo_exstats
+
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            masks[6], masks_exstats[6], 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=6,
+        )
         
         del pow_med_chans
         del pow_med_ints
@@ -2080,8 +2091,8 @@ if __name__ == "__main__":
         gsk_d_estimate_masked = np.ma.array(gsk_d_estimate_masked.filled(gsk_d_estimate_masked.mean()), mask=gsk_d_estimate_masked.mask)
 
         logging.info("Running 2D iqrm on -gsk and +gsk, chan-wise only")
-        mask_gsk_2diqrm_chan1 = run_iqrm_2D(gsk_d_estimate_masked.filled(np.nan), gsk_d_estimate_masked.mask, 1,r, ignorechans=ignorechans, threshold=5)
-        mask_gsk_2diqrm_chan2 = run_iqrm_2D(-gsk_d_estimate_masked.filled(np.nan), gsk_d_estimate_masked.mask, 1,r, ignorechans=ignorechans, threshold=5)
+        mask_gsk_2diqrm_chan1 = run_iqrm_2D(gsk_d_estimate_masked.filled(np.nan), gsk_d_estimate_masked.mask, 1,r, ignorechans=base_ignorechans, threshold=5)
+        mask_gsk_2diqrm_chan2 = run_iqrm_2D(-gsk_d_estimate_masked.filled(np.nan), gsk_d_estimate_masked.mask, 1,r, ignorechans=base_ignorechans, threshold=5)
         mask_gsk_2diqrm_chan = mask_gsk_2diqrm_chan1|mask_gsk_2diqrm_chan2
 
         fig_iqrm_gsk_mask, ax_iqrm_gsk_mask = plt.subplots()
@@ -2097,13 +2108,51 @@ if __name__ == "__main__":
         masks_exstats[7] = mask_gsk_2diqrm_chan
         masks[7] = reshape_extra_stats_mask(rfimask.mask.shape, mask_gsk_2diqrm_chan, extra_stats_gulp, rfimask.ptsperint)
 
+        working_mask, working_mask_exstats = check_mask_and_continue(
+            working_mask, working_mask_exstats, 
+            masks[7], masks_exstats[7], 
+            args.problem_frac, rfimask, means, var, p, 
+            stage=7,
+        )
+
         del mask_gsk_2diqrm_chan1
         del mask_gsk_2diqrm_chan2
+
+    if 8 in opts:
+        logging.info("8: high fraction cut (with a limit of 0.1% on additional data masked)")
+
+        hf = cut_off_high_fraction(working_mask_exstats, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=False, verbose=False)
+        diff = masked_frac(working_mask_exstats|hf) - masked_frac(working_mask_exstats)
+        if diff > 0.001:
+            for i, thresh in enumerate(np.linspace(0.2,1,101)[::-1]):
+                hf = cut_off_high_fraction(working_mask_exstats, hard_thresh_chans=thresh, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=False, verbose=False)
+                diff = masked_frac(working_mask_exstats|hf) - masked_frac(working_mask_exstats)
+                if diff > 0.001:
+                    logging.info(f"Over 0.1% threshold at thresh {thresh}")
+                    if i == 0:
+                        logging.warning(f"All extra data masked is coming from the int 0.3 fraction cut. This is a bit out of the ordinary, check the mask.")
+                        thresh = 1
+                    else:
+                        thresh = np.linspace(0,1,101)[::-1][i-1]
+                    break
+        else:
+            logging.info(f"Under 0.1% limit at thresh 0.2")
+            thresh = 0.2
+        logging.info(f"Using thresh {thresh}")
+        fighf, axhf = plt.subplots(1,2)
+        hf = cut_off_high_fraction(working_mask_exstats, hard_thresh_chans=thresh, cumul_threshold_chans=1, cumul_threshold_ints=1, axhard=axhf)
+        fighf.suptitle(f"Final high fraction cut using a hard theshold of {thresh} for the chans")
+        output_plot(fighf, pdf=p)
+
+        masks_exstats[8] = hf
+        masks[8] = reshape_extra_stats_mask(rfimask.mask.shape, hf, extra_stats_gulp, rfimask.ptsperint)
+
+        working_mask = working_mask | masks[8]
+        working_mask_exstats = working_mask_exstats | masks_exstats[8]
 
     # Write out some info and make resulting mask
 
     bs_exstats = masks_exstats[0]
-    working_mask = masks[0]
     bs_frac = masked_frac(bs_exstats)
 
 
@@ -2112,25 +2161,21 @@ if __name__ == "__main__":
     for opt in [1,2, 3]:
         if opt in opts:
             bs_exstats = bs_exstats|masks_exstats[opt]
-            working_mask = working_mask|masks[opt]
             logging.info(f"+{opt}: {masked_frac(bs_exstats)} ({masked_frac(bs_exstats)-bs_frac})")
             bs_frac = masked_frac(bs_exstats)
     logging.info("")
     logging.info("Masks on top of base:")
-    working_mask_exstats = copy.deepcopy(bs_exstats)
+    wm_exstats = copy.deepcopy(bs_exstats)
     for opt in [4,5,6]:
         if opt in opts:
             logging.info(f"base+{opt}: {masked_frac(bs_exstats|masks_exstats[opt])}")
-            working_mask_exstats = working_mask_exstats | masks_exstats[opt]
-            working_mask = working_mask|masks[opt]
-    logging.info(f"all up to this point: {masked_frac(working_mask_exstats)}")
+            wm_exstats = wm_exstats | masks_exstats[opt]
+    logging.info(f"all up to this point: {masked_frac(wm_exstats)}")
     if 7 in opts:
-        logging.info(f"+7: {masked_frac(working_mask_exstats|masks_exstats[7])}")
-        working_mask_exstats = working_mask_exstats | masks_exstats[7]
-        working_mask = working_mask|masks[7]
+        logging.info(f"+7: {masked_frac(wm_exstats|masks_exstats[7])}")
+        wm_exstats = wm_exstats | masks_exstats[7]
     logging.info("")
     logging.info(f"base+rfifind: {masked_frac(bs_exstats|masks_exstats['rfifind'])}")
-
 
 
     # ### Wrapping up
