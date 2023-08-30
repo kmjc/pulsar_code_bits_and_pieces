@@ -2124,7 +2124,8 @@ if __name__ == "__main__":
         hf = cut_off_high_fraction(working_mask_exstats, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=False, verbose=False)
         diff = masked_frac(working_mask_exstats|hf) - masked_frac(working_mask_exstats)
         if diff > 0.001:
-            for i, thresh in enumerate(np.linspace(0.2,1,101)[::-1]):
+            threshes = np.linspace(0.2,1,101)[::-1]
+            for i, thresh in enumerate(threshes):
                 hf = cut_off_high_fraction(working_mask_exstats, hard_thresh_chans=thresh, cumul_threshold_chans=1, cumul_threshold_ints=1, plot_diagnostics=False, verbose=False)
                 diff = masked_frac(working_mask_exstats|hf) - masked_frac(working_mask_exstats)
                 if diff > 0.001:
@@ -2133,8 +2134,7 @@ if __name__ == "__main__":
                         logging.warning(f"All extra data masked is coming from the int 0.3 fraction cut. This is a bit out of the ordinary, check the mask.")
                         thresh = 1
                     else:
-                        thresh = np.linspace(0,1,101)[::-1][i-1]
-                    break
+                        thresh = threshes[i-1]
         else:
             logging.info(f"Under 0.1% limit at thresh 0.2")
             thresh = 0.2
