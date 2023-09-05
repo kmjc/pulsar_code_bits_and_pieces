@@ -242,7 +242,7 @@ for i in range(loop_iters):
 
     # tscrunch if necessary
     if args.fdp_tscrunch != 1:
-        logging.info("tscrunching by a factor of {args.fdp_tscrunch} when searching for drops")
+        logging.info(f"tscrunching by a factor of {args.fdp_tscrunch} when searching for drops")
         working_spec = tscrunch(spec, args.fdp_tscrunch)
     else:
         working_spec = spec
