@@ -900,14 +900,14 @@ if __name__ == "__main__":
         current_int,
         mask,
     )
-    # logging.debug("First gulp, initializing prev_array")
+    logging.debug("First gulp, initializing prev_array")
     prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
-    # logging.debug(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
+    logging.debug(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
     prev_array, mid_array, end_array = shift_and_stack(
         intensities, shifts, prev_array, maxDT
     )
-    # logging.debug(f"shifted and stacked first gulp")
-    # logging.debug(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
+    logging.debug(f"shifted and stacked first gulp")
+    logging.debug(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
     outf.write(mid_array.ravel().astype(arr_outdtype))
     current_gulp += 1
 
