@@ -2135,6 +2135,7 @@ if __name__ == "__main__":
                         thresh = 1
                     else:
                         thresh = threshes[i-1]
+                    break
         else:
             logging.info(f"Under 0.1% limit at thresh 0.2")
             thresh = 0.2
