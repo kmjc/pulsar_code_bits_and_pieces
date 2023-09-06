@@ -1508,7 +1508,7 @@ parser.add_argument(
     5: a 2D iqrm run on the variance, both looking for bad intervals and bad channels,
     6: first a 1D iqrm on the medians (along both axes) then a 2D iqrm run on the pow_stats,
     7: a 2D iqrm run on the generarlized spectral kurtosis statistic, looking for bad channels only,
-    8: a high fraction cut. The threshold for the channels is varied so at most it masks an additional 0.1% of the data,
+    8: a high fraction cut. The threshold for the channels is varied so at most it masks an additional 0.1%% of the data,
     """
 )
 
