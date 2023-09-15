@@ -292,9 +292,9 @@ def clip_mask_subbase_gulp(
     """Clip, mask and subtract the running_avg from a gulp"""
     logging.debug(f"clip: subbase={subbase}")
     for interval in range(nint):
-        logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
         try:
             slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+            logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
             data[slc, :], running_dict = clip(
                 data[slc, :],
                 clipsig,
@@ -337,9 +337,9 @@ def clip_subbase_gulp(
     """Same as clip_mask_subbase_gulp but no mask"""
     logging.debug(f"clip: subbase={subbase}")
     for interval in range(nint):
-        logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
         try:
             slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+            logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
             data[slc, :], running_dict = clip(
                 data[slc, :],
                 clipsig,
