@@ -275,6 +275,7 @@ def clip_mask_subbase_gulp(
     maxDT,
     current_int,
     mask,
+    subbase=True,
 ):
     """Clip, mask and subtract the running_avg from a gulp"""
     for interval in range(nint):
@@ -298,8 +299,10 @@ def clip_mask_subbase_gulp(
                 **running_dict,
             )
 
-        data[slc, :] -= running_dict["chan_running_avg"]
-        data[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
+        data[slc, list(mask.mask_zap_chans_per_int[current_int])] = running_dict["chan_running_avg"][list(mask.mask_zap_chans_per_int[current_int])]
+        if subbase:
+            data[slc, :] -= running_dict["chan_running_avg"]
+
         current_int += 1
 
 
@@ -313,7 +316,8 @@ def clip_subbase_gulp(
     gulp,
     maxDT,
     current_int,
-    *args,
+    mask,
+    subbase=True,
 ):
     """Same as clip_mask_subbase_gulp but no mask"""
     for interval in range(nint):
@@ -337,7 +341,8 @@ def clip_subbase_gulp(
                 **running_dict,
             )
 
-        data[slc, :] -= running_dict["chan_running_avg"]
+        if subbase:
+            data[slc, :] -= running_dict["chan_running_avg"]
         current_int += 1
 
 
