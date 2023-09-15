@@ -332,7 +332,9 @@ def clip_subbase_gulp(
     subbase=True,
 ):
     """Same as clip_mask_subbase_gulp but no mask"""
+    logging.debug(f"clip: subbase={subbase}")
     for interval in range(nint):
+        logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
         try:
             slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
             data[slc, :], running_dict = clip(
@@ -356,6 +358,7 @@ def clip_subbase_gulp(
         if subbase:
             data[slc, :] -= running_dict["chan_running_avg"]
         current_int += 1
+        logging.debug(f"data mean for block after clip: {data[slc, :].mean()}")
 
 
 ################################################################################
@@ -678,6 +681,8 @@ if __name__ == "__main__":
 
     # log unhandled exception
     sys.excepthook = handle_exception
+
+    logging.debug(f"args:\n{args}")
 
     t0 = time.perf_counter()
 
