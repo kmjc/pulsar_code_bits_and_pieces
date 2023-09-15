@@ -631,6 +631,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--subbase",
+        action='store_true',
+        help="Subtract the (moving) mean from each channel as you go. NB the mean is updated every rfifnd interval so this may lead to discontinuities in data",
+    )
+
+    parser.add_argument(
         "-v",
         "--verbose",
         help="Increase logging level to debug",
@@ -672,8 +678,10 @@ if __name__ == "__main__":
     if args.clipsig or args.droptotsig or args.mask:
         if not_zero_or_none(args.mask):
             logging.info(
-                "Preprocess is: clipping/computing running averages, subtracting baseline, masking"
+                "Preprocess is: clipping/computing running averages, masking"
             )
+            if args.subbase:
+                logging.info("Preprocess will also subtract a per-channel, per-rfifind-interval baseline")
 
             def preprocess(*args, **kwargs):
                 clip_mask_subbase_gulp(*args, **kwargs)
@@ -682,6 +690,9 @@ if __name__ == "__main__":
             logging.info(
                 "Preprocess is: clipping/computing running averages, subtracting baseline, NOT masking"
             )
+
+            if args.subbase:
+                logging.info("Preprocess will also subtract a per-channel, per-rfifind-interval baseline")
 
             def preprocess(*args, **kwargs):
                 clip_subbase_gulp(*args, **kwargs)
@@ -904,6 +915,7 @@ if __name__ == "__main__":
         maxDT,
         current_int,
         mask,
+        subbase=args.subbase,
     )
     logging.debug("First gulp, initializing prev_array")
     prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
@@ -945,6 +957,7 @@ if __name__ == "__main__":
                 maxDT,
                 current_int,
                 mask,
+                subbase=args.subbase,
             )
             # tt1 = time.perf_counter()
             # logging.debug(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
