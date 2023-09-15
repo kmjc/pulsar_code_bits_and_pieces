@@ -10,6 +10,8 @@ import sys, os
 import logging
 from gen_utils import handle_exception
 
+from matplotlib import pyplot as plt
+
 ################################################################################
 ############################ DEFINE FUNCTIONS ETC ##############################
 
@@ -234,6 +236,13 @@ def clip(
         chan_running_std = chan_std_temp  # for CHIME dropped-packet clipping
         if current_avg == 0:
             logging.warning("Warning: problem with clipping in first block!!!\n\n")
+        # diagnostic to check not over-clipping
+        plt.plot(intensities)
+        plt.axhline(lo_cutoff)
+        plt.axhline(hi_cutoff)
+        plt.axhline(current_med)
+        plt.savefig("clipping_first_block_diagnostic.png")
+        plt.close()
 
     # See if any points need clipping
     if not_zero_or_none(clip_sigma):
