@@ -1569,6 +1569,12 @@ parser.add_argument(
 )
 
 parser.add_argument(
+    "--include_rfifind",
+    action='store_true',
+    help="Include the rfifind mask in the final mask"
+)
+
+parser.add_argument(
     "--log", type=str, help="name of file to write log to", default=None
 )
 
@@ -2175,6 +2181,9 @@ if __name__ == "__main__":
     if 7 in opts:
         logging.info(f"+7: {masked_frac(wm_exstats|masks_exstats[7])}")
         wm_exstats = wm_exstats | masks_exstats[7]
+    if args.include_rfifind:
+        logging.info(f"+rfifind: {masked_frac(wm_exstats|masks_exstats['rfifind'])}")
+
     logging.info("")
     logging.info(f"base+rfifind: {masked_frac(bs_exstats|masks_exstats['rfifind'])}")
 
@@ -2182,6 +2191,10 @@ if __name__ == "__main__":
     # ### Wrapping up
 
     logging.info("\nWrapping up")
+    if args.include_rfifind:
+        logging.info("Adding in rfifind mask to the final mask")
+        working_mask = working_mask | masks['rfifind']
+        working_mask_exstats = working_mask_exstats | masks_exstats['rfifind']
     wrap_up(working_mask, working_mask_exstats, rfimask, means, var, p, outfilename, infstats_too=(not args.overwrite))
 
     sys.exit(0)
