@@ -1709,8 +1709,8 @@ if __name__ == "__main__":
     base_mask_exstats = reshape_rfifind_mask(M.shape, base_mask, extra_stats_gulp, rfimask.ptsperint)
     logging.info(f"Reshaped base_mask from {base_mask.shape} to {base_mask_exstats.shape} for use with the extra stats from fdp")
 
-    masks[0] = base_mask
-    masks_exstats[0] = base_mask_exstats
+    masks[0] = copy.deepcopy(base_mask)
+    masks_exstats[0] = copy.deepcopy(base_mask_exstats)
     # # ### Add initial rfifind mask and do a hard threshold cut
     # base_mask = base_mask | rfimask.mask
     # logging.info(f"+rfifind mask  masks out {masked_frac(base_mask)} of data")
@@ -2161,7 +2161,6 @@ if __name__ == "__main__":
 
     bs_exstats = masks_exstats[0]
     bs_frac = masked_frac(bs_exstats)
-
 
     logging.info(f"Making base mask")
     logging.info(f"0: {bs_frac}")
