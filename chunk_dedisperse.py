@@ -202,6 +202,15 @@ def clip(
     hi_cutoff = current_med + 3.0 * current_std
     chan_avg_temp = np.zeros((numchan))
 
+    if first_block:
+        # diagnostic to check not over-clipping
+        plt.plot(intensities)
+        plt.axhline(lo_cutoff)
+        plt.axhline(hi_cutoff)
+        plt.axhline(current_med)
+        plt.savefig("clipping_first_block_diagnostic.png")
+        plt.close()
+
     # Find the "good" points
     good_pts_idx = np.where(
         (zero_dm_time_series > lo_cutoff) & (zero_dm_time_series < hi_cutoff)
@@ -236,13 +245,7 @@ def clip(
         chan_running_std = chan_std_temp  # for CHIME dropped-packet clipping
         if current_avg == 0:
             logging.warning("Warning: problem with clipping in first block!!!\n\n")
-        # diagnostic to check not over-clipping
-        plt.plot(intensities)
-        plt.axhline(lo_cutoff)
-        plt.axhline(hi_cutoff)
-        plt.axhline(current_med)
-        plt.savefig("clipping_first_block_diagnostic.png")
-        plt.close()
+
 
     # See if any points need clipping
     if not_zero_or_none(clip_sigma):
