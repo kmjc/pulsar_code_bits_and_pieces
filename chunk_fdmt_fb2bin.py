@@ -256,7 +256,7 @@ if invertband:
         """Read in next gulp and prep it to feed into fdmt"""
         data = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
             -1, nchans
-        )
+        ).astype(np.float32)
         return data[:, read_inv_slc].T
 
 else:
@@ -266,7 +266,7 @@ else:
         """Read in next gulp and prep it to feed into fdmt"""
         data = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
             -1, nchans
-        )
+        ).astype(np.float32)
         return data[:, read_slc].T
 
 
