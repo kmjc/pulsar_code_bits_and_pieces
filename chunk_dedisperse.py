@@ -132,7 +132,7 @@ class Mask:
 
         # get first unmasked mean for each channel
         self.first_unmasked_avg = np.zeros(self.nchan, dtype=float)
-        for c in range(nchan):
+        for c in range(self.nchan):
             if c in self.mask_zap_chans:
                 self.first_unmasked_avg[c] = 0
             else:
