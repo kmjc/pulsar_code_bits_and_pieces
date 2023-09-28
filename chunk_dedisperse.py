@@ -382,6 +382,7 @@ def clip_subbase_gulp(
             clipsig,
             droptot_sig=droptotsig,
             **running_dict,
+        )
         logging.debug(f"interval:{interval}, numgoodpts:{numgoodpts[interval]}")
 
         if subbase:
