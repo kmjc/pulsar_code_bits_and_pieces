@@ -280,14 +280,14 @@ def clip(
 
 def get_slice(data, interval, ptsperint, gulp, maxDT):
     try:
-            slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
-            tmp = data[slc,0].sum()  # throwaway to test the slice
-            del tmp
-        except IndexError:  # in case on leftover partial-interval 
-            logging.debug(
-                f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
-            )
-            slc = slice(interval * ptsperint, None)
+        slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+        tmp = data[slc,0].sum()  # throwaway to test the slice
+        del tmp
+    except IndexError:  # in case on leftover partial-interval 
+        logging.debug(
+            f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
+        )
+        slc = slice(interval * ptsperint, None)
     return slc
 
 
