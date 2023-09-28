@@ -127,6 +127,17 @@ class Mask:
             self.mask_zap_chans_per_int,
         )
 
+        if set(self.mask_zap_chans) != set(np.where(self.mask.sum(axis=0)==self.nint)[0]):
+            raise RuntimeError(f"mask initialisation, mask_zap_chans:\n{self.mask_zap_chans}\ndoes not match where all intervals are 0:\n{set(np.where(self.mask.sum(axis=0)==self.nint)[0])}")
+
+        # get first unmasked mean for each channel
+        self.first_unmasked_avg = np.zeros(self.nchan, dtype=float)
+        for c in range(nchan):
+            if c in self.mask_zap_chans:
+                self.first_unmasked_avg[c] = 0
+            else:
+                self.first_unmasked_avg[c] = rfimask.avg_stats[:,c][~self.mask[:,c]][0]
+
 
 def clip(
     intensities,
@@ -174,18 +185,16 @@ def clip(
     """
     ptsperint, numchan = intensities.shape
 
-    if running_avg_std is None and chan_running_avg is None:
+    if running_avg_std is None: # and chan_running_avg is None:
         first_block = True
         running_avg = 0
         running_std = 0
-        chan_running_avg = np.zeros((numchan))
-        chan_running_std = np.zeros((numchan))
+        if chan_running_avg is None:  # could happen if not masking
+            chan_running_avg = np.zeros((numchan))
+        if not_zero_or_none(droptot_sig) and chan_running_std is None:
+            chan_running_std = np.zeros((numchan))
     else:
         first_block = False
-        if running_avg_std is None or chan_running_avg is None:
-            raise RuntimeError(
-                "running_avg_std and chan_running_avg should either both be None (when it's the first block) or neither"
-            )
         running_avg, running_std = running_avg_std
 
     # Calculate the zero DM time series
@@ -201,15 +210,6 @@ def clip(
     lo_cutoff = current_med - 3.0 * current_std
     hi_cutoff = current_med + 3.0 * current_std
     chan_avg_temp = np.zeros((numchan))
-
-#    if first_block:
-        # diagnostic to check not over-clipping
-#        plt.plot(intensities)
-#        plt.axhline(lo_cutoff)
-#        plt.axhline(hi_cutoff)
-#        plt.axhline(current_med)
-#        plt.savefig("clipping_first_block_diagnostic.png")
-#        plt.close()
 
     # Find the "good" points
     good_pts_idx = np.where(
@@ -258,7 +258,7 @@ def clip(
             ] = chan_running_avg  # this edits intensities in place, might want to change
 
     # debugging
-    extra_stuff_to_return = []  #numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp]
+    extra_stuff_to_return = [numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp]
 
     # CHIME dropped-packet clipping
     if not_zero_or_none(droptot_sig):
@@ -276,6 +276,19 @@ def clip(
             running_avg_std=[running_avg, running_std],
             chan_running_avg=chan_running_avg,
         ), *extra_stuff_to_return
+
+
+def get_slice(data, interval, ptsperint, gulp, maxDT):
+    try:
+            slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+            tmp = data[slc,0].sum()  # throwaway to test the slice
+            del tmp
+        except IndexError:  # in case on leftover partial-interval 
+            logging.debug(
+                f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
+            )
+            slc = slice(interval * ptsperint, None)
+    return slc
 
 
 def clip_mask_subbase_gulp(
@@ -296,48 +309,38 @@ def clip_mask_subbase_gulp(
 
     # debugging
     # initialise extra stuff:
-    #nchan = data.shape[-1]
-    #numgoodpts = np.zeros((nint), dtype=int) 
-    #running_avg = np.zeros((nint), dtype=float)
-    #running_std = np.zeros((nint), dtype=float)
-    #current_avg = np.zeros((nint), dtype=float)
-    #current_std = np.zeros((nint), dtype=float)
-    #chan_running_avg = np.zeros((nint, nchan), dtype=float) 
-    #chan_avg_temp = np.zeros((nint, nchan), dtype=float)
+    nchan = data.shape[-1]
+    numgoodpts = np.zeros((nint), dtype=int) 
+    running_avg = np.zeros((nint), dtype=float)
+    running_std = np.zeros((nint), dtype=float)
+    current_avg = np.zeros((nint), dtype=float)
+    current_std = np.zeros((nint), dtype=float)
+    chan_running_avg = np.zeros((nint, nchan), dtype=float) 
+    chan_avg_temp = np.zeros((nint, nchan), dtype=float)
 
     for interval in range(nint):
-        try:
-            slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
-            logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
-            #data[slc, :], running_dict, numgoodpts[interval], running_avg[interval], running_std[interval], current_avg[interval], current_std[interval], chan_running_avg[interval,:], chan_avg_temp[interval,:] = clip(
-            data[slc, :], running_dict= clip(
-                data[slc, :],
-                clipsig,
-                droptot_sig=droptotsig,
-                **running_dict,
-            )
-            #logging.debug(f"interval:{interval}, numgoodpts[interval]:{numgoodpts[interval]}")
-        except IndexError:  # in case on leftover partial-interval 
-            logging.debug(
-                f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
-            )
-            slc = slice(interval * ptsperint, None)
-            #data[slc, :], running_dict, numgoodpts[interval], running_avg[interval], running_std[interval], current_avg[interval], current_std[interval], chan_running_avg[interval,:], chan_avg_temp[interval,:]  = clip(
-            data[slc, :], running_dict = clip(
-                data[slc, :],
-                clipsig,
-                droptot_sig=droptotsig,
-                **running_dict,
-            )
-            #logging.debug(f"interval:{interval}, numgoodpts[interval]:{numgoodpts[interval]}")
+        slc = get_slice(data, interval, ptsperint, gulp, maxDT)
 
-        data[slc, list(mask.mask_zap_chans_per_int[current_int])] = running_dict["chan_running_avg"][list(mask.mask_zap_chans_per_int[current_int])]
+        # apply mask, using previous chan running average. This should remain unchanged during clip
+        zap_chans = list(mask.mask_zap_chans_per_int[current_int])
+        data[slc, zap_chans] = running_dict["chan_running_avg"][zap_chans]
+
+        logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
+        data[slc, :], running_dict, numgoodpts[interval], running_avg[interval], running_std[interval], current_avg[interval], current_std[interval], chan_running_avg[interval,:], chan_avg_temp[interval,:] = clip(
+        #data[slc, :], running_dict= clip(
+            data[slc, :],
+            clipsig,
+            droptot_sig=droptotsig,
+            **running_dict,
+        )
+        logging.debug(f"interval:{interval}, numgoodpts:{numgoodpts[interval]}")
+
         if subbase:
             data[slc, :] -= running_dict["chan_running_avg"]
 
         current_int += 1
         logging.debug(f"data mean for block after clip: {data[slc, :].mean()}")
-    return running_dict  #, numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp
+    return running_dict, numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp
 
 
 def clip_subbase_gulp(
@@ -358,48 +361,34 @@ def clip_subbase_gulp(
 
     # debugging
     # initialise extra stuff:
-    #nchan = data.shape[-1]
-    #numgoodpts = np.zeros((nint), dtype=int) 
-    #running_avg = np.zeros((nint), dtype=float)
-    #running_std = np.zeros((nint), dtype=float)
-    #current_avg = np.zeros((nint), dtype=float)
-    #current_std = np.zeros((nint), dtype=float)
-    #chan_running_avg = np.zeros((nint, nchan), dtype=float) 
-    #chan_avg_temp = np.zeros((nint, nchan), dtype=float)
+    nchan = data.shape[-1]
+    numgoodpts = np.zeros((nint), dtype=int) 
+    running_avg = np.zeros((nint), dtype=float)
+    running_std = np.zeros((nint), dtype=float)
+    current_avg = np.zeros((nint), dtype=float)
+    current_std = np.zeros((nint), dtype=float)
+    chan_running_avg = np.zeros((nint, nchan), dtype=float) 
+    chan_avg_temp = np.zeros((nint, nchan), dtype=float)
 
     logging.debug(f"clip: nint:{nint}")
     for interval in range(nint):
         logging.debug(f"{interval}")
-        try:
-            slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
-            logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
-            #data[slc, :], running_dict, numgoodpts[interval], running_avg[interval], running_std[interval], current_avg[interval], current_std[interval], chan_running_avg[interval,:], chan_avg_temp[interval,:]  = clip(
-            data[slc, :], running_dict = clip(
-                data[slc, :],
-                clipsig,
-                droptot_sig=droptotsig,
-                **running_dict,
-            )
-            #logging.debug(f"interval:{interval}, numgoodpts[interval]:{numgoodpts[interval]}")
-        except IndexError:  # in case on leftover partial-interval  # this seems to not get activated ever?
-            logging.debug(
-                f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
-            )
-            slc = slice(interval * ptsperint, None)
-            #data[slc, :], running_dict, numgoodpts[interval], running_avg[interval], running_std[interval], current_avg[interval], current_std[interval], chan_running_avg[interval,:], chan_avg_temp[interval,:]  = clip(
-            data[slc, :], running_dict = clip(
-                data[slc, :],
-                clipsig,
-                droptot_sig=droptotsig,
-                **running_dict,
-            )
-            #logging.debug(f"interval:{interval}, numgoodpts[interval]:{numgoodpts[interval]}")
+        slc = get_slice(data, interval, ptsperint, gulp, maxDT)
+
+        logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
+        data[slc, :], running_dict, numgoodpts[interval], running_avg[interval], running_std[interval], current_avg[interval], current_std[interval], chan_running_avg[interval,:], chan_avg_temp[interval,:]  = clip(
+        #data[slc, :], running_dict = clip(
+            data[slc, :],
+            clipsig,
+            droptot_sig=droptotsig,
+            **running_dict,
+        logging.debug(f"interval:{interval}, numgoodpts:{numgoodpts[interval]}")
 
         if subbase:
             data[slc, :] -= running_dict["chan_running_avg"]
         current_int += 1
         logging.debug(f"data mean for block after clip: {data[slc, :].mean()}")
-    return running_dict  #, numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp
+    return running_dict, numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp
 
 
 ################################################################################
@@ -919,6 +908,9 @@ if __name__ == "__main__":
     running_dict = dict(
         running_avg_std=None, chan_running_avg=None, chan_running_std=None
     )
+    if mask is not None:
+        running_dict['chan_running_avg'] = mask.first_unmasked_avg
+    
     arr_dtype = get_dtype(header["nbits"])
     arr_outdtype = np.float32  # as subtracting average in clipping/masking
 
@@ -953,9 +945,9 @@ if __name__ == "__main__":
     out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
     outf = open(os.path.join(args.outdir, out_filename), "wb")
 
-    #out_filename_0dm = args.filename[:-4] + f"_DM{DM:.{dmprec}f}_DM0.dat"
-    #logging.debug(f"Writing dm0 dat to {out_filename_0dm}")
-    #outfdm0 = open(os.path.join(args.outdir, out_filename_0dm), "wb")
+    out_filename_0dm = args.filename[:-4] + f"_DM{DM:.{dmprec}f}_DM0.dat"
+    logging.debug(f"Writing dm0 dat to {out_filename_0dm}")
+    outfdm0 = open(os.path.join(args.outdir, out_filename_0dm), "wb")
 
     logging.info(f"Writing header to {out_filename}\n")
     write_header(header, outf)
@@ -979,19 +971,19 @@ if __name__ == "__main__":
 
     # debugging
     # initialise extra stuff
-    #numgoodpts = np.zeros((nints_tot), dtype=int) 
-    #running_avg = np.zeros((nints_tot), dtype=float) 
-    #running_std = np.zeros_like(running_avg) 
-    #current_avg = np.zeros_like(running_avg)
-    #current_std = np.zeros_like(running_avg)
-    #chan_running_avg = np.zeros((nints_tot, nchans), dtype=float)
-    #chan_avg_temp = np.zeros_like(chan_running_avg)
+    numgoodpts = np.zeros((nints_tot), dtype=int) 
+    running_avg = np.zeros((nints_tot), dtype=float) 
+    running_std = np.zeros_like(running_avg) 
+    current_avg = np.zeros_like(running_avg)
+    current_std = np.zeros_like(running_avg)
+    chan_running_avg = np.zeros((nints_tot, nchans), dtype=float)
+    chan_avg_temp = np.zeros_like(chan_running_avg)
 
     # Process first gulp separately
     intensities[:, list(zerochans)] = 0
     logging.debug(f"pre first gulp running_dict:\n{running_dict}")
-    #running_dict, numgoodpts[:intspergulp], running_avg[:intspergulp], running_std[:intspergulp], current_avg[:intspergulp], current_std[:intspergulp], chan_running_avg[:intspergulp,:], chan_avg_temp[:intspergulp,:] = preprocess(
-    running_dict = preprocess(
+    running_dict, numgoodpts[:intspergulp], running_avg[:intspergulp], running_std[:intspergulp], current_avg[:intspergulp], current_std[:intspergulp], chan_running_avg[:intspergulp,:], chan_avg_temp[:intspergulp,:] = preprocess(
+    #running_dict = preprocess(
         intspergulp,
         ptsperint,
         intensities,
@@ -1014,7 +1006,7 @@ if __name__ == "__main__":
     logging.info(f"shifted and stacked first gulp")
     logging.info(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
     outf.write(mid_array.ravel().astype(arr_outdtype))
-    #outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
+    outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
     current_gulp += 1
 
     # reset for next loop
@@ -1043,8 +1035,8 @@ if __name__ == "__main__":
             int_slc = slice(intspergulp_norm*current_gulp, intspergulp_norm*current_gulp + intspergulp)
             logging.debug(f"int_slic is from {intspergulp_norm*current_gulp} to {intspergulp_norm*current_gulp + intspergulp}")
             logging.debug(f"pre {current_gulp} gulp running_dict:\n{running_dict}")
-            #running_dict, numgoodpts[int_slc], running_avg[int_slc], running_std[int_slc], current_avg[int_slc], current_std[int_slc], chan_running_avg[int_slc,:], chan_avg_temp[int_slc,:] = preprocess(
-            running_dict = preprocess(
+            running_dict, numgoodpts[int_slc], running_avg[int_slc], running_std[int_slc], current_avg[int_slc], current_std[int_slc], chan_running_avg[int_slc,:], chan_avg_temp[int_slc,:] = preprocess(
+            #running_dict = preprocess(
                 intspergulp,
                 ptsperint,
                 intensities,
@@ -1067,8 +1059,8 @@ if __name__ == "__main__":
             )
             outf.write(prev_array.ravel().astype(arr_outdtype))
             outf.write(mid_array.ravel().astype(arr_outdtype))
-            #outfdm0.write(prev_array.sum(axis=-1).astype(arr_outdtype))
-            #outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
+            outfdm0.write(prev_array.sum(axis=-1).astype(arr_outdtype))
+            outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
             # tt2 = time.perf_counter()
             # logging.debug(f"Dedispersed in {tt2-tt1} s")
             # logging.debug(f"Processed gulp {current_gulp}")
@@ -1094,11 +1086,12 @@ if __name__ == "__main__":
                     )
 
     outf.close()
-    #outfdm0.close()
+    outfdm0.close()
     filfile.close()
 
     # debugging, write more things
-    #np.savez(os.path.join(args.outdir, "_chunk_dedsip_debug_stats.npz"), numgoodpts=numgoodpts, running_avg=running_avg, running_std=running_std, current_avg=current_avg, current_std=current_std, chan_running_avg=chan_running_avg, chan_avg_temp=chan_avg_temp)
+    logging.info(f"Writing running averages etc for debugging to {out_filename[:-4]}_chunk_dedsip_debug_stats.npz")
+    np.savez(os.path.join(args.outdir, "{out_filename[:-4]}_chunk_dedsip_debug_stats.npz"), numgoodpts=numgoodpts, running_avg=running_avg, running_std=running_std, current_avg=current_avg, current_std=current_std, chan_running_avg=chan_running_avg, chan_avg_temp=chan_avg_temp)
 
     t2 = time.perf_counter()
 
