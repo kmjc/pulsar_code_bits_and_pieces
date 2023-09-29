@@ -971,9 +971,9 @@ if __name__ == "__main__":
     out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
     outf = open(os.path.join(args.outdir, out_filename), "wb")
 
-    out_filename_0dm = args.filename[:-4] + f"_DM{DM:.{dmprec}f}_DM0.dat"
-    logging.debug(f"Writing dm0 dat to {out_filename_0dm}")
-    outfdm0 = open(os.path.join(args.outdir, out_filename_0dm), "wb")
+    #out_filename_0dm = args.filename[:-4] + f"_DM{DM:.{dmprec}f}_DM0.dat"
+    #logging.debug(f"Writing dm0 dat to {out_filename_0dm}")
+    #outfdm0 = open(os.path.join(args.outdir, out_filename_0dm), "wb")
 
     logging.info(f"Writing header to {out_filename}\n")
     write_header(header, outf)
@@ -1032,7 +1032,7 @@ if __name__ == "__main__":
     logging.info(f"shifted and stacked first gulp")
     logging.info(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
     outf.write(mid_array.ravel().astype(arr_outdtype))
-    outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
+    #outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
     current_gulp += 1
 
     # reset for next loop
@@ -1085,8 +1085,8 @@ if __name__ == "__main__":
             )
             outf.write(prev_array.ravel().astype(arr_outdtype))
             outf.write(mid_array.ravel().astype(arr_outdtype))
-            outfdm0.write(prev_array.sum(axis=-1).astype(arr_outdtype))
-            outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
+            #outfdm0.write(prev_array.sum(axis=-1).astype(arr_outdtype))
+            #outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
             # tt2 = time.perf_counter()
             # logging.debug(f"Dedispersed in {tt2-tt1} s")
             # logging.debug(f"Processed gulp {current_gulp}")
@@ -1112,7 +1112,7 @@ if __name__ == "__main__":
                     )
 
     outf.close()
-    outfdm0.close()
+    #outfdm0.close()
     filfile.close()
 
     # debugging, write more things
