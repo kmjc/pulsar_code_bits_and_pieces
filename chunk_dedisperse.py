@@ -10,8 +10,6 @@ import sys, os
 import logging
 from gen_utils import handle_exception
 
-from matplotlib import pyplot as plt
-
 ################################################################################
 ############################ DEFINE FUNCTIONS ETC ##############################
 
