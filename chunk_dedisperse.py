@@ -1103,11 +1103,14 @@ if __name__ == "__main__":
             if intensities.shape[0] < gulp:
                 if intensities.size == 0 or intensities.shape[0] < maxDT:
                     break
-                elif intensities.shape[0] % ptsperint:
-                    intspergulp = (intensities.shape[0] // ptsperint) + 1
-                    logging.debug(
-                        f"last gulp detected, intspergulp changed to {intspergulp}"
-                    )
+                else:
+                    logging.info("On last gulp")
+                    logging.debug(f"intensities.shape[0]// ptsperint: {intensities.shape[0]// ptsperint}")
+                    intspergulp = int(intensities.shape[0]// ptsperint)
+                    if intensities.shape[0] % ptsperint:  # last int is weirdly sized
+                        intspergulp += 1
+                        logging.debug(f"intspergulp changed to {intspergulp}")
+                    logging.info(f"intspergulp: {intspergulp}")
 
     outf.close()
     #outfdm0.close()
