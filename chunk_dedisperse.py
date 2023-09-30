@@ -125,10 +125,28 @@ class Mask:
             self.mask_zap_chans_per_int,
         )
 
+        logging.debug(f"mask zap ints:\n{self.mask_zap_ints}")
+        logging.debug(f"check:\n{set(np.where(self.mask.sum(axis=1)==self.nchan)[0])}")
+        logging.debug(f"mask zap chans:\n{self.mask_zap_chans}")
+        logging.debug(f"check:\n{set(np.where(self.mask.sum(axis=0)==self.nint)[0])}")
+
+        if set(self.mask_zap_chans) != set(np.where(self.mask.sum(axis=0)==self.nint)[0]):
+            raise RuntimeError(f"mask initialisation, mask_zap_chans:\n{self.mask_zap_chans}\ndoes not match where all intervals are 0:\n{set(np.where(self.mask.sum(axis=0)==self.nint)[0])}")
+
+        # get first unmasked mean for each channel
+        self.first_unmasked_avg = np.zeros(self.nchan, dtype=float)
+        for c in range(self.nchan):
+            if c in self.mask_zap_chans:
+                self.first_unmasked_avg[c] = 0
+            else:
+                self.first_unmasked_avg[c] = rfimask.avg_stats[:,c][~self.mask[:,c]][0]
+                logging.debug(f"first unmasked avg {c} : at int {np.arange(self.nint)[~self.mask[:,c]][0]}: {self.first_unmasked_avg[c]}")
+
 
 def clip(
     intensities,
     clip_sigma,
+    ignorechans=[],
     running_avg_std=None,
     chan_running_avg=None,
     droptot_sig=None,
@@ -143,6 +161,7 @@ def clip(
         intensities: Raw data with shape (ptsperint, numchan)
         clip_sigma: Clipping is done at clip_sigma above/below the (pseudo) running mean
             (if don't want to actually do the clipping, pass in 0 or None)
+        ignorechans: channels to ignore in this int
         running_avg_std: [running_avg, running_std], stores running average and std of DM0 time series
         chan_running_avg: a numpy array of length numchan, stores running average of each channel
         droptot_sig, chan_running_std: see last paragraph
@@ -171,19 +190,19 @@ def clip(
     Example usage is exactly the same as above, just add in e.g. droptot_sigma=4.5
     """
     ptsperint, numchan = intensities.shape
+    chans_in_sum = len(ignorechans)
 
-    if running_avg_std is None and chan_running_avg is None:
+
+    if running_avg_std is None: # and chan_running_avg is None:
         first_block = True
         running_avg = 0
         running_std = 0
-        chan_running_avg = np.zeros((numchan))
-        chan_running_std = np.zeros((numchan))
+        if chan_running_avg is None:  # could happen if not masking
+            chan_running_avg = np.zeros((numchan))
+        if not_zero_or_none(droptot_sig) and chan_running_std is None:
+            chan_running_std = np.zeros((numchan))
     else:
         first_block = False
-        if running_avg_std is None or chan_running_avg is None:
-            raise RuntimeError(
-                "running_avg_std and chan_running_avg should either both be None (when it's the first block) or neither"
-            )
         running_avg, running_std = running_avg_std
 
     # Calculate the zero DM time series
@@ -206,6 +225,11 @@ def clip(
     )[0]
     numgoodpts = good_pts_idx.size
 
+    if chans_in_sum == numchan:
+        logging.debug(f"clip: ignorechans = all chans, numgoodpts from clipping was {numgoodpts} before reset to 0")
+        logging.debug(f"zero_dm avg, med, std were: {current_avg}, {current_med}, {current_std}")
+        numgoodpts = 0
+
     if numgoodpts < 1:
         current_avg = running_avg
         current_std = running_std
@@ -225,7 +249,7 @@ def clip(
         running_avg = 0.9 * running_avg + 0.1 * current_avg
         running_std = 0.9 * running_std + 0.1 * current_std
         chan_running_avg = 0.9 * chan_running_avg + 0.1 * chan_avg_temp
-        if droptot_sig is not None:
+        if not_zero_or_none(droptot_sig):
             chan_running_std = 0.9 * chan_running_std + 0.1 * chan_std_temp
     else:
         running_avg = current_avg
@@ -246,6 +270,9 @@ def clip(
                 where_clip, :
             ] = chan_running_avg  # this edits intensities in place, might want to change
 
+    # debugging
+    extra_stuff_to_return = []  #numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp]
+
     # CHIME dropped-packet clipping
     if not_zero_or_none(droptot_sig):
         where_droptot_clip = np.where(
@@ -256,12 +283,25 @@ def clip(
             running_avg_std=[running_avg, running_std],
             chan_running_avg=chan_running_avg,
             chan_running_std=chan_running_std,
-        )
+        ), *extra_stuff_to_return
     else:
         return intensities, dict(
             running_avg_std=[running_avg, running_std],
             chan_running_avg=chan_running_avg,
+        ), *extra_stuff_to_return
+
+
+def get_slice(data, interval, ptsperint, gulp, maxDT):
+    try:
+        slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
+        tmp = data[slc,0].sum()  # throwaway to test the slice
+        del tmp
+    except IndexError:  # in case on leftover partial-interval 
+        logging.debug(
+            f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
         )
+        slc = slice(interval * ptsperint, None)
+    return slc
 
 
 def clip_mask_subbase_gulp(
@@ -275,32 +315,55 @@ def clip_mask_subbase_gulp(
     maxDT,
     current_int,
     mask,
+    subbase=True,
 ):
     """Clip, mask and subtract the running_avg from a gulp"""
-    for interval in range(nint):
-        try:
-            slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
-            data[slc, :], running_dict = clip(
-                data[slc, :],
-                clipsig,
-                droptot_sig=droptotsig,
-                **running_dict,
-            )
-        except IndexError:  # in case on leftover partial-interval  # this seems to not get activated ever?
-            logging.debug(
-                f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
-            )
-            slc = slice(interval * ptsperint, None)
-            data[slc, :], running_dict = clip(
-                data[slc, :],
-                clipsig,
-                droptot_sig=droptotsig,
-                **running_dict,
-            )
+    logging.debug(f"clip: subbase={subbase}")
 
-        data[slc, :] -= running_dict["chan_running_avg"]
-        data[slc, list(mask.mask_zap_chans_per_int[current_int])] = 0
+    # debugging
+    # initialise extra stuff:
+    #nchan = data.shape[-1]
+    #numgoodpts = np.zeros((nint), dtype=int) 
+    #running_avg = np.zeros((nint), dtype=float)
+    #running_std = np.zeros((nint), dtype=float)
+    #current_avg = np.zeros((nint), dtype=float)
+    #current_std = np.zeros((nint), dtype=float)
+    #chan_running_avg = np.zeros((nint, nchan), dtype=float) 
+    #chan_avg_temp = np.zeros((nint, nchan), dtype=float)
+
+    for interval in range(nint):
+        slc = get_slice(data, interval, ptsperint, gulp, maxDT)
+        logging.debug(f"current int: {current_int}")
+        if current_int in mask.mask_zap_ints:
+            logging.debug(f"current int ({current_int}) in mask_zap ints")
+            tmp = copy.deepcopy(running_dict["chan_running_avg"])
+            logging.debug(f"chan_running_avg before:\n{running_dict['chan_running_avg']}")
+        ign = mask.mask_zap_chans_per_int[current_int]
+
+        # apply mask, using previous chan running average. This should remain unchanged during clip
+        zap_chans = list(mask.mask_zap_chans_per_int[current_int])
+        data[slc, zap_chans] = running_dict["chan_running_avg"][zap_chans]
+
+        logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
+        #data[slc, :], running_dict, numgoodpts[interval], running_avg[interval], running_std[interval], current_avg[interval], current_std[interval], chan_running_avg[interval,:], chan_avg_temp[interval,:] = clip(
+        data[slc, :], running_dict= clip(
+            data[slc, :],
+            clipsig,
+            ignorechans=ign,
+            droptot_sig=droptotsig,
+            **running_dict,
+        )
+        if current_int in mask.mask_zap_ints:
+            logging.debug(f"chan_running_avg after:\n{running_dict['chan_running_avg']}")
+            logging.debug(f"same everywhere? {np.isclose(running_dict['chan_running_avg'], tmp).all()}")
+        #logging.debug(f"interval:{interval}, numgoodpts:{numgoodpts[interval]}")
+
+        if subbase:
+            data[slc, :] -= running_dict["chan_running_avg"]
+
         current_int += 1
+        logging.debug(f"data mean for block after clip: {data[slc, :].mean()}")
+    return running_dict, current_int  #, numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp
 
 
 def clip_subbase_gulp(
@@ -313,32 +376,43 @@ def clip_subbase_gulp(
     gulp,
     maxDT,
     current_int,
-    *args,
+    mask,
+    subbase=True,
 ):
     """Same as clip_mask_subbase_gulp but no mask"""
-    for interval in range(nint):
-        try:
-            slc = slice(interval * ptsperint, (interval + 1) * ptsperint)
-            data[slc, :], running_dict = clip(
-                data[slc, :],
-                clipsig,
-                droptot_sig=droptotsig,
-                **running_dict,
-            )
-        except IndexError:  # in case on leftover partial-interval  # this seems to not get activated ever?
-            logging.debug(
-                f"Last interval detected: length {data.shape[0]} where gulp is {gulp} and maxDT {maxDT}",
-            )
-            slc = slice(interval * ptsperint, None)
-            data[slc, :], running_dict = clip(
-                data[slc, :],
-                clipsig,
-                droptot_sig=droptotsig,
-                **running_dict,
-            )
+    logging.debug(f"clip: subbase={subbase}")
 
-        data[slc, :] -= running_dict["chan_running_avg"]
+    # debugging
+    # initialise extra stuff:
+    #nchan = data.shape[-1]
+    #numgoodpts = np.zeros((nint), dtype=int) 
+    #running_avg = np.zeros((nint), dtype=float)
+    #running_std = np.zeros((nint), dtype=float)
+    #current_avg = np.zeros((nint), dtype=float)
+    #current_std = np.zeros((nint), dtype=float)
+    #chan_running_avg = np.zeros((nint, nchan), dtype=float) 
+    #chan_avg_temp = np.zeros((nint, nchan), dtype=float)
+
+    logging.debug(f"clip: nint:{nint}")
+    for interval in range(nint):
+        logging.debug(f"{interval}")
+        slc = get_slice(data, interval, ptsperint, gulp, maxDT)
+
+        logging.debug(f"data mean for block before clip: {data[slc, :].mean()}")
+        #data[slc, :], running_dict, numgoodpts[interval], running_avg[interval], running_std[interval], current_avg[interval], current_std[interval], chan_running_avg[interval,:], chan_avg_temp[interval,:]  = clip(
+        data[slc, :], running_dict = clip(
+            data[slc, :],
+            clipsig,
+            droptot_sig=droptotsig,
+            **running_dict,
+        )
+        #logging.debug(f"interval:{interval}, numgoodpts:{numgoodpts[interval]}")
+
+        if subbase:
+            data[slc, :] -= running_dict["chan_running_avg"]
         current_int += 1
+        logging.debug(f"data mean for block after clip: {data[slc, :].mean()}")
+    return running_dict, current_int  #, numgoodpts, running_avg, running_std, current_avg, current_std, chan_running_avg, chan_avg_temp
 
 
 ################################################################################
@@ -626,6 +700,12 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        "--subbase",
+        action='store_true',
+        help="Subtract the (moving) mean from each channel as you go. NB the mean is updated every rfifnd interval so this may lead to discontinuities in data",
+    )
+
+    parser.add_argument(
         "-v",
         "--verbose",
         help="Increase logging level to debug",
@@ -656,6 +736,8 @@ if __name__ == "__main__":
     # log unhandled exception
     sys.excepthook = handle_exception
 
+    logging.info(f"args:\n{args}")
+
     t0 = time.perf_counter()
 
     # being too lazy to refactor
@@ -667,19 +749,26 @@ if __name__ == "__main__":
     if args.clipsig or args.droptotsig or args.mask:
         if not_zero_or_none(args.mask):
             logging.info(
-                "Preprocess is: clipping/computing running averages, subtracting baseline, masking"
+                "Preprocess is: clipping/computing running averages, masking"
             )
+            if args.subbase:
+                logging.info("Preprocess will also subtract a per-channel, per-rfifind-interval baseline")
 
             def preprocess(*args, **kwargs):
-                clip_mask_subbase_gulp(*args, **kwargs)
+                ret = clip_mask_subbase_gulp(*args, **kwargs)
+                return ret
 
         else:
             logging.info(
                 "Preprocess is: clipping/computing running averages, subtracting baseline, NOT masking"
             )
 
+            if args.subbase:
+                logging.info("Preprocess will also subtract a per-channel, per-rfifind-interval baseline")
+
             def preprocess(*args, **kwargs):
-                clip_subbase_gulp(*args, **kwargs)
+                ret = clip_subbase_gulp(*args, **kwargs)
+                return ret
 
     else:
         logging.info(
@@ -692,7 +781,7 @@ if __name__ == "__main__":
     logging.info(f"Working on file: {args.filename}")
     header, hdrlen = sigproc.read_header(args.filename)
     nsamples = int(sigproc.samples_per_file(args.filename, header, hdrlen))
-    logging.debug(header)
+    logging.info(header)
 
     if header["nifs"] != 1:
         raise ValueError(f"Code not written to deal with unsummed polarization data")
@@ -824,7 +913,18 @@ if __name__ == "__main__":
         )
     else:
         intspergulp = gulp // ptsperint
-        logging.debug(f"intspergulp: {intspergulp}")
+    logging.info(f"intspergulp: {intspergulp}")
+
+    nints_tot = (nsamples // gulp)*intspergulp
+    if nsamples % gulp:
+        remainder = nsamples % gulp - nsamp_cut_off
+        nints_tot += remainder//ptsperint
+        if remainder % ptsperint:
+            nints_tot += 1
+    logging.debug(f"total number intervals = {nints_tot}")
+    nints_tot = int(nints_tot)
+    logging.debug(f"total number intervals = {nints_tot}")
+
 
     # initialize things that need to survive multiple gulps
     current_int = 0
@@ -832,6 +932,9 @@ if __name__ == "__main__":
     running_dict = dict(
         running_avg_std=None, chan_running_avg=None, chan_running_std=None
     )
+    if mask is not None:
+        running_dict['chan_running_avg'] = mask.first_unmasked_avg
+    
     arr_dtype = get_dtype(header["nbits"])
     arr_outdtype = np.float32  # as subtracting average in clipping/masking
 
@@ -866,6 +969,10 @@ if __name__ == "__main__":
     out_filename = args.filename[:-4] + f"_DM{DM:.{dmprec}f}.fil"
     outf = open(os.path.join(args.outdir, out_filename), "wb")
 
+    #out_filename_0dm = args.filename[:-4] + f"_DM{DM:.{dmprec}f}_DM0.dat"
+    #logging.debug(f"Writing dm0 dat to {out_filename_0dm}")
+    #outfdm0 = open(os.path.join(args.outdir, out_filename_0dm), "wb")
+
     logging.info(f"Writing header to {out_filename}\n")
     write_header(header, outf)
 
@@ -880,15 +987,27 @@ if __name__ == "__main__":
         .reshape(-1, nchans)
         .astype(arr_outdtype)
     )
-    logging.debug(f"Read in first chunk {intensities.shape}")
-    logging.debug(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
-    logging.debug(
+    logging.info(f"Read in first chunk {intensities.shape}")
+    logging.info(f"Size of chunk: {sys.getsizeof(intensities)/1000/1000} MB")
+    logging.info(
         f"Approximate size of dedispersion arrays: {approx_size_shifted_arrays(intensities, maxDT)/1000/1000} MB"
     )
 
+    # debugging
+    # initialise extra stuff
+    #numgoodpts = np.zeros((nints_tot), dtype=int) 
+    #running_avg = np.zeros((nints_tot), dtype=float) 
+    #running_std = np.zeros_like(running_avg) 
+    #current_avg = np.zeros_like(running_avg)
+    #current_std = np.zeros_like(running_avg)
+    #chan_running_avg = np.zeros((nints_tot, nchans), dtype=float)
+    #chan_avg_temp = np.zeros_like(chan_running_avg)
+
     # Process first gulp separately
     intensities[:, list(zerochans)] = 0
-    preprocess(
+    logging.debug(f"pre first gulp running_dict:\n{running_dict}")
+    #running_dict, current_int, numgoodpts[:intspergulp], running_avg[:intspergulp], running_std[:intspergulp], current_avg[:intspergulp], current_std[:intspergulp], chan_running_avg[:intspergulp,:], chan_avg_temp[:intspergulp,:] = preprocess(
+    running_dict, current_int = preprocess(
         intspergulp,
         ptsperint,
         intensities,
@@ -899,16 +1018,19 @@ if __name__ == "__main__":
         maxDT,
         current_int,
         mask,
+        subbase=args.subbase,
     )
-    logging.debug("First gulp, initializing prev_array")
+    logging.debug(f"post first gulp running_dict:\n{running_dict}")
+    logging.info("First gulp, initializing prev_array")
     prev_array = np.zeros((maxDT, nchans), dtype=intensities.dtype)
-    logging.debug(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
+    logging.info(f"prev_array size {sys.getsizeof(prev_array)/1000/1000}MB")
     prev_array, mid_array, end_array = shift_and_stack(
         intensities, shifts, prev_array, maxDT
     )
-    logging.debug(f"shifted and stacked first gulp")
-    logging.debug(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
+    logging.info(f"shifted and stacked first gulp")
+    logging.info(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
     outf.write(mid_array.ravel().astype(arr_outdtype))
+    #outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
     current_gulp += 1
 
     # reset for next loop
@@ -919,17 +1041,26 @@ if __name__ == "__main__":
         .astype(arr_outdtype)
     )
 
+    intspergulp_norm = copy.deepcopy(intspergulp)
     # test if need to do next loop, or if on last gulp
     if intensities.shape[0] > maxDT:
         if intensities.shape[0] < gulp:  #  on last gulp
+            logging.info("On last gulp")
+            logging.debug(f"intensities.shape[0]// ptsperint: {intensities.shape[0]// ptsperint}")
+            intspergulp = int(intensities.shape[0]// ptsperint)
             if intensities.shape[0] % ptsperint:  # last int is weirdly sized
-                intspergulp = (gulp // ptsperint) + 1
+                intspergulp += 1
                 logging.debug(f"intspergulp changed to {intspergulp}")
+            logging.info(f"intspergulp: {intspergulp}")
 
         while True:
             # tt0 = time.perf_counter()
             intensities[:, list(zerochans)] = 0
-            preprocess(
+            int_slc = slice(intspergulp_norm*current_gulp, intspergulp_norm*current_gulp + intspergulp)
+            logging.debug(f"int_slic is from {intspergulp_norm*current_gulp} to {intspergulp_norm*current_gulp + intspergulp}")
+            logging.debug(f"pre {current_gulp} gulp running_dict:\n{running_dict}")
+            #running_dict, current_int, numgoodpts[int_slc], running_avg[int_slc], running_std[int_slc], current_avg[int_slc], current_std[int_slc], chan_running_avg[int_slc,:], chan_avg_temp[int_slc,:] = preprocess(
+            running_dict, current_int = preprocess(
                 intspergulp,
                 ptsperint,
                 intensities,
@@ -940,7 +1071,9 @@ if __name__ == "__main__":
                 maxDT,
                 current_int,
                 mask,
+                subbase=args.subbase,
             )
+            logging.debug(f"post {current_gulp} gulp running_dict:\n{running_dict}")
             # tt1 = time.perf_counter()
             # logging.debug(f"Clipped and masked gulp {current_gulp} in {tt1 - tt0} s")
 
@@ -950,6 +1083,8 @@ if __name__ == "__main__":
             )
             outf.write(prev_array.ravel().astype(arr_outdtype))
             outf.write(mid_array.ravel().astype(arr_outdtype))
+            #outfdm0.write(prev_array.sum(axis=-1).astype(arr_outdtype))
+            #outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
             # tt2 = time.perf_counter()
             # logging.debug(f"Dedispersed in {tt2-tt1} s")
             # logging.debug(f"Processed gulp {current_gulp}")
@@ -968,14 +1103,22 @@ if __name__ == "__main__":
             if intensities.shape[0] < gulp:
                 if intensities.size == 0 or intensities.shape[0] < maxDT:
                     break
-                elif intensities.shape[0] % ptsperint:
-                    intspergulp = (intensities.shape[0] // ptsperint) + 1
-                    logging.debug(
-                        f"last gulp detected, intspergulp changed to {intspergulp}"
-                    )
+                else:
+                    logging.info("On last gulp")
+                    logging.debug(f"intensities.shape[0]// ptsperint: {intensities.shape[0]// ptsperint}")
+                    intspergulp = int(intensities.shape[0]// ptsperint)
+                    if intensities.shape[0] % ptsperint:  # last int is weirdly sized
+                        intspergulp += 1
+                        logging.debug(f"intspergulp changed to {intspergulp}")
+                    logging.info(f"intspergulp: {intspergulp}")
 
     outf.close()
+    #outfdm0.close()
     filfile.close()
+
+    # debugging, write more things
+    #logging.info(f"Writing running averages etc for debugging to {out_filename[:-4]}_chunk_dedsip_debug_stats.npz")
+    #np.savez(os.path.join(args.outdir, "{out_filename[:-4]}_chunk_dedsip_debug_stats.npz"), numgoodpts=numgoodpts, running_avg=running_avg, running_std=running_std, current_avg=current_avg, current_std=current_std, chan_running_avg=chan_running_avg, chan_avg_temp=chan_avg_temp)
 
     t2 = time.perf_counter()
 
@@ -983,5 +1126,7 @@ if __name__ == "__main__":
     logging.info(f"TIME initialize: {t1-t0} s")
     logging.info(f"TIME clip, mask, dedisperse all gulps: {t2-t1} s")
     logging.info(f"TIME total: {t2-t0} s")
+
+    # debugging also output dm0 time series
 
     sys.exit()
