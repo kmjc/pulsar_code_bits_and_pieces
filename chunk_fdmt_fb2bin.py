@@ -121,12 +121,12 @@ parser.add_argument(
     help="Pad to this number of samples (actual padding done by bin_to_datinf, this records the N in the .fdmt.yaml)"
 )
 
-parser.add_argument(
-    "--num_threads",
-    type=int,
-    default=1,
-    help="Number of threads to use in fdmt. Default is 1",
-)
+#parser.add_argument(
+#    "--num_threads",
+#    type=int,
+#    default=1,
+#    help="Number of threads to use in fdmt. Default is 1",
+#)
 
 parser.add_argument(
     "--fdmt_corr_fac",
@@ -243,11 +243,14 @@ if args.gulp <= maxDT:
 
 # initialize FDMT class object
 if args.tophalf:
-    fd = FDMT(fmin=fmin + (fmax - fmin) / 2, fmax=fmax, nchan=nchans // 2, maxDT=maxDT, num_threads=args.num_threads, corr_fac=args.fdmt_corr_fac)
+#    fd = FDMT(fmin=fmin + (fmax - fmin) / 2, fmax=fmax, nchan=nchans // 2, maxDT=maxDT, num_threads=args.num_threads, corr_fac=args.fdmt_corr_fac)
+    fd = FDMT(fmin=fmin + (fmax - fmin) / 2, fmax=fmax, nchan=nchans // 2, maxDT=maxDT, corr_fac=args.fdmt_corr_fac)
 else:
-    fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT, num_threads=args.num_threads, corr_fac=args.fdmt_corr_fac)
+#    fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT, num_threads=args.num_threads, corr_fac=args.fdmt_corr_fac)
+    fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT, corr_fac=args.fdmt_corr_fac)
 logging.info(
-    f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}, num_threads {fd.num_threads}, corr_fac {fd.corr_fac}\n"
+#    f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}, num_threads {fd.num_threads}, corr_fac {fd.corr_fac}\n"
+    f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}, corr_fac {fd.corr_fac}\n"
 )
 
 # Define slices to return intensities in read_gulp
