@@ -600,12 +600,12 @@ def dm_steps(loDM, hiDM, obs, cohdm=0.0, numsub=0, numprocs=1,
         ax.set_ylabel("Smearing (ms)")
 
         # add some info as the title
-        title = f"$f_{{{'ctr'}}}$ = {obs.f_ctr:d} MHz \t "
+        title = f"$f_{{{'ctr'}}}$ = {obs.f_ctr:.2f} MHz \t "
         if dtms < 0.1:
             title += f"dt = {dtms*1000} ms \t "
         else:
             title += f"dt = {dtms} ms \t "
-        title += f"BW = {obs.BW:d} MHz \t $N_{{{'chan'}}}$ = {obs.numchan:d}"
+        title += f"BW = {obs.BW:.2f} MHz \t $N_{{{'chan'}}}$ = {obs.numchan:d}"
         if numsub:
             title += f" \t $N_{{{'sub'}}}$ = {numsub:d}"
 
