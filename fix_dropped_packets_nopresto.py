@@ -57,8 +57,36 @@ def get_fdp_mask(arr, axis=0, sigma=4.5):  #, debug=False):
 
 def tscrunch(arr, fac):
     """Scrunch (by summing) a (nspec,nchan) array in time by <fac>
-    Returns array of shape (nspec/fac, nchan)"""
-    return arr.reshape(-1, fac, arr.shape[-1]).sum(axis=1)
+    Returns array of shape (nspec/fac, nchan)
+    If nspec does not divide nicely into fac you get (nspec//fac+1, nchan)"""
+    remainder = arr.shape[0] % fac
+    if remainder:
+        tmp = arr[:-remainder,:]
+        excess = arr[-remainder:,:]
+        return_nint = arr.shape[0] // fac + 1
+        mout = np.zeros((return_nint, arr.shape[1]), dtype=arr.dtype)
+        mout[:-1,:] = tmp.reshape(-1, fac, tmp.shape[-1]).sum(1)
+        mout[-1,:] = excess.sum(0)
+        return mout
+    else:
+        return arr.reshape(-1,fac,arr.shape[-1]).sum(1)
+    
+def tscrunch1d(arr, fac):
+    """Scrunch (by summing) a (nspec) array in time by <fac>
+    Returns array of shape (nspec/fac)
+    If nspec does not divide nicely into fac you get (nspec//fac+1)"""
+    remainder = arr.shape[0] % fac
+    if remainder:
+        tmp = arr[:-remainder]
+        excess = arr[-remainder:]
+        return_nint = arr.shape[0] // fac + 1
+        mout = np.zeros((return_nint), dtype=arr.dtype)
+        mout[:-1] = tmp.reshape(-1, fac).sum(1)
+        mout[-1] = excess.sum(0)
+        return mout
+    else:
+        return arr.reshape(-1,fac).sum(1)
+
 
 
 parser = argparse.ArgumentParser(
@@ -127,6 +155,12 @@ parser.add_argument(
     help="Also calculate and save some stats: skewness, kurtosis, s1 & s2 for spectral kurtosis, number of unmasked time samples summed, total number of time samples",
 )
 
+parser.add_argument(
+    "--rfifind_gulp",
+    type=int,
+    help="gulp using for rfifind (generally blocks x 2400), if gulp is a mulitple of rfifind_gulp this will be used for the stats calculations"
+)
+
 #parser.add_argument(
 #    "--debug",
 #    action='store_true',
@@ -167,8 +201,6 @@ else:
     )
 
 
-
-
 logging.info(f"Running fdp with args:\n{args}")
 
 if args.fdp_tscrunch < 1:
@@ -179,6 +211,17 @@ if args.gulp % args.fdp_tscrunch:
     logging.info(f"Gulp adjusted to {gulp}")
 else:
     gulp = args.gulp
+
+if args.rfifind_gulp is not None and args.stats:
+    if gulp % args.rfifind_gulp:
+        logging.warning(f"gulp {gulp} is not divisible by rfifind_gulp {args.rfifind_gulp}. Stats will be written using gulp")
+        stats_gulp = gulp
+        stats_gulp_per_gulp = 1
+    else:
+        stats_gulp = args.rfifind_gulp
+        stats_gulp_per_gulp = int(gulp/stats_gulp)
+    logging.info(f"There will be {stats_gulp_per_gulp} stats-intervals in every gulp")
+
 
 header, hdrlen = sigproc.read_header(args.fn)
 nspecs = int(sigproc.samples_per_file(args.fn, header, hdrlen))
@@ -195,6 +238,17 @@ loop_iters = int(nspecs // gulp)
 if nspecs % gulp:
     loop_iters += 1
 logging.info(f"Loop through in {loop_iters} iterations")
+# find shape for stats
+if args.stats:
+    if stats_gulp_per_gulp == 1:
+        stats_loop_iters = loop_iters
+    else:
+        stats_loop_iters = int(nspecs // stats_gulp)
+        if nspecs % stats_gulp:
+            stats_loop_iters += 1
+    logging.info(f"Will be {stats_loop_iters} intervals in stats file")
+
+
 fn_clean = args.fn.strip(".fil")
 #if args.debug:
 #    fn_clean += "_debug"
@@ -208,12 +262,12 @@ fil.seek(hdrlen)
 if args.stats:
 #    skews = np.zeros((loop_iters, nchans))
 #    kurtoses = np.zeros((loop_iters, nchans))
-    s1 = np.zeros((loop_iters, nchans))
-    s2 = np.zeros((loop_iters, nchans))
-    num_unmasked_points = np.zeros((loop_iters, nchans), dtype=int)
-    n = np.zeros((loop_iters), dtype=int)
+    s1 = np.zeros((stats_loop_iters, nchans))
+    s2 = np.zeros((stats_loop_iters, nchans))
+    num_unmasked_points = np.zeros((stats_loop_iters, nchans), dtype=int)
+    n = np.zeros((stats_loop_iters), dtype=int)
 
-    logging.debug(f"Initilaized stats arrays with shape {(loop_iters, nchans)}")
+    logging.debug(f"Initilaized stats arrays with shape {(stats_loop_iters, nchans)}")
 
 additional_fils = []
 if args.downsamp is not None:
@@ -294,12 +348,14 @@ for i in range(loop_iters):
     # calc stats
     if args.stats:
         del spec
+        jmin = i*stats_gulp_per_gulp
+        jmax = min((i+1)*stats_gulp_per_gulp, stats_loop_iters)
  #       skews[i, :] = skew(tmp, axis=0, bias=False)
  #       kurtoses[i, :] = kurtosis(tmp, axis=0, bias=False)
-        s1[i, :] = tmp.sum(axis=0)
-        s2[i, :] = (tmp**2).sum(axis=0)
-        num_unmasked_points[i, :] = (~tmp.mask).sum(axis=0)
-        n[i] = tmp.shape[0]
+        s1[jmin:jmax, :] = tscrunch(tmp, stats_gulp)
+        s2[jmin:jmax, :] = tscrunch(tmp**2, stats_gulp)
+        num_unmasked_points[jmin:jmax, :] = tscrunch(~tmp.mask, stats_gulp)
+        n[jmin:jmax] = tscrunch1d(np.ones((tmp[0])), stats_gulp)
 
 
 fil.close()
@@ -315,7 +371,7 @@ if args.stats:  # and not args.debug:
         s2=s2,
         num_unmasked_points=num_unmasked_points,
         n=n,
-        gulp=gulp,
+        gulp=stats_gulp,
     )
 if additional_fils:
     for add_fil in additional_fils:
