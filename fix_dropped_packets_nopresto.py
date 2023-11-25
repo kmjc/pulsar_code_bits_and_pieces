@@ -355,7 +355,7 @@ for i in range(loop_iters):
         s1[jmin:jmax, :] = tscrunch(tmp, stats_gulp)
         s2[jmin:jmax, :] = tscrunch(tmp**2, stats_gulp)
         num_unmasked_points[jmin:jmax, :] = tscrunch(~tmp.mask, stats_gulp)
-        n[jmin:jmax] = tscrunch1d(np.ones((tmp[0])), stats_gulp)
+        n[jmin:jmax] = tscrunch1d(np.ones((tmp.shape[0])), stats_gulp)
 
 
 fil.close()
