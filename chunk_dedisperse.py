@@ -1035,6 +1035,7 @@ if __name__ == "__main__":
 
     # reset for next loop
     prev_array = end_array
+    del intensities  # otheriwse both are in memory for a bit and get a spike
     intensities = (
         np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
         .reshape(-1, nchans)
@@ -1093,6 +1094,7 @@ if __name__ == "__main__":
 
             # reset for next loop
             prev_array = end_array
+            del intensities
             intensities = (
                 np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
                 .reshape(-1, nchans)
