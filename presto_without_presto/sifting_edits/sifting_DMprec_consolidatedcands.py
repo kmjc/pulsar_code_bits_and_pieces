@@ -539,7 +539,7 @@ class Candlist(object):
 
     def plot_goodcands(self, usefreqs=True):
         """Produce a plot highlighting good candidates as selected by
-        the sifiting performed.
+        the sifting performed.
 
         Input:
             usefreqs: If True, the horizontal axis will use
@@ -588,7 +588,7 @@ class Candlist(object):
             dms = []
             xdata = []
             for c in cands:
-                sigmas.extend([h.sigma for h in c.hits])
+                sigmas.extend([h[2] for h in c.hits])
                 dms.extend([h[0] for h in c.hits])
                 if usefreqs:
                     xval = c.f
