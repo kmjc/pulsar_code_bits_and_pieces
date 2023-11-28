@@ -1292,6 +1292,91 @@ class Candlist(object):
         if reportfilenm is not None:
             reportfile.close()
 
+    def print_goodcand_summary(self, summarygcandfilenm=None):
+        """Write a summary of all good candidates to file (or stdout).
+        Things like number of candidates above sigmas etc.
+
+        Input:
+            summarygcandfilenm: Name of file to write to. If None write to stdout.
+                (Default: write to stdout).
+
+        Outputs:
+            None
+        """
+        if summarygcandfilenm is None:
+            summarygcandfile = sys.stdout
+        elif summarygcandfilenm in [sys.stdout, sys.stderr]:
+            summarygcandfile = summarygcandfilenm
+        else:
+            summarygcandfile = open(summarygcandfilenm, "w")
+
+        sigmas = np.array([cand.sigma for cand in self.cands])
+        cpows = np.array([cand.cpow for cand in self.cands])
+        cpow_ipows = np.array([cand.cpow/cand.ipow_det for cand in self.cands])
+
+
+        summarygcandfile.write(
+            "   Candlist contains %d 'good' candidates\n" % len(self.cands)
+        )
+        sigma_threshes = [5,6,7,8,9,10,15,20]
+        for sigma_thresh in sigma_threshes:
+            n_over_sig = (sigmas > sigma_thresh).sum()
+            summarygcandfile.write(
+                "   Candlist contains %d 'good' candidates over sigma %d\n" % (n_over_sig, sigma_thresh)
+            )
+            if n_over_sig == 0:
+                break
+
+        cpow_threshes = [100, 200, 500]
+        for cpow_thresh in cpow_threshes:
+            n_over_cpow = (cpows > cpow_thresh).sum()
+            summarygcandfile.write(
+                "   Candlist contains %d 'good' candidates over cpow %d\n" % (n_over_cpow, cpow_thresh)
+            )
+            if n_over_cpow == 0:
+                break
+
+        summarygcandfile.write(
+            "   Sigma:\n"
+        )
+        summarygcandfile.write(
+            f"      Min:     {sigmas.min()}\n"
+        )
+        summarygcandfile.write(
+            f"      Max:     {sigmas.max()}\n"
+        )
+        summarygcandfile.write(
+            f"      Median:  {np.median(sigmas)}\n"
+        )
+        summarygcandfile.write(
+            "   Cpow:\n"
+        )
+        summarygcandfile.write(
+            f"      Min:     {cpows.min()}\n"
+        )
+        summarygcandfile.write(
+            f"      Max:     {cpows.max()}\n"
+        )
+        summarygcandfile.write(
+            f"      Median:  {np.median(cpows)}\n"
+        )
+        summarygcandfile.write(
+            "   Cpow/Ipow_det:\n"
+        )
+        summarygcandfile.write(
+            f"      Min:     {cpow_ipows.min()}\n"
+        )
+        summarygcandfile.write(
+            f"      Max:     {cpow_ipows.max()}\n"
+        )
+        summarygcandfile.write(
+            f"      Median:  {np.median(cpow_ipows)}\n"
+        )
+        if summarygcandfilenm not in [None, sys.stdout, sys.stderr]:
+            summarygcandfile.close()
+
+
+
     def __add__(self, other):
         copy_of_self = copy.deepcopy(self)
         copy_of_self.extend(other)
