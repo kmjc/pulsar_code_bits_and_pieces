@@ -1344,9 +1344,6 @@ class Candlist(object):
             "   Sigma:\n"
         )
         summarygcandfile.write(
-            f"      Min:     {sigmas.min()}\n"
-        )
-        summarygcandfile.write(
             f"      Max:     {sigmas.max()}\n"
         )
         summarygcandfile.write(
