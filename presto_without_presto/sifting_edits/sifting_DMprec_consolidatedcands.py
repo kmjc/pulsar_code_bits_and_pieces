@@ -1327,7 +1327,11 @@ class Candlist(object):
             if n_over_sig == 0:
                 break
 
-        cpow_threshes = [100, 200, 500]
+        summarygcandfile.write(
+            "\n"
+        )
+
+        cpow_threshes = [50, 100, 200, 500]
         for cpow_thresh in cpow_threshes:
             n_over_cpow = (cpows > cpow_thresh).sum()
             summarygcandfile.write(
