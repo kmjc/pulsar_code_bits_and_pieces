@@ -207,7 +207,8 @@ def get_zeros_mask_alt(rfifind_obj, ignorechans=[], verbose=False, plot_diagnost
     tmp = (rfifind_obj.std_stats==0)
 
     working_mask = np.zeros_like(rfifind_obj.mask, dtype=bool)
-    working_mask[:,np.array(ignorechans)] = True
+    if ignorechans:
+        working_mask[:,np.array(ignorechans)] = True
     if plot_diagnostics:
         if ax is None:
             fig, ax = plt.subplots()
@@ -838,7 +839,7 @@ def plot_mask_comparison(maska, maskb, title="", ax=None, returnplt=False, color
     if colorbar:
         plt.colorbar(ax=ax)
 
-    if ignorechans is not None:
+    if ignorechans is not None and ignorechans != []:
         cmap2 = ListedColormap(['none', 'black'])
         ignorechans_mask = np.zeros_like(maska)
         for c in ignorechans:
