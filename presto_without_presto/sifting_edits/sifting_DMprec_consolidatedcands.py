@@ -745,7 +745,7 @@ class Candlist(object):
                 )
                 self.mark_as_bad(ii, "shortperiod")
 
-    def reject_knownbirds(self, known_birds_f=[], known_birds_p=[]):
+    def reject_knownbirds(self, known_birds_f=None, known_birds_p=None):
         """Find and remove candidates conincident with known birds.
 
         Inputs:
