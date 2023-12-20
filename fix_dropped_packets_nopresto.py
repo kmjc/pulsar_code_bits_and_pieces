@@ -249,7 +249,8 @@ if args.stats:
     logging.info(f"Will be {stats_loop_iters} intervals in stats file")
 
 
-fn_clean = args.fn.strip(".fil")
+fn_clean = args.fn.strip(".fil")  # for some incredibly strange reason I cannot figure out for my filename beginning with fake they -> ake!!
+fn_clean = args.fn.split(".fil")[0]  # this doesn not
 #if args.debug:
 #    fn_clean += "_debug"
 fdp_fn = f"{fn_clean}_fdp.fil"
@@ -354,7 +355,7 @@ for i in range(loop_iters):
  #       kurtoses[i, :] = kurtosis(tmp, axis=0, bias=False)
         s1[jmin:jmax, :] = tscrunch(tmp, stats_gulp)
         s2[jmin:jmax, :] = tscrunch(tmp**2, stats_gulp)
-        num_unmasked_points[jmin:jmax, :] = tscrunch(~tmp.mask, stats_gulp)
+        num_unmasked_points[jmin:jmax, :] = tscrunch((~tmp.mask).astype(int), stats_gulp)
         n[jmin:jmax] = tscrunch1d(np.ones((tmp.shape[0])), stats_gulp)
 
 
