@@ -2,6 +2,9 @@
 
 import numpy as np
 
+import matplotlib
+matplotlib.use('pdf')
+
 from matplotlib import pyplot as plt
 from matplotlib import colors
 import copy
