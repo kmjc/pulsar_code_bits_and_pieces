@@ -1631,7 +1631,11 @@ if __name__ == "__main__":
     else:
         ignorechans = [int(x) for x in args.ignorechans.split(",")]
 
-    optstr="".join(args.option.split(","))
+    opts = [0]
+    if args.option:
+        opts.extend([int(x) for x in args.option.split(",") if x>0])
+
+    optstr="".join([f"{x}" for x in opts])
     if args.overwrite:
         outfilename = args.maskfile
     elif args.outfilename is None:
@@ -1643,7 +1647,6 @@ if __name__ == "__main__":
     if args.show:
         p = None
     else:
-
         plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")]
         if optstr not in plotfname:
             plotfname += f"_{optstr}"
@@ -1651,7 +1654,6 @@ if __name__ == "__main__":
         p = PdfPages(plotfname)
         logging.info(f"Plots will be written to {plotfname}")
 
-    opts = [int(x) for x in args.option.split(",")]
     opt_dict = {
         0: "basic processing: ignorechans, anywhere the std is 0, where the number of unmasked points is < set threshold",
         1: "bad ints: do an interval high fraction cut on a 2D iqrm run on the means, aka flag intervals which are bad for many channels",
