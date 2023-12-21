@@ -197,19 +197,19 @@ def reshape_rfifind_mask(extra_stats_shape, msk, fdp_gulp, ptsperint):
 
 
 # ## Zapping functions
-
-def get_zeros_mask_alt(rfifind_obj, ignorechans=[], verbose=False, plot_diagnostics=True, ax=None):
+def get_zeros_mask_alt(var_stats, ignorechans=[], verbose=False, plot_diagnostics=True, ax=None):
     """
-    Get a mask where the std_stats = 0
+    Get a mask where the var_stats = 0
+    (changed from std_stats as that seems to always be 0 for the final interval (always always or just with my data? tbd))
     Then shuffle it +- 1 interval on each side
     Often if something went wrong, like a node going down or a network error, intervals either side are affected also
     This, hopefully catches that but also doesn't throw out whole channel if only part of it has dropped out.
 
     verbose and plot_diagnostics both concern where std==0 in the data in places not covered by ignorechans
     """
-    tmp = (rfifind_obj.std_stats==0)
+    tmp = (var_stats.std_stats==0)
 
-    working_mask = np.zeros_like(rfifind_obj.mask, dtype=bool)
+    working_mask = np.zeros_like(tmp dtype=bool)
     if ignorechans:
         working_mask[:,np.array(ignorechans)] = True
     if plot_diagnostics:
@@ -218,7 +218,7 @@ def get_zeros_mask_alt(rfifind_obj, ignorechans=[], verbose=False, plot_diagnost
         ax.imshow(np.ma.array(tmp, mask=working_mask).T, aspect='auto', origin='lower')
         ax.set_xlabel("int")
         ax.set_ylabel("chan")
-        ax.set_title("Plot of where std_stats==0, masked by the ignorechans")
+        ax.set_title("Plot of where var_stats==0, masked by the ignorechans")
 
     # add ignorechans to mask
     for ii in ignorechans:
@@ -233,11 +233,11 @@ def get_zeros_mask_alt(rfifind_obj, ignorechans=[], verbose=False, plot_diagnost
         additional_whole_chans = whole_chans.difference(ignorechans)
 
         if whole_ints:
-            logging.info(f"Found whole interval/s where std_stats==0: {sorted(list(whole_ints))}")
+            logging.info(f"Found whole interval/s where var_stats==0: {sorted(list(whole_ints))}")
             working_mask[np.array(list(whole_ints)),:] = 1
 
         if additional_whole_chans:
-            logging.info(f"Found whole channel/s where std_stats==0 (not covered by ignorechans): {sorted(list(additional_whole_chans))}")
+            logging.info(f"Found whole channel/s where var_stats==0 (not covered by ignorechans): {sorted(list(additional_whole_chans))}")
             working_mask[:,np.array(list(whole_chans))] = 1
 
 
@@ -245,7 +245,7 @@ def get_zeros_mask_alt(rfifind_obj, ignorechans=[], verbose=False, plot_diagnost
         inv_tmp2 = np.ma.array(inv_tmp, mask=working_mask)
         partial_channels = list(np.where((inv_tmp2 == 0).any(axis=0))[0])
         if partial_channels:
-            logging.info(f"Found partial channel/s where std_stats==0 (not covered by ignorechans): {partial_channels}")
+            logging.info(f"Found partial channel/s where var_stats==0 (not covered by ignorechans): {partial_channels}")
 
     # shuffling mask +-1 int
     tmp[1:,:] = (tmp[1:,:] | tmp[:-1,:])
@@ -1683,6 +1683,9 @@ if __name__ == "__main__":
 
     N = extra_stats["n"]
     extra_stats_gulp = extra_stats["gulp"]
+    # something really weird happens with the means and var if you make them with masked arrays. Make and mask afterwards
+    means = s1/M
+    var = (s2 - s1**2/M)/M
 
     # ## make some other parameters
     r = rfimask.nchan/rfac
@@ -1695,23 +1698,24 @@ if __name__ == "__main__":
     masks_exstats = {'rfifind': reshape_rfifind_mask(M.shape, rfimask.mask, extra_stats_gulp, rfimask.ptsperint)}
 
     # Stage 0 is non-optional
-    # ### std_stats==0 mask
+    # ### var==0 mask
     logging.info(f"Ignoring {len(ignorechans)}/{rfimask.nchan} channels")
-
-    logging.info(f"\nGetting zeros mask")
+    logging.info(f"Getting zeros mask")
     fig0, ax0 = plt.subplots()
-    m0 = get_zeros_mask_alt(rfimask, ignorechans=ignorechans, verbose=True, ax=ax0)
+    m0 = get_zeros_mask_alt(var, ignorechans=ignorechans, verbose=True, ax=ax0)
     output_plot(fig0, pdf=p)
 
     # ### M mask (where num_points_unmasked from fdp is under some threshold)
     # cut off anywhere where <0.5 of the gulp was nonzero
+    logging.info(f"Ignoring anywhere where the fraction of points used to calculate the stats was < {m_frac_threshold}")
     mmask = (M.T < m_frac_threshold*N).T
     # right the gulp is different for fdp and rfifind. damn. will have to record that in extra_stats
 
-    base_mask = m0|reshape_extra_stats_mask(m0.shape, mmask, extra_stats_gulp, rfimask.ptsperint)
-    logging.info(f"ignorechans, std_stats=0 and lots of 0 data alone mask out {masked_frac(base_mask)} of data")
-    base_mask_exstats = reshape_rfifind_mask(M.shape, base_mask, extra_stats_gulp, rfimask.ptsperint)
-    logging.info(f"Reshaped base_mask from {base_mask.shape} to {base_mask_exstats.shape} for use with the extra stats from fdp")
+
+    base_mask_exstats = m0 | mmask
+    base_mask = reshape_extra_stats_mask(rfimask.mask.shape, base_mask_exstats, extra_stats_gulp, rfimask.ptsperint)
+    logging.info(f"Reshaped base_mask_exstats from {base_mask_exstats.shape} to {base_mask.shape} for use with the rfifind mask")
+    logging.info(f"ignorechans, std_stats=0 and lots of 0 data alone mask out {masked_frac(base_mask_exstats)} of data")
 
     masks[0] = copy.deepcopy(base_mask)
     masks_exstats[0] = copy.deepcopy(base_mask_exstats)
@@ -1731,9 +1735,6 @@ if __name__ == "__main__":
 
     logging.info(f"0: base mask zaps {masked_frac(base_mask)} of data")
 
-    # something really weird happens with the means and var if you make them with masked arrays. Make and mask afterwards
-    means = s1/M
-    var = (s2 - s1**2/M)/M
 
     # make gsk here for same reason if need it
     if 7 in opts:
@@ -2193,7 +2194,7 @@ if __name__ == "__main__":
 
     # ### Wrapping up
 
-    logging.info("\nWrapping up")
+    logging.info("Wrapping up")
     if args.include_rfifind:
         logging.info("Adding in rfifind mask to the final mask")
         working_mask = working_mask | masks['rfifind']
