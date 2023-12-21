@@ -1636,10 +1636,11 @@ if __name__ == "__main__":
         opts.extend([int(x) for x in args.option.split(",") if x>0])
 
     optstr="".join([f"{x}" for x in opts])
+    basename_mask = maskfile[:maskfile.rfind("_rfifind.mask")]
     if args.overwrite:
-        outfilename = args.maskfile
+        outfilename = maskfile
     elif args.outfilename is None:
-        outfilename = maskfile[:maskfile.rfind("_rfifind.mask")] + "_" + optstr + "_rfifind.mask"
+        outfilename = basename_mask + "_" + optstr + "_rfifind.mask"
     else:
         outfilename = args.outfilename
     logging.info(f"New mask will be written to: {outfilename}")
@@ -1647,10 +1648,7 @@ if __name__ == "__main__":
     if args.show:
         p = None
     else:
-        plotfname = "rfipipeline_plots" + outfilename[:outfilename.rfind("_rfifind.mask")]
-        if optstr not in plotfname:
-            plotfname += f"_{optstr}"
-        plotfname += ".pdf"
+        plotfname = f"rfipipeline_plots_{basename_mask}_{optstr}.pdf"
         p = PdfPages(plotfname)
         logging.info(f"Plots will be written to {plotfname}")
 
