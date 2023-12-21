@@ -1633,7 +1633,7 @@ if __name__ == "__main__":
 
     opts = [0]
     if args.option:
-        opts.extend([int(x) for x in args.option.split(",") if x>0])
+        opts.extend([int(x) for x in args.option.split(",") if int(x)>0])
 
     optstr="".join([f"{x}" for x in opts])
     basename_mask = maskfile[:maskfile.rfind("_rfifind.mask")]
