@@ -83,9 +83,14 @@ def make_summary_plots(mask, mask_exstats, rfifind_obj, means, var, pdf, title_i
     figtmp.suptitle(f"{title_insert} mask ({masked_frac(mask):.2f})")
     output_plot(figtmp, pdf=p)
 
-    figtmp, axtmp = plot_map_plus_sums(rfifind_obj.pow_stats, mask=mask, returnplt=True)
+    pow_stats_plot_mask = copy.deepcopy(mask)
+    if (rfifind_obj.pow_stats[-1,:] == 1).all():
+        logging.info("Weird final interval stats for rfifind, it will be masked in pow_stats plot, but not in the mask itself")
+        pow_stats_plot_mask[-1,:] = True
+    figtmp, axtmp = plot_map_plus_sums(rfifind_obj.pow_stats, mask=pow_stats_plot_mask, returnplt=True)
     figtmp.suptitle(f"{title_insert} pow_stats ({masked_frac(mask):.2f})")
     output_plot(figtmp, pdf=pdf)
+    del pow_stats_plot_mask
 
     figtmp, axtmp = plot_map_plus_sums(means.data, mask=mask_exstats, returnplt=True)
     figtmp.suptitle(f"{title_insert} means ({masked_frac(mask_exstats):.2f})")
@@ -1776,10 +1781,14 @@ if __name__ == "__main__":
     fig_ref_var.suptitle("Var rfimask + base mask")
     output_plot(fig_ref_var, pdf=p)
 
-    fig_ref_pow, ax_ref_pow = plot_map_plus_sums(rfimask.pow_stats, base_mask|rfimask.mask, returnplt=True)
+    pow_stats_plot_mask = base_mask|rfimask.mask
+    if (rfimask.pow_stats[-1,:] == 1).all():
+        logging.info("Weird final interval stats for rfifind, it will be masked in pow_stats plot, but not in the mask itself")
+        pow_stats_plot_mask[-1,:] = True
+    fig_ref_pow, ax_ref_pow = plot_map_plus_sums(rfimask.pow_stats, pow_stats_plot_mask, returnplt=True)
     fig_ref_pow.suptitle("pow_stats rfimask + base mask")
     output_plot(fig_ref_pow, pdf=p)
-
+    del pow_stats_plot_mask
 
     if 1 in opts:
         logging.info("1: Looking for bad intervals")
@@ -2043,8 +2052,12 @@ if __name__ == "__main__":
     if 6 in opts:
         # On pow
         logging.info("6: Running iqrm on median of pow_stats along each axis")
-        pow_med_chans = np.ma.median(np.ma.array(rfimask.pow_stats, mask=base_mask), axis=0)
-        pow_med_ints = np.ma.median(np.ma.array(rfimask.pow_stats, mask=base_mask), axis=1)
+        pow_stats_mask = copy.deepcopy(base_mask)
+        if (rfimask.pow_stats[-1,:] == 1).all():
+            logging.info("Weird final interval stats for rfifind, will not include the final interval when computing pow_stats masks")
+            pow_stats_mask[-1,:] = True
+        pow_med_chans = np.ma.median(np.ma.array(rfimask.pow_stats, mask=pow_stats_mask), axis=0)
+        pow_med_ints = np.ma.median(np.ma.array(rfimask.pow_stats, mask=pow_stats_mask), axis=1)
         pow_chans, v = iqrm_mask(pow_med_chans.filled(np.nan), threshold=5, radius=r, ignorechans=np.where(pow_med_chans.mask)[0])
         pow_ints, v = iqrm_mask(pow_med_ints.filled(np.nan), threshold=5, radius=r, ignorechans=np.where(pow_med_ints.mask)[0])
 
@@ -2055,12 +2068,20 @@ if __name__ == "__main__":
         for j, masked in enumerate(pow_ints):
             if masked:
                 iqrm_med_pow_mask[j,:] = True
-        fig_iqrm_med_pow, ax_iqrm_med_pow = plot_map_plus_sums(rfimask.pow_stats, mask=(base_mask|iqrm_med_pow_mask), returnplt=True)
+        pow_stats_plot_mask = (base_mask|iqrm_med_pow_mask)
+        if (rfimask.pow_stats[-1,:] == 1).all():
+            pow_stats_plot_mask[-1,:] = True
+        fig_iqrm_med_pow, ax_iqrm_med_pow = plot_map_plus_sums(rfimask.pow_stats, mask=pow_stats_plot_mask, returnplt=True)
         fig_iqrm_med_pow.suptitle("pow_stats masked by base + iqrm 1D on medians along both axes")
 
         logging.info("5: Running 2D iqrm on pow_stats both int-wise and chan-wise")
-        mask_pow_2diqrm_chan = run_iqrm_2D(rfimask.pow_stats, (base_mask|iqrm_med_pow_mask), 1,r, ignorechans=base_ignorechans, threshold=5)
-        mask_pow_2diqrm_int = run_iqrm_2D(rfimask.pow_stats, (base_mask|iqrm_med_pow_mask), 0,r, ignorechans=base_ignorechans, threshold=5)
+        mask_pow_2diqrm_chan = run_iqrm_2D(rfimask.pow_stats, pow_stats_plot_mask, 1,r, ignorechans=base_ignorechans, threshold=5)
+        mask_pow_2diqrm_int = run_iqrm_2D(rfimask.pow_stats, pow_stats_plot_mask, 0,r, ignorechans=base_ignorechans, threshold=5)
+        if (rfimask.pow_stats[-1,:] == 1).all():
+            tmp_mask = (base_mask[-1,:] | iqrm_med_pow_mask[-1,:])
+            mask_pow_2diqrm_chan[-1,:] = tmp_mask
+            mask_pow_2diqrm_int[-1,:] = tmp_mask
+            del tmp_mask
 
         fig_iqrm_pow_mask, ax_iqrm_pow_mask = plt.subplots(2,1)
         plot_mask_comparison(mask_pow_2diqrm_chan, base_mask, title="iqrm_2D_pow (bad chans) - iqrm_1D_pow_on_medians", ax=ax_iqrm_pow_mask[0])
@@ -2069,8 +2090,11 @@ if __name__ == "__main__":
 
         mask_pow_iqrm_combo = mask_pow_2diqrm_chan|mask_pow_2diqrm_int|iqrm_med_pow_mask
 
-        fig_iqrm_pow, ax_iqrm_pow = plot_map_plus_sums(rfimask.pow_stats, mask_pow_iqrm_combo|base_mask, returnplt=True)
-        fig_iqrm_pow.suptitle("pow_stats post-!D-and-2D-iqrm")
+        pow_stats_plot_mask = (mask_pow_iqrm_combo|base_mask)
+        if (rfimask.pow_stats[-1,:] == 1).all():
+            pow_stats_plot_mask[-1,:] = True
+        fig_iqrm_pow, ax_iqrm_pow = plot_map_plus_sums(rfimask.pow_stats, pow_stats_plot_mask, returnplt=True)
+        fig_iqrm_pow.suptitle("pow_stats post-1D-and-2D-iqrm")
         output_plot(fig_iqrm_pow, pdf=p)
         logging.info(f"masks {masked_frac(mask_pow_iqrm_combo|base_mask)}")
 
