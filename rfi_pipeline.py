@@ -212,9 +212,9 @@ def get_zeros_mask_alt(var_stats, ignorechans=[], verbose=False, plot_diagnostic
 
     verbose and plot_diagnostics both concern where std==0 in the data in places not covered by ignorechans
     """
-    tmp = (var_stats.std_stats==0)
+    tmp = (var_stats == 0)
 
-    working_mask = np.zeros_like(tmp dtype=bool)
+    working_mask = np.zeros_like(tmp, dtype=bool)
     if ignorechans:
         working_mask[:,np.array(ignorechans)] = True
     if plot_diagnostics:
