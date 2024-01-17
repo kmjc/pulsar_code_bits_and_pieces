@@ -1477,6 +1477,25 @@ class Candlist(object):
         np.savez(filename, **save_dict)
         print(f"Saved Candlist to {filename}")
 
+    def to_npy_basic(self, filename, include_hits = False):
+        """Save the most basic info about candidates: DM, freq, sigma
+        If include_hits then also include the information of the hits"""
+        vals = []
+        dt = [
+            ("f", float),
+            ("DM", float),
+            ("sigma", float),
+        ]
+        for cand in self.cands:
+            vals.append((cand.f, cand.DM, cand.sigma))
+            if include_hits:
+                for hit in cand.hits:
+                    vals.append((cand.f, hit[0], hit[2]))
+        to_save = np.array(vals, dtype=dt)
+        np.save(filename, to_save)
+        print(f"Saved basic info about candidates to {filename}")
+
+
     @classmethod
     def from_npz(cls, filename):
         """Load a Candlist from a .npz file"""
