@@ -33,6 +33,7 @@ def split_fil(fname, nfiles):
 
         outf.close()
         print(f"Wrote {out_fname}")
+        del intensities
 
     filfile.close()
 
