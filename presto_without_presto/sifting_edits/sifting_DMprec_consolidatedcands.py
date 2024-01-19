@@ -854,7 +854,7 @@ class Candlist(object):
                 cand.note = "All harmonics have power < %g" % harm_pow_cutoff
                 self.mark_as_bad(ii, "harmpowcutoff")
 
-    def reject_rogueharmpow(self):
+    def reject_rogueharmpow_original(self):
         """Find and remove candidates which are dominated by a single
         high-power but high-numbered harmonic.
 
@@ -888,6 +888,50 @@ class Candlist(object):
                     "High-numbered harmonic (%d) has too " "much power" % maxharm
                 )
                 self.mark_as_bad(ii, "rogueharmpow")
+
+    def reject_rogueharmpow(self):
+        """Find and remove candidates which are dominated by a single
+        high-power but high-numbered harmonic.
+
+        Inputs:
+            None
+
+        Ouputs:
+            None
+
+        # KC: this is my tweak to match how I interpret the comments
+        # in the original, if the harmonics are [0th, 1st, 2nd, 3rd, 4th, ...]
+        # so how the function is written, the 2+th harmonic actually means
+        # 3rd or higher
+        # since i) the condition is a > rather than >=, and ii) it's that the index is >2
+        # my rewrite says basically harmonics are [1st, 2nd, 3rd, 4th, 5th, ...]
+        # and 2+th means 2nd, 3rd, 4th, etc
+        """
+        for ii in reversed(list(range(len(self.cands)))):
+            cand = self.cands[ii]
+            maxharm = np.argmax(cand.harm_pows)
+            maxpow = cand.harm_pows[maxharm]
+
+            # Sort the harmonics by power
+            sortedpows = np.sort(cand.harm_pows)
+
+            if cand.numharm >= 8 and maxharm >= 3 and maxpow > 2 * sortedpows[-2]:
+                # Max-power harmonic is at least 2x more powerful
+                # than the next highest-power harmonic, and is the
+                # 4+th harmonic our of 8+ harmonics
+                cand.note = (
+                    "High-numbered harmonic (%d) has too " "much power" % maxharm
+                )
+                self.mark_as_bad(ii, "rogueharmpow")
+            elif cand.numharm >= 4 and maxharm >= 1 and maxpow > 3 * sortedpows[-2]:
+                # Max-power harmonic is at least 3x more powerful
+                # than the next highest-power harmonic, and is the
+                # 2+th harmonic our of 4+ harmonics
+                cand.note = (
+                    "High-numbered harmonic (%d) has too " "much power" % maxharm
+                )
+                self.mark_as_bad(ii, "rogueharmpow")
+
 
     def default_rejection(self):
         """Run all rejection methonds with default arguments.
