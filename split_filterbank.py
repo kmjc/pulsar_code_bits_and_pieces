@@ -62,7 +62,7 @@ if __name__ == "__main__":
 
     parser.add_argument(
         "subgulp",
-        defualt=100000,
+        default=100000,
         help="how many time samples to read at once (100000 with 1024 channels and uint8 => ~100 MB)"
     )
 
