@@ -6,7 +6,7 @@ import copy
 import sys
 
 
-def split_fil(fname, nfiles):
+def split_fil(fname, nfiles, subgulp=100000):
     header, hdrlen = sigproc.read_header(fname)
     tsamp = header['tsamp']
     nchans = header['nchans']
@@ -20,7 +20,7 @@ def split_fil(fname, nfiles):
     filfile = open(fname, "rb")
     filfile.seek(hdrlen)
 
-    for i, gulp in enumerate(gulps, subgulp=100000):
+    for i, gulp in enumerate(gulps):
         out_fname = f"{fname.rstrip('.fil')}_{i}.fil"
         header_out = copy.deepcopy(header)
         header_out['tstart'] = header['tstart'] + sum(gulps[:i+1]) * tsamp / 60 / 60 / 24
