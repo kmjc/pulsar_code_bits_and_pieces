@@ -344,7 +344,9 @@ for i in range(loop_iters):
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
         for ii, d in enumerate(args.downsamp):
-            additional_fils[ii].write(spec[::d, :].ravel().astype(arr_dtype))
+            scrunched_arr =  tscrunch(spec, d)
+            additional_fils[ii].write(scrunched_arr.ravel().astype(arr_dtype))
+            del scrunched_arr
 
     # calc stats
     if args.stats:
