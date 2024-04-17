@@ -213,12 +213,19 @@ else:
 
 DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
 
-
 logging.info(f"pyfdmt incoherent DM is {DM}")
 logging.info(f"Maximum delay need to shift by is {max_delay_s} s")
 logging.info(f"This corresponds to {maxDT} time samples\n")
 if DM == 0:
     sys.exit("DM=0, why are you running this?")
+
+
+logging.debug("\n")
+logging.debug(f"input dm: {args.dm} computed dm: {DM}")
+logging.debug(f"fsmax: {fs.max()}, fsmin: {fs.min()}")
+logging.debug(f"maxDT_dec: {(fs.min()**-2 - fs.max()**-2)*args.dm/2.41e-4/header['tsamp']}")
+logging.debug("\n")
+
 
 # checks and other stuff based on gulp size
 ngulps = nsamples // args.gulp
@@ -284,7 +291,8 @@ else:
         return data[:, read_inv_slc].T
 
 # Compute and store DMs
-DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, fs.min(), fs.max())
+# for pyfdmt it's np.arange(maxDT+1) for fdmt it's np.arange(maxDT)
+DMs = inverse_DM_delay(np.arange(maxDT+1) * tsamp, fs.min(), fs.max())
 DMs += args.atdm
 logging.info(f"FDMT DMs are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}")
 
@@ -380,7 +388,9 @@ if not args.yaml_only:
     # as delete out after each gulp for memory reasons, need to preserve some info
     ymax = out.ymax
     actual_DMs = out.dms + args.atdm
-    logging.debug(f"Checking DMs match what expected: {(DMs == actual_DMs).all()}")
+    logging.debug(f"expected DMs: length:{len(DMs)}, ddm:{DMs[1]-DMs[0]}, first2:{DMs[:2]}, last2:{DMs[-2:]}")
+    logging.debug(f"actual DMs: length:{len(actual_DMs)}, ddm:{actual_DMs[1]-actual_DMs[0]}, first2:{actual_DMs[:2]}, last2:{actual_DMs[-2:]}")
+    logging.debug(f"Checking DMs match what expected (np.isclose): {np.isclose(DMs, actual_DMs).all()}")
 
     logging.info(f"Writing gulp 0")
     # write mid_arr
@@ -419,6 +429,7 @@ if not args.yaml_only:
             prev_arr[:, :] = 0
             prev_arr += out.data[:, -out.ymax:]
             out = None
+            logging.info(f"Completed gulp {g}")
 
     for ii in fouts_indices:
         fouts[ii].close()
