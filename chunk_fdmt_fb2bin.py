@@ -371,13 +371,22 @@ if not args.yaml_only:
     logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
     out = pyfdmt.transform(intensities, fs[0], fs[-1], header["tsamp"], 0, DM, frontpad=True)
+    logging.debug(f"intensities shape: {intensities.shape}, out shape: {out.data.shape}")
+    logging.debug(f"ndms: {len(out.dms)}")
+    logging.debug(f"some dms: {out.dms[:3]}, {out.dms[-3:]}")
     t1 = time.perf_counter()
+
     logging.debug(f"Check: maxDT matches pyfdmt ymax: {maxDT==out.ymax}, maxDT:{maxDT}, ymax:{out.ymax}")
+    # as delete out after each gulp for memory reasons, need to preserve some info
+    ymax = out.ymax
+    actual_DMs = out.dms + args.atdm
+    logging.debug(f"Checking DMs match what expected: {(DMs == actual_DMs).all()}")
+
     logging.info(f"Writing gulp 0")
     # write mid_arr
     logging.debug(f"FDMT transform shape: {out.data.shape}")
     logging.debug(
-        f"Only writing {out.ymax}:-{out.ymax} slice in time, should be {out.shape[1] - 2*out.ymax} samples"
+        f"Only writing {out.ymax}:-{out.ymax} slice in time, should be {out.data.shape[1] - 2*out.ymax} samples"
     )
     for ii in fouts_indices:
         fouts[ii].write(out.data[dm_slices[ii], out.ymax:-out.ymax].ravel())
@@ -386,8 +395,10 @@ if not args.yaml_only:
     logging.info(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
 
     # setup for next iteration
-    prev_arr = np.zeros((out.ymax, out.ymax), dtype=intensities.dtype)
+    # for fdmt he shape is (maxDT, maxDT), for pyfdmt it's (ymax+1, ymax)
+    prev_arr = np.zeros((out.ymax+1, out.ymax), dtype=intensities.dtype)
     prev_arr += out.data[:, -out.ymax:]
+    out = None
 
     if ngulps > 1:
         for g in np.arange(1, ngulps):
@@ -396,8 +407,8 @@ if not args.yaml_only:
             prev_arr += out.data[:, :out.ymax]
 
             # write prev_arr and mid_arr
-            # logging.debug(f"gulp {g} out array shape {out.shape}")
-            # logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*out.ymax} time samples")
+            # logging.debug(f"gulp {g} out array shape {out.data.shape}")
+            # logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.data.shape[1] - 2*out.ymax} time samples")
             for ii in fouts_indices:
                 fouts[ii].write(prev_arr[dm_slices[ii], :].ravel())
                 fouts[ii].write(out.data[dm_slices[ii], out.ymax:-out.ymax].ravel())
@@ -407,6 +418,7 @@ if not args.yaml_only:
             # setting it to 0 and using += stops prev_arr changing when out does
             prev_arr[:, :] = 0
             prev_arr += out.data[:, -out.ymax:]
+            out = None
 
     for ii in fouts_indices:
         fouts[ii].close()
@@ -465,7 +477,7 @@ yaml_dict = dict(
     ngulps=ngulps,
     gulp=args.gulp,
     inf_dict=inf_dict,
-    maxDT=int(out.ymax),  # int is leftover from fdmt, not sure if still necessary
+    maxDT=int(ymax),  # int is leftover from fdmt, not sure if still necessary
     origNdat=int(origNdat),
 )
 
@@ -475,9 +487,6 @@ if weird_last_gulp:
 
 logging.debug("Dict values to go into every yaml file:")
 logging.debug(f"{yaml_dict}")
-
-actual_DMs = out.dms + args.atdm
-logging.debug(f"Checking DMs match what expected: {(DMs == actual_DMs).all()}")
 
 # loop through each split file and write a yaml for each
 inf_names = [f"{basename}_DM{aDM:.{args.dmprec}f}.inf" for aDM in actual_DMs]
