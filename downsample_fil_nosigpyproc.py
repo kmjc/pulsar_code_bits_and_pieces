@@ -87,7 +87,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--gulp",
         type=int,
-        default=28800,
+        default=115200,
         help="Maximum number of time samples to read at once",
     )
 
