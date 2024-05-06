@@ -1035,6 +1035,8 @@ class Candlist(object):
             print("\nSearching for duplicate harmonics...")
         ii = 0
         while 1:
+            if len(self.cands) <= 1:
+                break
             fundcand = self.cands[ii]
             jj = len(self.cands) - 1
             zapj = 0
@@ -1109,7 +1111,7 @@ class Candlist(object):
                         print("    %s" % harmcand.note)
                     zapj = 0
                 jj -= 1
-                if jj <= ii:  # < only happens when there was only one cand in the list
+                if jj == ii:
                     break
             ii += 1
             if ii >= len(self.cands) - 1:
