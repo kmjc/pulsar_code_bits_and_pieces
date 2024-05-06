@@ -1109,7 +1109,7 @@ class Candlist(object):
                         print("    %s" % harmcand.note)
                     zapj = 0
                 jj -= 1
-                if jj == ii:
+                if jj <= ii:  # < only happens when there was only one cand in the list
                     break
             ii += 1
             if ii >= len(self.cands) - 1:
