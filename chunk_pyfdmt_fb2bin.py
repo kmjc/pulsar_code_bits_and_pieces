@@ -1,12 +1,13 @@
 import sys, os
 import numpy as np
-from fdmt.cpu_fdmt import FDMT
 import argparse
 import time
 import copy
 import yaml
 import math
 import logging
+
+import pyfdmt
 
 from presto_without_presto import sigproc
 from presto_without_presto.sigproc import ids_to_telescope, ids_to_machine
@@ -17,6 +18,7 @@ from chunk_dedisperse import (
     get_maxDT_DM,
     check_positive_float,
     not_zero_or_none,
+    get_fs,
 )
 
 from gen_utils import handle_exception
@@ -200,14 +202,18 @@ logging.info(
 
 # define fs, for CD/maxDT calculation
 # FDMT computes based on shift between fmin and fmax
+# pyfdmt uses center channels and fs[0] = highest freq
 if args.tophalf:
     logging.info("Only using top half of the band")
-    fs = np.linspace(fmin + (fmax - fmin) / 2, fmax, nchans // 2, endpoint=True)
+    fs = get_fs(fmin, fmax, nchans, invertband=invertband)[:int(nchans/2)]
+    #fs = np.linspace(fmin + (fmax - fmin) / 2, fmax, nchans // 2, endpoint=True)
 else:
-    fs = np.linspace(fmin, fmax, nchans, endpoint=True)
+    #fs = np.linspace(fmin, fmax, nchans, endpoint=True)
+    fs = get_fs(fmin, fmax, nchans, invertband=invertband)
+
 DM, maxDT, max_delay_s = get_maxDT_DM(args.dm, args.maxdt, tsamp, fs)
 
-logging.info(f"FDMT incoherent DM is {DM}")
+logging.info(f"pyfdmt incoherent DM is {DM}")
 logging.info(f"Maximum delay need to shift by is {max_delay_s} s")
 logging.info(f"This corresponds to {maxDT} time samples\n")
 if DM == 0:
@@ -248,14 +254,6 @@ if args.gulp <= maxDT:
         f"Try running get_good_gulp.py -t {maxDT} {args.filename}\n"
     )
 
-# initialize FDMT class object
-if args.tophalf:
-    fd = FDMT(fmin=fmin + (fmax - fmin) / 2, fmax=fmax, nchan=nchans // 2, maxDT=maxDT, corr_fac=args.fdmt_corr_fac)
-else:
-    fd = FDMT(fmin=fmin, fmax=fmax, nchan=nchans, maxDT=maxDT, corr_fac=args.fdmt_corr_fac)
-logging.info(
-    f"FDMT initialized with fmin {fd.fmin}, fmax {fd.fmax}, nchan {fd.nchan}, maxDT {fd.maxDT}, corr_fac {fd.corr_fac}\n"
-)
 
 # Define slices to return intensities in read_gulp
 if args.tophalf:
@@ -268,6 +266,8 @@ else:
 # Don't want an "if invertband:" in my loop, define function to return data as flipped/not
 # also need to transpose anyway for FDMT so it's (nchans, gulp)
 # (NB FDMT needs the lowest freq channel to be at index 0)
+
+# pyfdmt is the opposite. Needs highest freq channel to be 0
 if invertband:
     logging.debug(f"Frequency slice used to read data: {read_inv_slc}\n")
 
@@ -276,7 +276,8 @@ if invertband:
         data = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
             -1, nchans
         ).astype(np.float32)
-        return data[:, read_inv_slc].T
+        #return data[:, read_inv_slc].T
+        return data[:, read_slc].T
 
 else:
     logging.debug(f"Frequency slice used to read data: {read_slc}\n")
@@ -286,16 +287,12 @@ else:
         data = np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype).reshape(
             -1, nchans
         ).astype(np.float32)
-        return data[:, read_slc].T
-
+        #return data[:, read_slc].T
+        return data[:, read_inv_slc].T
 
 # Compute and store DMs
-# Hao said arange(maxDT) is correct
-if args.tophalf:
-    flo = fmin + (fmax - fmin) / 2
-else:
-    flo = fmin
-DMs = inverse_DM_delay(np.arange(maxDT) * tsamp, flo, fmax)
+# for pyfdmt it's np.arange(maxDT+1) for fdmt it's np.arange(maxDT)
+DMs = inverse_DM_delay(np.arange(maxDT+1) * tsamp, fs.min(), fs.max())
 DMs += args.atdm
 logging.info(f"FDMT DMs are from {DMs[0]} to {DMs[-1]} in steps of {DMs[1] - DMs[0]}")
 
@@ -377,50 +374,62 @@ if not args.yaml_only:
     logging.info("Reading in first gulp")
     # Do first gulp separately
     intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
-    fd.reset_ABQ()
     logging.info(f"Starting gulp 0")
     logging.debug(f"Shape of first chunk read: {intensities.shape}")
     logging.debug(f"Size of chunk: {sys.getsizeof(intensities.base)/1000/1000} MB")
     t0 = time.perf_counter()
-    out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-    logging.debug(f"Size of fdmt A, {fd.A.shape}: {sys.getsizeof(fd.A)/1000/1000} MB")
-    logging.debug(f"Size of fdmt B, {fd.B.shape}: {sys.getsizeof(fd.B)/1000/1000} MB")
+    out = pyfdmt.transform(intensities, fs[0], fs[-1], header["tsamp"], 0, DM, frontpad=True)
+    logging.debug(f"intensities shape: {intensities.shape}, out shape: {out.data.shape}")
+    logging.debug(f"ndms: {len(out.dms)}")
+    logging.debug(f"some dms: {out.dms[:3]}, {out.dms[-3:]}")
     t1 = time.perf_counter()
+
+    logging.debug(f"Check: maxDT matches pyfdmt ymax: {maxDT==out.ymax}, maxDT:{maxDT}, ymax:{out.ymax}")
+    # as delete out after each gulp for memory reasons, need to preserve some info
+    ymax = out.ymax
+    actual_DMs = out.dms + args.atdm
+    logging.debug(f"expected DMs: length:{len(DMs)}, ddm:{DMs[1]-DMs[0]}, first2:{DMs[:2]}, last2:{DMs[-2:]}")
+    logging.debug(f"actual DMs: length:{len(actual_DMs)}, ddm:{actual_DMs[1]-actual_DMs[0]}, first2:{actual_DMs[:2]}, last2:{actual_DMs[-2:]}")
+    logging.debug(f"Checking DMs match what expected (np.isclose): {np.isclose(DMs, actual_DMs).all()}")
+
     logging.info(f"Writing gulp 0")
     # write mid_arr
-    logging.debug(f"FDMT transform shape: {out.shape}")
+    logging.debug(f"FDMT transform shape: {out.data.shape}")
     logging.debug(
-        f"Only writing {maxDT}:-{maxDT} slice in time, should be {out.shape[1] - 2*maxDT} samples"
+        f"Only writing {out.ymax}:-{out.ymax} slice in time, should be {out.data.shape[1] - 2*out.ymax} samples"
     )
     for ii in fouts_indices:
-        fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
+        fouts[ii].write(out.data[dm_slices[ii], out.ymax:-out.ymax].ravel())
 
     t2 = time.perf_counter()
     logging.info(f"Completed gulp 0 in {t1-t0} s, wrote in {t2-t1} s\n")
 
     # setup for next iteration
-    prev_arr = np.zeros((maxDT, maxDT), dtype=intensities.dtype)
-    prev_arr += out[:, -maxDT:]
+    # for fdmt he shape is (maxDT, maxDT), for pyfdmt it's (ymax+1, ymax)
+    prev_arr = np.zeros((out.ymax+1, out.ymax), dtype=intensities.dtype)
+    prev_arr += out.data[:, -out.ymax:]
+    out = None
 
     if ngulps > 1:
         for g in np.arange(1, ngulps):
             intensities = read_gulp(filfile, args.gulp, nchans, arr_dtype)
-            fd.reset_ABQ()
-            out = fd.fdmt(intensities, padding=True, frontpadding=True, retDMT=True)
-            prev_arr += out[:, :maxDT]
+            out = pyfdmt.transform(intensities, fs[0], fs[-1], header["tsamp"], 0, DM, frontpad=True)
+            prev_arr += out.data[:, :out.ymax]
 
             # write prev_arr and mid_arr
-            # logging.debug(f"gulp {g} out array shape {out.shape}")
-            # logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.shape[1] - 2*maxDT} time samples")
+            # logging.debug(f"gulp {g} out array shape {out.data.shape}")
+            # logging.debug(f"gulp {g} writing {prev_arr.shape[1] + out.data.shape[1] - 2*out.ymax} time samples")
             for ii in fouts_indices:
                 fouts[ii].write(prev_arr[dm_slices[ii], :].ravel())
-                fouts[ii].write(out[dm_slices[ii], maxDT:-maxDT].ravel())
+                fouts[ii].write(out.data[dm_slices[ii], out.ymax:-out.ymax].ravel())
             logging.debug(f"Completed gulp {g}")
 
             # reset for next gulp
             # setting it to 0 and using += stops prev_arr changing when out does
             prev_arr[:, :] = 0
-            prev_arr += out[:, -maxDT:]
+            prev_arr += out.data[:, -out.ymax:]
+            out = None
+            logging.info(f"Completed gulp {g}")
 
     for ii in fouts_indices:
         fouts[ii].close()
@@ -479,7 +488,7 @@ yaml_dict = dict(
     ngulps=ngulps,
     gulp=args.gulp,
     inf_dict=inf_dict,
-    maxDT=int(maxDT),  # otherwise numpy int
+    maxDT=int(ymax),  # int is leftover from fdmt, not sure if still necessary
     origNdat=int(origNdat),
 )
 
@@ -491,13 +500,13 @@ logging.debug("Dict values to go into every yaml file:")
 logging.debug(f"{yaml_dict}")
 
 # loop through each split file and write a yaml for each
-inf_names = [f"{basename}_DM{aDM:.{args.dmprec}f}.inf" for aDM in DMs]
+inf_names = [f"{basename}_DM{aDM:.{args.dmprec}f}.inf" for aDM in actual_DMs]
 for ii in fouts_indices:
     specific_yaml_dict = copy.copy(yaml_dict)
 
     slc = dm_slices[ii]
     specific_yaml_dict["inf_names"] = inf_names[slc]
-    specific_yaml_dict["DMs"] = [float(aDM) for aDM in DMs[slc]]
+    specific_yaml_dict["DMs"] = [float(aDM) for aDM in actual_DMs[slc]]
 
     # write yaml
     with open(os.path.join(args.outdir, f"{fouts_names[ii]}.yaml"), "w") as fyaml:
