@@ -48,10 +48,11 @@ accelname_re = re.compile("([a-zA-Z0-9_.+-]+_ACCEL_[0-9]+)")
 fund_re = re.compile("^\d")
 harms_re = re.compile("^[ ]\d")
 # NB this only works if there's only one DMx.xx in your filename
-DM_re = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
+#DM_re = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
+DM_re = re.compile(f"DM(\d+\.\d+)")
 # AH! OK have to call this to refresh it because this gets set during the initial import when dmprec=2
 def refresh_DM_re():
-    DM_re_refreshed = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
+    DM_re_refreshed = re.compile(f"DM(\d+\.\d+)")  #re.compile(f"DM(\d+\.\d{{{dmprec}}})")
     return DM_re_refreshed
 
 
