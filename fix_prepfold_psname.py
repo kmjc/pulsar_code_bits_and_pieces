@@ -32,7 +32,7 @@ def rename_ps(dirname, verbose=True):
         new_name = f"{pfd[:-3]}ps"
         if verbose:
             print(f"Moving {weird} to {new_name}")
-        #os.rename(weird, new_name)
+        os.rename(weird, new_name)
 
     if verbose:
         print("DONE")
