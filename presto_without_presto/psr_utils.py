@@ -9,12 +9,11 @@ from scipy.special import ndtr, ndtri, chdtrc, chdtri, fdtrc, i0, kolmogorov
 from scipy.optimize import leastsq
 import scipy.optimize.zeros as zeros
 
-# from presto import Pgplot, ppgplot, sinc_interp
+# from presto import Pgplot, ppgplot, 
+from presto_without_presto import sinc_interp
 import presto_without_presto.psr_constants as pc
 
 # KC: not implemented
-# interp_rotate
-#  - can't see where sinc_interp is within presto
 
 # Removed due to pgplot:
 # smear_plot
@@ -1295,18 +1294,18 @@ def rotate(arr, bins):
         return Num.concatenate((arr[bins:], arr[:bins]))
 
 
-# def interp_rotate(arr, bins, zoomfact=10):
-#    """
-#    interp_rotate(arr, bins, zoomfact=10):
-#        Return a sinc-interpolated array rotated by 'bins' places to the left.
-#            'bins' can be fractional and will be rounded to the closest
-#            whole-number of interpolated bins.  The resulting vector will
-#            have the same length as the oiginal.
-#    """
-#    newlen = len(arr) * zoomfact
-#    rotbins = int(Num.floor(bins * zoomfact + 0.5)) % newlen
-#    newarr = sinc_interp.periodic_interp(arr, zoomfact)
-#    return rotate(newarr, rotbins)[::zoomfact]
+def interp_rotate(arr, bins, zoomfact=10):
+    """
+    interp_rotate(arr, bins, zoomfact=10):
+        Return a sinc-interpolated array rotated by 'bins' places to the left.
+            'bins' can be fractional and will be rounded to the closest
+            whole-number of interpolated bins.  The resulting vector will
+            have the same length as the oiginal.
+    """
+    newlen = len(arr) * zoomfact
+    rotbins = int(Num.floor(bins * zoomfact + 0.5)) % newlen
+    newarr = sinc_interp.periodic_interp(arr, zoomfact)
+    return rotate(newarr, rotbins)[::zoomfact]
 
 
 def fft_rotate(arr, bins):
