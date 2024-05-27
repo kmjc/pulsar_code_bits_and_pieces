@@ -1,6 +1,3 @@
-from __future__ import print_function
-from __future__ import absolute_import
-
 from matplotlib import pyplot as plt
 from matplotlib import colorbar
 import attr
