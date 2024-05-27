@@ -769,7 +769,7 @@ def PBDOT(porb, e, Mp, Mc):
     """
     PBDOT(porb, e, Mp, Mc):
         Return the predicted orbital period derivative (s/s) given the
-        orbital period (s), eccentricity, and pulsar and companion masses.
+        orbital period (d), eccentricity, and pulsar and companion masses.
     """
     return (
         -192.0
