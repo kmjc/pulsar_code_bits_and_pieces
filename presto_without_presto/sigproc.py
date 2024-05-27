@@ -24,6 +24,7 @@ telescope_ids = {
     "VLA": 12,
     "CHIME": 20,
     "FAST": 21,
+    "MWA": 30,
     "MeerKAT": 64,
     "KAT-7": 65,
 }
@@ -46,6 +47,9 @@ machine_ids = {
     "BG/P": 11,
     "PDEV": 12,
     "CHIME+PSR": 20,
+    "MWA-VCS": 30,
+    "MWAX-VCS": 31,
+    "MWAX-RTB": 32,
     "KAT": 64,
     "KAT-DC2": 65,
     "FAKE2": 10,
