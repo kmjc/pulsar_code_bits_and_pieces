@@ -10,12 +10,13 @@ from matplotlib import ticker as mpltick
 import six
 import numbers
 from presto_without_presto.bestprof import bestprof
+from numba import jit
 
 try:
     from presto.presto import chi2_sigma
 except ImportError:
     print("Couldn't import chi2_sigma from presto. Implemented workaround may give slight differences")
-    from scipy.stats import chi2 # I really hope the normalization's the same as presto
+    from scipy.stats import chi2 as scipychi2 
 
     def chi2_sigma(chi2, dof):
         """
@@ -24,8 +25,9 @@ except ImportError:
         """
         if chi2 <= 0.0:
             return 0.0
-        logp = chi2.logsf(chi2, dof)
-        return psr_utils.equivalent_gaussian_sigma(logp)
+        logp = scipychi2.logsf(chi2, dof)
+        return psr_utils.extended_equiv_gaussian_sigma(logp)
+
 
 def set_labels(ax, labx="", laby=""):
     if labx:
@@ -43,7 +45,7 @@ params = {
     "ytick.minor.visible": True,
     "xtick.labelsize": "small",
     "ytick.labelsize": "small",
-    "axes.labelsize": "small"
+    "axes.labelsize": "small",
 }
 plt.rcParams.update(params)
 
@@ -291,7 +293,12 @@ class pfd(object):
         self.DOFcor = self.DOFnom * self.DOF_corr()
         infile.close()
         self.barysubfreqs = None
-        if self.avgvoverc==0 and self.candnm.startswith("PSR_"):
+        # KC: changed this so doppler corrects if self.avgvoverc is initially nonzero
+        if self.avgvoverc != 0:
+            # Make the Doppler correction
+            #self.barysubfreqs = None
+            self.barysubfreqs = self.subfreqs*(1.0+self.avgvoverc)
+        elif self.candnm.startswith("PSR_"):
             try:
                 psrname = self.candnm[4:]
                 self.polycos = polycos.polycos(psrname,
@@ -941,7 +948,7 @@ class pfd(object):
         return dupe_axes
 
 
-    def plotxy(self, y, x=None, labx="", laby="", rangey=[], ax=None):
+    def plotxy(self, y, x=None, labx="", laby="", rangey=None, rangex=None, ax=None):
         show = False
         if ax is None:
             show = True
@@ -961,8 +968,10 @@ class pfd(object):
 
         ax.tick_params(axis='y', labelrotation = 90)
 
-        if rangey:
-            ax.set_ylim(*rangey)
+        if rangey is not None:
+            ax.set_ylim(rangey[0], rangey[-1])
+        if rangex is not None:
+            ax.set_xlim(rangex[0], rangex[-1])
 
         if show:
             plt.show()
@@ -1163,6 +1172,44 @@ class pfd(object):
                 if sub in self.killed_subbands: continue
                 varprof += self.stats[part][sub][5] # foldstats prof_var
         return varprof
+    
+    def calc_vardata(self):
+        # NB stats[part][sub] corresponds to the following from foldstats
+        # numdata, data_avg, data_var, numprof, prof_avg, prof_var, redchi
+        """
+        WRONG: does not give the same value as the prepfold plot
+        calc_vardata(self):
+            This function calculates the summed data variance of the
+                current pfd file.  Killed profiles are ignored.
+        """
+        vardata = 0.0
+        for part in range(self.npart):
+            if part in self.killed_intervals: continue
+            for sub in range(self.nsub):
+                if sub in self.killed_subbands: continue
+                vardata += self.stats[part][sub][2] # foldstats data_var
+        return vardata
+    
+    def calc_avgdata(self):
+        # NB stats[part][sub] corresponds to the following from foldstats
+        # numdata, data_avg, data_var, numprof, prof_avg, prof_var, redchi
+        """
+        WRONG: does not give the same value as the prepfold plot
+        (removing the /nsum doesn't do it either)
+        calc_avgdata(self):
+            This function calculates the summed data average of the
+                current pfd file.  Killed profiles are ignored.
+        """
+        avgdata = 0.0
+        nsum = 0
+        for part in range(self.npart):
+            if part in self.killed_intervals: continue
+            for sub in range(self.nsub):
+                if sub in self.killed_subbands: continue
+                avgdata += self.stats[part][sub][1] # foldstats data_var
+                nsum += 1
+        return avgdata / nsum
+
 
     def calc_redchi2(self, prof=None, avg=None, var=None):
         """
@@ -1191,6 +1238,7 @@ class pfd(object):
             Plot (and return) an array showing the reduced-chi^2 versus
                 DM (N DMs spanning loDM-hiDM).  Use sinc_interpolation
                 if 'interp' is non-zero.
+        # KC this is using doppler-corrected freqs
         """
         show = False
         if ax is None:
@@ -1228,7 +1276,7 @@ class pfd(object):
             sumprof = profs.sum(0)
             chis[ii] = self.calc_redchi2(prof=sumprof, avg=avgprof)
         # Now plot it
-        self.plotxy(chis, DMs, labx="DM", laby=r"Reduced $\chi^2$", ax=ax)
+        self.plotxy(chis, DMs, labx="DM", laby=r"Reduced $\chi^2$", ax=ax, rangey=[0.0, max(chis)*1.1])
 
         if show:
             plt.show()
@@ -1407,7 +1455,7 @@ class pfd(object):
             plt.close()
         return self.DS
 
-    def ppdot_grid(self, dm=None, periods=None, pdots=None, search=False, pdd=None):
+    def ppdot_grid(self, dm=None, periods=None, pdots=None, search=False, pdd=None, doppler=False):
         """
         ppdot_grid(self, dm=None, periods=None, pdots=None, search=False, pdd=None):
             Make the p-pdot grid.
@@ -1423,12 +1471,12 @@ class pfd(object):
             The original adjust_period notes in its docstring that the
             results are *almost* identical to those from the prepfold search.
             adjust_period_more_efficient has 2 differences from adjust_period
-              - it uses np.roll rather than psr_utils.rotate
+              - it uses Num.roll rather than psr_utils.rotate
               - there is not option to use fft interpolation
 
             grid has shape (npdots, nperiods)
 
-            returns grid, periods, pdots
+            returns grid, periods, pdots, dm, pdd, best_p, best_pd
         """
         if periods is None:
             periods = self.periods
@@ -1442,30 +1490,97 @@ class pfd(object):
         if dm is None:
             dm = self.bestdm
 
+        # check if already have an identical one stored
+        if 'ppdotgrid' in self.__dict__:
+            print("Found existing ppdot grid, checking for compatibility")
+            if self.ppdotgrid.same_input_pars(periods, pdots, pdd, dm, doppler):
+                print("Same input parameters. Using existing ppdotgrid")
+                return self.ppdotgrid.redchi2s, self.ppdotgrid.periods, self.ppdotgrid.pdots, self.ppdotgrid.dm, self.ppdotgrid.pdd, self.ppdotgrid.best_p, self.ppdotgrid.best_pd
+            else:
+                print("Not a match. Proceeding with the search; ppdotgrid will be overwritten")
+
         # so can return the pfd to the state it started in if search=False
         starting_values = [self.currdm, self.curr_p1, self.curr_p2, self.curr_p3]
-        self.dedisperse(dm)
+        print(f"For p-pdot search, using dm: {dm}, pdd: {pdd}")
+        self.dedisperse(dm, doppler=doppler)
         redchi2s = Num.zeros((len(pdots), len(periods)))
         pp, pdpd = Num.meshgrid(periods, pdots)
         for idx, p in Num.ndenumerate(pp):
             self.adjust_period_more_efficient(p=p, pd=pdpd[idx], pdd=pdd)
             redchi2s[idx] = self.calc_redchi2()
 
+        best_index = Num.unravel_index(Num.argmax(redchi2s), redchi2s.shape)
+        best_p = periods[best_index[1]]
+        best_pd = pdots[best_index[0]]
+
         if not search:
             self.dedisperse(starting_values[0])
             p, pd, pdd = starting_values[1:]
+            #print(f"Resetting dm, p, pd, pdd to their starting values: {starting_values}")
+            self.dedisperse(starting_values[0])
+            # I think this is necessary so other functions behave as expected
+            if starting_values[0] == 0:
+                del self.subdelays
             self.adjust_period_more_efficient(p=p, pd=pd, pdd=pdd)
         else:
-            best_index = Num.unravel_index(Num.argmax(redchi2s), Num.shape)
-            best_p = periods[best_index[0]]
-            best_pd = pdots[best_index[1]]
             self.adjust_period_more_efficient(p=best_p, pd=best_pd, pdd=pdd)
 
-        return redchi2s, periods, pdots
+        self.ppdotgrid = RedChi2s(redchi2s, periods, pdots, pdd, dm, doppler, best_p=best_p, best_pd=best_pd)
 
-    def plot_ppdot_grid(self, dm=None, periods=None, pdots=None, axs=None, search=True, use_fold=False, imshow=False):
+        return redchi2s, periods, pdots, dm, pdd, best_p, best_pd
+
+    def ppdot_grid2(self, dm=None, pdd=None, periods=None, pdots=None, doppler=False):
+        # this should leave the profiles etc unchanged
+        # BUT it also assumes that the curr_p1 etc values are those derived from fold_p1 etc
+        if periods is None:
+            periods = self.periods
+        if pdots is None:
+            pdots = self.pdots
+        if pdd is None:
+            if self.fold_pow == 1.0:
+                pdd = self.bary_p3
+            else:
+                pdd = self.topo_p3
+        if dm is None:
+            dm = self.bestdm
+
+        # check if already have an identical one stored
+        if 'ppdotgrid' in self.__dict__:
+            print("Found existing ppdot grid, checking for compatibility")
+            if self.ppdotgrid.same_input_pars(periods, pdots, pdd, dm, doppler):
+                print("Same input parameters. Using existing ppdotgrid")
+                return self.ppdotgrid.redchi2s, self.ppdotgrid.periods, self.ppdotgrid.pdots, self.ppdotgrid.dm, self.ppdotgrid.pdd, self.ppdotgrid.best_p, self.ppdotgrid.best_pd
+            else:
+                print("Not a match. Proceeding with the search; ppdotgrid will be overwritten")
+
+        print(f"For p-pdot search, using dm: {dm}, pdd: {pdd}")
+        startingdm = self.currdm
+        self.dedisperse(dm, doppler=doppler)
+
+        # pre-calculate some stuff
+        parttimes = self.start_secs.astype('float32').astype('float64')
+        fold_ps = self.fold_p1, self.fold_p2, self.fold_p3
+        # not searching in dm so can sum all subbands
+        tmp_profs = self.profs.sum(1)
+        pp, pdpd = Num.meshgrid(periods, pdots)
+
+        redchi2s = calc_many_redchis(pp, pdpd, pdd, parttimes, fold_ps, tmp_profs, self.proflen, self.npart, self.pdelays_bins, self.avgprof, self.varprof, self.DOFcor)
+        best_index = Num.unravel_index(Num.argmax(redchi2s), redchi2s.shape)
+        best_p = periods[best_index[1]]
+        best_pd = pdots[best_index[0]]
+
+        self.dedisperse(startingdm, doppler=doppler)
+        if startingdm == 0:
+                del self.subdelays
+
+        self.ppdotgrid = RedChi2s(redchi2s, periods, pdots, pdd, dm, doppler, best_p=best_p, best_pd=best_pd)
+
+        return redchi2s, periods, pdots, dm, pdd, best_p, best_pd
+
+    def plot_ppdot_grid(self, dm=None, pdd=None, periods=None, pdots=None, axs=None, search=True, use_fold=False, imshow=False, doppler=False):
         """
             if search=True the best p and pdot in the grid will be used for the p/pdot vs redchi2 plots
+                BUT pfd will still be in its original state (aka ppdot_grid is run with search=False)
             if search=False 
                 and use_fold=False the best p and pdot stored in the pfd (aka from the prepfold search) will be used
                 and use_fold=True the original p and pdot from the prepfold command will be used
@@ -1475,7 +1590,17 @@ class pfd(object):
             axs can be one axis, in which case just the grid will be plotted
             or a list of 3 axes for the grid, period, pdot in that order.
             If axs is None, all 3 will be plotted by default.
+
+            returns:
+            dupe_axes_grid, dm, best_p, best_pd, pdd
+            
+            where dupe_axes_grid is a list of duplicate axes used for plotting
+            [dupe_asis_x, dupe_axis_y]
+            (if passed in axs=None, these will both be None)
+
         """
+        starting_values = [self.currdm, self.curr_p1, self.curr_p2, self.curr_p3]
+
         show = False
         if axs is None:
             show = True
@@ -1491,16 +1616,19 @@ class pfd(object):
             ax_grid = axs
             ax_p, ax_pdot = None, None
 
-        pfold, pdfold = self.curr_p1, self.curr_p2
+        pfold, pdfold, pddfold = psr_utils.p_to_f(self.fold_p1, self.fold_p2, self.fold_p3)
         ffold, fdfold = self.fold_p1, self.fold_p2
-        redchi2s, periods, pdots = self.ppdot_grid(dm=dm, periods=periods, pdots=pdots)
+        redchi2s, periods, pdots, dm, pdd, best_p, best_pd = self.ppdot_grid2(dm=dm, periods=periods, pdots=pdots, doppler=doppler)
 
         # get p,pd to use for 1D plots, and to mark on chisq grid
         mark_bestppd = True
         if search:
             best_index = Num.unravel_index(Num.argmax(redchi2s), redchi2s.shape)
-            best_p = periods[best_index[1]]
-            best_pd = pdots[best_index[0]]
+            # check best values are what expect
+            assert best_p == periods[best_index[1]]
+            assert best_pd == pdots[best_index[0]]
+            print(f"Found best period:\n{best_p}")
+            print(f"Found best pdot:\n{best_pd}")
         else:
             if use_fold:
                 best_p = pfold
@@ -1546,36 +1674,46 @@ class pfd(object):
 
         dupe_axes_grid = self.plot2d(redchi2s, rangex=prange, rangey=pdrange, ax=ax_grid, cmap_name='antirainbow', rangex2=frange, rangey2=fdrange, labx=labx, laby=laby, labx2=labx2, laby2=laby2, imshow=imshow, indiv_scaling=False)
         if mark_bestppd:
-            ax_grid.scatter(best_p, best_pd, marker="+")
+            ax_grid.scatter((best_p-pfold)*1000, best_pd-pdfold, marker="+", linewidth=2)
 
         if ax_p is not None:
-            # 
+            if mark_bestppd:
+                ax_p.axvline((best_p-pfold)*1000, c='lightsalmon')
             # test if it's in a corner plot
             if ax_grid in ax_p.get_shared_x_axes().get_siblings(ax_p):
                 _labx = None
             else:
                 _labx = labx
-            self.plotxy(p_slice, x=(periods-pfold)*1000, labx=_labx, laby=r"Reduced $\chi^2$", ax=ax_p)
+            rangey=[0.0, max(p_slice)*1.1]
+            self.plotxy(p_slice, x=(periods-pfold)*1000, labx=_labx, laby=r"Reduced $\chi^2$", rangex=prange, rangey=rangey, ax=ax_p)
 
         if ax_pdot is not None:
             if ax_grid in ax_pdot.get_shared_y_axes().get_siblings(ax_pdot):
+                if mark_bestppd:
+                    ax_pdot.axhline((best_pd-pdfold), c='lightsalmon')
                 x = pd_slice
                 y = pdots - pdfold
                 _laby = ""
                 _labx = r"Reduced $\chi^2$"
+                rangex = [0.0, max(pd_slice)]
+                rangey = pdrange
             else:
+                if mark_bestppd:
+                    ax_pdot.axvline((best_pd-pdfold), c='lightsalmon')
                 x = pdots - pdfold
                 y = pd_slice
                 _labx = laby
                 _laby = r"Reduced $\chi^2$"
-            self.plotxy(y, x=x, labx=_labx, laby=_laby, ax=ax_pdot)
+                rangex = pdrange
+                rangey = [0.0, max(pd_slice)]
+            self.plotxy(y, x=x, labx=_labx, laby=_laby, rangex=rangex, rangey=rangey, ax=ax_pdot)
 
         if show:
             plt.show()
             plt.close()
-            return None, None
+            return None, None, dm, best_p, best_pd, pdd
 
-        return dupe_axes_grid
+        return dupe_axes_grid, dm, best_p, best_pd, pdd
 
 
     def plot_intervals_corner(self, axs=None):
@@ -1593,8 +1731,8 @@ class pfd(object):
             # share axes if not already set up
             if axs[1,0] not in axs[0,0].get_shared_x_axes().get_siblings(axs[0,0]):
                 axs[0,0].sharex(axs[1,0])
-            if axs[1,0] not in axs[1,1].get_shared_y_axes().get_siblings(axs[1,1]):
-                axs[1,1].sharey(axs[1,0])
+#            if axs[1,0] not in axs[1,1].get_shared_y_axes().get_siblings(axs[1,1]):
+#                axs[1,1].sharey(axs[1,0])
 
         # delete some axis spines etc
         axs[0,1].set_axis_off()
@@ -1612,13 +1750,16 @@ class pfd(object):
         axs[0,0].xaxis.set_ticks_position('bottom')
         axs[0,0].set_xticks([1])
 
+        axs[0,0].set_title("2 Pulses of Best Profile")
+
         if show:
             plt.show()
             plt.close()
 
 
-    def prepfold_plot(self, dm=None, search=False, use_fold=False, new_nsub=None, lodm=None, hidm=None, ndm=None):
-
+    def prepfold_plot(self, dm=None, search=False, use_fold=False, new_nsub=None, lodm=None, hidm=None, ndm=None, reset_afterwards=True, doppler=True):
+        starting_values = [self.currdm, self.curr_p1, self.curr_p2, self.curr_p3]
+        #print("DEBUG: barysubfreqs==subfreqs?",(self.barysubfreqs==self.subfreqs).all())
         fig = plt.figure(figsize=(10.11,7.56), constrained_layout=False)
         #fig = plt.figure(figsize=(12,8))
         outer_grid = fig.add_gridspec(11, 3, width_ratios=[3,2,2], wspace=0.4)
@@ -1627,7 +1768,7 @@ class pfd(object):
         grid_text = outer_grid[:3,1:].subgridspec(1,1)
         ax_text = grid_text.subplots()
         grid_int = outer_grid[:,0].subgridspec(2,2, wspace=0, hspace=0, height_ratios=[3,8], width_ratios=[2,1])
-        axs_int = grid_int.subplots(sharex="col", sharey="row")
+        axs_int = grid_int.subplots(sharex="col")
         axs_int[0,1].spines['top'].set_visible(False)
         axs_int[0,1].spines['right'].set_visible(False)
         grid_subband_dmchi = outer_grid[3:,1].subgridspec(2,1,height_ratios=[5,3], hspace=0.3)
@@ -1639,14 +1780,21 @@ class pfd(object):
         grid_ppdotchi2d = grid_ppdotchi[1].subgridspec(1,1)
         axs_ppdotchi2d = grid_ppdotchi2d.subplots()
 
-        self.dedisperse(DM=dm)
-        # Need to do the ppdot grid first since it dedisperses and sets the p and pdot to their new values (if using)
+        # Need to do the ppdot grid first since it finds the "best" p and pd values
+        # and we want those applied for the other plots
+        # if search == False:
+        #    if use_fold == True:
+        #        best_p, best_pd are the fold values (arguments passed into prepfold)
+        #    else:
+        #        best_p, best_pd are the best values from the original prepfold search
         print("Plotting P-Pdot")
-        dupe_axs_ppdot = self.plot_ppdot_grid(dm=dm, search=search, use_fold=use_fold, axs=[axs_ppdotchi2d, axs_ppdotchi1d[1], axs_ppdotchi1d[0]])
-        print("Plotting intervals")
-        dupe_axs_intervals = self.plot_intervals_corner(axs=axs_int)
-        print("Plotting subbands")
-        dupe_axs_subband = self.plot_subbands_prepfold(ax=axs_subband_dmchi[0], new_nsub=new_nsub)
+        dupe_axs_ppdot, dm, best_p, best_pd, pdd = self.plot_ppdot_grid(dm=dm, search=search, use_fold=use_fold, axs=[axs_ppdotchi2d, axs_ppdotchi1d[1], axs_ppdotchi1d[0]], doppler=doppler)
+        # adjust the pfd to the values to be used for the other plots
+        self.adjust_period_more_efficient(p=best_p, pd=best_pd, pdd=pdd)
+
+        # DM-chi2 plot is next because I think it expects the profiles to be at DM0
+        assert self.currdm == 0
+        axs_subband_dmchi[1].axvline(dm, c='lightsalmon')
         print("Plotting DM")
         if lodm is None:
             lodm = self.dms.min()
@@ -1655,6 +1803,13 @@ class pfd(object):
         if ndm is None:
             ndm = len(self.dms)
         _ , _ = self.plot_chi2_vs_DM(lodm, hidm, ndm, ax=axs_subband_dmchi[1])
+
+        # Now we dedisperse before plotting the intervals and subbands
+        self.dedisperse(DM=dm, doppler=doppler)
+        print("Plotting intervals")
+        dupe_axs_intervals = self.plot_intervals_corner(axs=axs_int)
+        print("Plotting subbands")
+        dupe_axs_subband = self.plot_subbands_prepfold(ax=axs_subband_dmchi[0], new_nsub=new_nsub)
 
         # will need to set some tick marks and such
         # move P, P-dot vs chi plot labels to the right
@@ -1666,10 +1821,224 @@ class pfd(object):
         # Sometimes too many yticks and the labels run into each other
         # tried MaxNLocator but it gave weird results with just 1 tick
         for axx in [axs_ppdotchi2d, dupe_axs_ppdot[1]]:
-            if len(axx.yaxis.get_ticklabels()) > 4:
+            if (len(axx.yaxis.get_ticklabels()) - 2) > 4:  # added a -2 since it often trims the ends
                 resample_ticks(axx, 'y', factor=2, keep=0)
 
+        # The text box bit
+        ax_text.set_axis_off()
+
+        tepoch_str = r"$\rm{Epoch_{topo}}$ = "
+        if self.tepoch <= 0:
+            tepoch_str += "N/A"
+        else:
+            tepoch_str += f"{self.tepoch:.11f}"
+
+        tbary_str = r"$\rm{Epoch_{bary}}$ = "
+        if self.bepoch == 0:
+            tbary_str += "N/A"
+        else:
+            tbary_str += f"{self.bepoch:.11f}"
+
+        cand_text = [
+            f"Candidate: {self.candnm}",
+            f"Telescope: {self.telescope}",
+            tepoch_str,
+            tbary_str,
+            r"$\rm{T_{sample}}$",  # can't find an attribute which indicates whether an Events were used
+            f"Data Folded",  # can't find an attribute which indicates whether an Events were used
+            f"Data Avg", # beststats.data_avg
+            f"Data StdDev", # sqrt(beststats.data_var)
+            f"Profile Bins",
+            f"Profile Avg", # beststats.prof_avg
+            f"Profile StdDev", # sqrt(beststats.prof_var)
+        ]
+        cand_text2 = [
+            f" = {self.dt:.5g}",
+            f" = {int(self.Nfolded)}",
+            f" = {self.calc_avgdata():.4g}",
+            f" = {Num.sqrt(self.calc_vardata()):.4g}",
+            f" = {self.proflen:d}",
+            f" = {self.avgprof:.4g}",
+            f" = {Num.sqrt(self.varprof):.4g}",
+        ]
+        offset = 0.2
+        cand_text_x = -0.36
+        linespacing=1.1
+        ax_text.text(cand_text_x, 0.01, "\n".join(cand_text), transform=ax_text.transAxes, fontsize='smaller', linespacing=linespacing)
+        ax_text.text(cand_text_x+offset, 0.01, "\n".join(cand_text2), transform=ax_text.transAxes, fontsize='smaller', linespacing=linespacing)
+
+        # set orbital parameter strings
+        Porb_str = r"$\rm{P_{orb}}$" + " (s) = "
+        asini_str = r"$\rm{a_1 sin(i)/c}$ = "
+        Tperi_str = r"$\rm{T_{peri}}$ = "
+        ecc_str = r"$\rm{e}$ = "
+        omega_str = r"$\omega$" + " (rad) = "
+        if self.orb_p == 0:
+            Porb_str += "N/A"
+            asini_str += "N/A"
+            Tperi_str += "N/A"
+            ecc_str += "N/A"
+            omega_str += "N/A"
+        else:
+            Porb_str += f"{self.orb_p}"
+            asini_str += f"{self.orb_x}"
+            Tperi_str += f"{self.orb_t}"
+            ecc_str += f"{self.orb_e}"
+            omega_str += f"{self.orb_w}"
+
+        search_text_lhs = [
+            r"$\rm{RA_{J2000}}$" + f" = {self.rastr.decode('utf-8')}",
+            "           Folding Parameters",
+            r"$\rm{DOF_{eff}}$" + f" = {self.DOFcor:.2f}" + r"  $\chi^2_{\rm{red}}$" + f" = {self.calc_redchi2():.3f}",
+            r"Dispersion Meansure (DM; $\rm{pc/cm^3}$)" + f" = {self.currdm}",
+            r"$\rm{P_{x}}$" + f" (ms) = {self.curr_p1*1000}",  # I have no idea if these are bary or topo! It maybe depends. I think topo in my file but not sure if that's always true
+            r"$\rm{P'_{x}}$" + f" (s/s) = {self.curr_p2}",
+            r"$\rm{P''_{x} (s/s^2)}$" + f" = {self.curr_p3}",
+            "           Binary Parameters",
+            Porb_str,
+            asini_str,
+            Tperi_str,
+        ]
+
+        # this won't work if did the actual presto thing
+        logp = scipychi2.logsf(self.calc_redchi2() * self.DOFcor, self.DOFcor)
+
+        search_text_rhs = [
+            r"$\rm{DEC_{J2000}}$" + f" = {self.decstr.decode('utf-8')}",
+            "",
+            f"P(Noise) < {Num.exp(logp):.2g}  ({self.calc_sigma():.1f})" + r"$\sigma$)",
+            "",
+            r"$\rm{ }$",
+            r"$\rm{P_{bary}}$",
+            r"$\rm{P'_{bary}}$",
+            r"$\rm{P''_{bary}}$",
+            "",
+            ecc_str,
+            omega_str,
+            r"$\rm{ }$"
+        ]
+
+        offset = 0.6
+        fold_text_x = 0.1
+        linespacing=0.9
+        ax_text.text(fold_text_x, 0.01, "\n".join(search_text_lhs), transform=ax_text.transAxes, fontsize='smaller', linespacing=linespacing)
+        ax_text.text(fold_text_x+offset, 0.01, "\n".join(search_text_rhs), transform=ax_text.transAxes, fontsize='smaller', linespacing=linespacing)
+
+        if reset_afterwards:
+            #print(f"Resetting dm, p, pd, pdd to their starting values: {starting_values}")
+            self.dedisperse(starting_values[0], doppler=doppler)
+            if starting_values[0] == 0:
+                del self.subdelays
+            self.adjust_period_more_efficient(p=starting_values[1], pd=starting_values[2], pdd=starting_values[3])
+
         return fig
+
+# added this so I could store it in the pfd and didn't have to recompute it every time
+class RedChi2s:
+    def __init__(self, redchi2s, periods, pdots, pdd, dm, doppler,  best_p=None, best_pd=None):
+        self.redchi2s = redchi2s
+        self.periods = periods
+        self.pdots = pdots
+        self.pdd = pdd
+        self.dm = dm
+        self.doppler = doppler
+        # these are derived quantities but this is simpler
+        self.best_p = best_p
+        self.best_pd = best_pd
+        best_index = Num.unravel_index(Num.argmax(redchi2s), redchi2s.shape)
+        if self.best_p is None:
+            self.best_p = periods[best_index[1]]
+        if self.best_pd is None:
+            self.best_pd = pdots[best_index[0]]
+
+    def __eq__(self, other): 
+        if not isinstance(other, RedChi2s):
+            # don't attempt to compare against unrelated types
+            return NotImplemented
+
+        condition = (
+            (self.redchi2s == other.redchi2s).all() 
+            and (self.periods == other.periods).all()
+            and (self.pdots == other.pdots).all()
+            and self.pdd == other.pdd
+            and self.dm == other.dm
+            and self.doppler == other.doppler
+        )
+
+        return condition
+
+    def same_input_pars(self, periods, pdots, pdd, dm, doppler):
+        condition = (
+            (self.periods == periods).all()
+            and (self.pdots == pdots).all()
+            and self.pdd == pdd
+            and self.dm == dm
+            and self.doppler == doppler
+        )
+
+        return condition
+
+
+
+@jit(nopython=True)
+def p_to_f(p, pd, pdd=None):
+    """
+    p_to_f(p, pd, pdd=None):
+       Convert period, period derivative and period second
+       derivative to the equivalent frequency counterparts.
+       Will also convert from f to p.
+    """
+    f = 1.0 / p
+    fd = -pd / (p * p)
+    if pdd is None:
+        return [f, fd]
+    else:
+        if pdd == 0.0:
+            fdd = 0.0
+        else:
+            fdd = 2.0 * pd * pd / (p**3.0) - pdd / (p * p)
+        return [f, fd, fdd]
+
+@jit(nopython=True)
+def delay_from_foffsets(df, dfd, dfdd, times):
+    """
+    Return the delays in phase caused by offsets in
+    frequency (df), and two frequency derivatives (dfd, dfdd)
+    at the given times in seconds.
+    """
+    f_delays = df * times
+    fd_delays = dfd * times**2 / 2.0
+    fdd_delays = dfdd * times**3 / 6.0
+    return f_delays + fd_delays + fdd_delays
+
+@jit(nopython=True)
+def calc_many_redchis(pp, pdpd, pdd, parttimes, fold_ps, tmp_profs, proflen, npart, pdelays_bins, avgprof, varprof, DOFcor):
+    redchi2s = Num.zeros(pp.shape)
+
+    foldf, foldfd, foldfdd = fold_ps
+    foldp, foldpd, foldpdd = p_to_f(*fold_ps)
+
+    for idx, p in Num.ndenumerate(pp):
+        pd = pdpd[idx]
+        new_profs = Num.zeros_like(tmp_profs)
+        fdd = p_to_f(foldp, foldpd, pdd)[2]
+        fd = p_to_f(foldp, pd)[1]
+        f = 1.0/p
+        f_diff = f - foldf
+        fd_diff = fd - foldfd
+        fdd_diff = fdd - foldfdd
+        delays = delay_from_foffsets(f_diff, fd_diff, fdd_diff, parttimes)
+        # Convert from delays in phase to delays in bins
+        bin_delays = Num.fmod(delays * proflen, proflen) - pdelays_bins
+        new_pdelays_bins = Num.floor(bin_delays+0.5)
+        new_pdelays_bins = Num.array([int(x) % proflen for x in new_pdelays_bins])
+
+        for jj in range(npart):
+            new_profs[jj,:] = Num.roll(tmp_profs[jj,:], new_pdelays_bins[jj])
+        sumprof = new_profs.sum(0)
+        redchi2s[idx] = ((sumprof - avgprof)**2.0/varprof).sum() / DOFcor
+
+    return redchi2s
 
 def resample_ticks(ax, xory, factor=2, keep=0):
     """
