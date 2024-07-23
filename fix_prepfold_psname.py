@@ -9,7 +9,7 @@ def rename_ps(dirname, verbose=True):
     pfds = sorted(glob.glob(os.path.join(dirname, "*.pfd")))
     allfnames = sorted(glob.glob(os.path.join(dirname, "*")))
     pss_existing = sorted(glob.glob(os.path.join(dirname, "*.ps")))
-    pss_expect = [f"{pfd[:-3]}.ps" for pfd in pfds]
+    pss_expect = [f"{pfd}.ps" for pfd in pfds]
     weird_files = [f for f in allfnames if (f[-4:] != ".pfd" and f[-9:] != ".bestprof" and f[-3:] != ".ps")]
 
     rename = {}
@@ -20,6 +20,8 @@ def rename_ps(dirname, verbose=True):
 
         found = False
         for j, weird in reversed(list(enumerate(weird_files))):
+            print("j:", j)
+            print(j, weird, pss_expect[i])
             if weird in pss_expect[i]:
                 if found:
                     raise RuntimeError(f"Duplicate match {pfd} : {weird}, existing match: {rename[pfd]})")
