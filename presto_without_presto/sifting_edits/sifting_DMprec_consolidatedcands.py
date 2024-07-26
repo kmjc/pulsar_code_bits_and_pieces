@@ -153,7 +153,7 @@ def parse_power(pow):
 
 
 class Candidate(object):
-    def __init__(self, candnum, sigma, numharm, ipow, cpow, bin, z, DMstr, filename, T):
+    def __init__(self, candnum, sigma, numharm, ipow, cpow, bin, z, DMstr, filename, T, accelsearch_sigma=0):
         self.path, self.filename = os.path.split(filename)
         self.candnum = candnum
         self.sigma = sigma
@@ -172,6 +172,8 @@ class Candidate(object):
         self.snr = 0.0
         self.hits = []
         self.note = ""
+        if accelsearch_sigma:
+            self.accelsearch_sigma = accelsearch_sigma
 
     def add_as_hit(self, other):
         self.hits.extend(other.hits)
@@ -214,6 +216,8 @@ class Candidate(object):
             hits=self.hits,
             note=self.note,
         )
+        if hasattr(self, "accelsearch_sigma"):
+            ret_dict["accelsearch_sigma"] = self.accelsearch_sigma
         return ret_dict
 
 
@@ -238,6 +242,8 @@ class Candidate(object):
         cand_out.snr = in_dict["snr"]
         cand_out.hits = in_dict["hits"]
         cand_out.note = in_dict["note"]
+        if "accelsearch_sigma" in in_dict.keys():
+            cand_out.accelsearch_sigma = in_dict["accelsearch_sigma"]
         return cand_out
 
 class Candlist(object):
@@ -1617,6 +1623,7 @@ def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
                     DMstr,
                     filename,
                     tobs,
+                    accelsearch_sigma=sigma,
                 )
             )
             candnums.append(candnum)
@@ -1730,6 +1737,7 @@ def candlist_from_candfile_chunk(filename, chunk, trackbad=False, trackdupes=Fal
                     DMstr,
                     filename,
                     tobs,
+                    accelsearch_sigma=sigma,
                 )
             )
             candnums.append(candnum)
