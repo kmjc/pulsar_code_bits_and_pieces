@@ -1573,7 +1573,7 @@ parser.add_argument(
 parser.add_argument(
     "--problem_frac",
     type=float,
-    default=0.7,
+    default=0.6,
     help="If masking fraction goes above this threshold then there is a problem, skip whatever step did this"
 )
 
