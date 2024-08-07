@@ -1455,6 +1455,31 @@ class pfd(object):
             plt.close()
         return self.DS
 
+    def compute_periods_pdots(self, pstep, pdstep, npfact):
+        """Compute periods and pdots to search over for a given pstep, pdstep, npfact"""
+        # weirdly this is not the same as self.dt*self.Nfolded
+        # this is the T prepfold uses to calculate the periods etc
+        tot_time = self.start_secs[-1] + self.start_secs[1] - self.start_secs[0]
+
+        numtrials = 2 * self.proflen * npfact + 1
+        foldf, foldfd = self.fold_p1, self.fold_p2
+        periods = Num.zeros((numtrials))
+        pdots = Num.zeros((numtrials))
+        fdots = Num.zeros((numtrials))
+        fdotdots = Num.zeros((numtrials))
+
+        for ii in range(numtrials):
+            totpdelay = ii - (numtrials - 1) / 2
+            dtmp = (totpdelay * pstep) / self.proflen
+            periods[ii] = 1.0 / (foldf + dtmp / tot_time)
+            dtmp = (totpdelay * pdstep) / self.proflen
+            fdots[ii] = phasedelay2fdot(dtmp, tot_time)
+            pdots[ii] = psr_utils.p_to_f(foldf, foldfd + fdots[ii])[1]
+            fdotdots[ii] = phasedelay2fdotdot(dtmp, tot_time)
+
+        return periods, pdots
+
+
     def ppdot_grid(self, dm=None, periods=None, pdots=None, search=False, pdd=None, doppler=False):
         """
         ppdot_grid(self, dm=None, periods=None, pdots=None, search=False, pdd=None):
@@ -1597,10 +1622,7 @@ class pfd(object):
             where dupe_axes_grid is a list of duplicate axes used for plotting
             [dupe_asis_x, dupe_axis_y]
             (if passed in axs=None, these will both be None)
-
         """
-        starting_values = [self.currdm, self.curr_p1, self.curr_p2, self.curr_p3]
-
         show = False
         if axs is None:
             show = True
@@ -1978,7 +2000,19 @@ class RedChi2s:
 
         return condition
 
+def phasedelay2fdot(phasedelay, time):
+    """Translated from prepfold.c"""
+    if (time == 0.0):
+        return 0.0
+    else:
+        return 2.0 * phasedelay / (time * time)
 
+def phasedelay2fdotdot(phasedelay, time):
+    """Translated from prepfold.c"""
+    if (time == 0.0):
+        return 0.0
+    else:
+        return 6.0 * phasedelay / (time * time * time)
 
 @jit(nopython=True)
 def p_to_f(p, pd, pdd=None):
@@ -2014,7 +2048,6 @@ def delay_from_foffsets(df, dfd, dfdd, times):
 @jit(nopython=True)
 def calc_many_redchis(pp, pdpd, pdd, parttimes, fold_ps, tmp_profs, proflen, npart, pdelays_bins, avgprof, varprof, DOFcor):
     redchi2s = Num.zeros(pp.shape)
-
     foldf, foldfd, foldfdd = fold_ps
     foldp, foldpd, foldpdd = p_to_f(*fold_ps)
 
