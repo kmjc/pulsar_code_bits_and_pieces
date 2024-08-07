@@ -48,10 +48,11 @@ accelname_re = re.compile("([a-zA-Z0-9_.+-]+_ACCEL_[0-9]+)")
 fund_re = re.compile("^\d")
 harms_re = re.compile("^[ ]\d")
 # NB this only works if there's only one DMx.xx in your filename
-DM_re = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
+#DM_re = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
+DM_re = re.compile(f"DM(\d+\.\d+)")
 # AH! OK have to call this to refresh it because this gets set during the initial import when dmprec=2
 def refresh_DM_re():
-    DM_re_refreshed = re.compile(f"DM(\d+\.\d{{{dmprec}}})")
+    DM_re_refreshed = re.compile(f"DM(\d+\.\d+)")  #re.compile(f"DM(\d+\.\d{{{dmprec}}})")
     return DM_re_refreshed
 
 
@@ -1570,7 +1571,7 @@ class Candlist(object):
         return candlist_out
 
 
-def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
+def candlist_from_candfile(filename, trackbad=False, trackdupes=False, accelsearch_sig_thresh=2.0):
     candfile = open(filename, "r")
     # First identify the length of the observation searched
     for line in candfile:
@@ -1589,6 +1590,8 @@ def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
     last_candnum = 0
     last_goodcandnum = 0
 
+    cands_below_sig_thresh = []
+
     for line in candfile:
         # Identify the candidates in the top of the file
         if fund_re.match(line):
@@ -1604,6 +1607,9 @@ def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
             z = float(split_line[9].split("(")[0])
             f = bin / tobs  # Spin freq in hz
             p = 1.0 / f  # Spin period in sec
+
+            if sigma < accelsearch_sig_thresh:
+                cands_below_sig_thresh.append(candnum)
 
             # Add it to the candidates list
             DMstr = DM_re.search(filename).groups()[0]
@@ -1682,9 +1688,11 @@ def candlist_from_candfile(filename, trackbad=False, trackdupes=False):
                 last_goodcandnum = candnum
                 current_goodcandnum = 0
     candfile.close()
-    return Candlist(cands, trackbad=trackbad, trackdupes=trackdupes)
 
-def candlist_from_candfile_chunk(filename, chunk, trackbad=False, trackdupes=False):
+    adjusted_cands = [cand for cand in cands if cand.candnum not in cands_below_sig_thresh]
+    return Candlist(adjusted_cands, trackbad=trackbad, trackdupes=trackdupes)
+
+def candlist_from_candfile_chunk(filename, chunk, trackbad=False, trackdupes=False, accelsearch_sig_thresh=2.0):
     """For when multiple *_ACCEL_<zmax> files have been combined into one.
     This reads a single chunk which used to form a single ACCEL file"""
     # First identify the length of the observation searched
@@ -1702,6 +1710,8 @@ def candlist_from_candfile_chunk(filename, chunk, trackbad=False, trackdupes=Fal
     last_candnum = 0
     last_goodcandnum = 0
 
+    cands_below_sig_thresh = []
+
     for line in chunk:
         # Identify the candidates in the top of the file
         if fund_re.match(line):
@@ -1717,6 +1727,9 @@ def candlist_from_candfile_chunk(filename, chunk, trackbad=False, trackdupes=Fal
             z = float(split_line[9].split("(")[0])
             f = bin / tobs  # Spin freq in hz
             p = 1.0 / f  # Spin period in sec
+
+            if sigma < accelsearch_sig_thresh:
+                cands_below_sig_thresh.append(candnum)
 
             # Add it to the candidates list
             DMstr = DM_re.search(filename).groups()[0]
@@ -1794,9 +1807,11 @@ def candlist_from_candfile_chunk(filename, chunk, trackbad=False, trackdupes=Fal
                 cand.ipow_det = opt_ipow
                 last_goodcandnum = candnum
                 current_goodcandnum = 0
-    return Candlist(cands, trackbad=trackbad, trackdupes=trackdupes)
 
-def read_candidates_amalgamated(filenms, prelim_reject=True, track=False):
+    adjusted_cands = [cand for cand in cands if cand.candnum not in cands_below_sig_thresh]
+    return Candlist(adjusted_cands, trackbad=trackbad, trackdupes=trackdupes)
+
+def read_candidates_amalgamated(filenms, prelim_reject=True, track=False, accelsearch_sig_thresh=2.0):
     """read_candidates, but for when many ACCEL files have been combined
     Each ACCEL file section should start with
     ### <ACCEL_filename>
@@ -1820,7 +1835,8 @@ def read_candidates_amalgamated(filenms, prelim_reject=True, track=False):
                             accelname,
                             chunk,
                             trackbad=track,
-                            trackdupes=track
+                            trackdupes=track,
+                            accelsearch_sig_thresh=accelsearch_sig_thresh,
                             )
                         if prelim_reject:
                             curr_candlist.default_rejection()
@@ -1839,7 +1855,7 @@ def read_candidates_amalgamated(filenms, prelim_reject=True, track=False):
         print("Error:  There are no candidate files to read!")
     return candlist
 
-def read_candidates(filenms, prelim_reject=True, track=False):
+def read_candidates(filenms, prelim_reject=True, track=False, accelsearch_sig_thresh=2.0):
     """Read in accelsearch candidates from the test ACCEL files.
     Return a Candlist object of Candidate instances.
 
@@ -1857,7 +1873,7 @@ def read_candidates(filenms, prelim_reject=True, track=False):
         print("\nReading candidates from %d files...." % len(filenms))
         for ii, filenm in enumerate(filenms):
             curr_candlist = candlist_from_candfile(
-                filenm, trackbad=track, trackdupes=track
+                filenm, trackbad=track, trackdupes=track, accelsearch_sig_thresh=accelsearch_sig_thresh
             )
             if prelim_reject:
                 curr_candlist.default_rejection()

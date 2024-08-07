@@ -1033,13 +1033,15 @@ if __name__ == "__main__":
     )
     logging.info(f"shifted and stacked first gulp")
     logging.info(f"array sizes: {sys.getsizeof(prev_array)/1000000}, {sys.getsizeof(mid_array)/1000000}, {sys.getsizeof(end_array)/1000000} MB")
-    outf.write(mid_array.ravel().astype(arr_outdtype))
+    assert mid_array.dtype == arr_outdtype
+    outf.write(mid_array.ravel())
     #outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
     current_gulp += 1
 
     # reset for next loop
     prev_array = end_array
     del intensities  # otheriwse both are in memory for a bit and get a spike
+    del mid_array
     intensities = (
         np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
         .reshape(-1, nchans)
@@ -1086,8 +1088,11 @@ if __name__ == "__main__":
             prev_array, mid_array, end_array = shift_and_stack(
                 intensities, shifts, prev_array, maxDT
             )
-            outf.write(prev_array.ravel().astype(arr_outdtype))
-            outf.write(mid_array.ravel().astype(arr_outdtype))
+            assert prev_array.dtype == arr_outdtype
+            assert mid_array.dtype == arr_outdtype
+            assert end_array.dtype == arr_outdtype
+            outf.write(prev_array.ravel())
+            outf.write(mid_array.ravel())
             #outfdm0.write(prev_array.sum(axis=-1).astype(arr_outdtype))
             #outfdm0.write(mid_array.sum(axis=-1).astype(arr_outdtype))
             # tt2 = time.perf_counter()
@@ -1099,6 +1104,7 @@ if __name__ == "__main__":
             # reset for next loop
             prev_array = end_array
             del intensities
+            del mid_array
             intensities = (
                 np.fromfile(filfile, count=gulp * nchans, dtype=arr_dtype)
                 .reshape(-1, nchans)
