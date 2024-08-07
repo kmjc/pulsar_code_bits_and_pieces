@@ -890,6 +890,10 @@ def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exsta
         logging.warning(f"{stage}: completely zaps {zap_int_frac} of the intervals, this probably indicates a problem, plotting summary and exiting")
         logging.info(f"{stage}: working msk unchanged")
         make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
+        if pdf is not None:
+            logging.info("Writing pdf")
+            pdf.close()
+        logging.info("Done")
         sys.exit(1)
         return old_mask, old_mask_exstats
     else:
