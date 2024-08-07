@@ -65,11 +65,11 @@ def tscrunch(arr, fac):
         excess = arr[-remainder:,:]
         return_nint = arr.shape[0] // fac + 1
         mout = np.zeros((return_nint, arr.shape[1]), dtype=arr.dtype)
-        mout[:-1,:] = tmp.reshape(-1, fac, tmp.shape[-1]).sum(1)
-        mout[-1,:] = excess.sum(0)
+        mout[:-1,:] = np.add.reduce(tmp.reshape(-1, fac, tmp.shape[-1]), 1)
+        mout[-1,:] = np.add.reduce(excess, 0)
         return mout
     else:
-        return arr.reshape(-1,fac,arr.shape[-1]).sum(1)
+        return np.add.reduce(arr.reshape(-1,fac,arr.shape[-1]), 1)
     
 def tscrunch1d(arr, fac):
     """Scrunch (by summing) a (nspec) array in time by <fac>
@@ -81,11 +81,11 @@ def tscrunch1d(arr, fac):
         excess = arr[-remainder:]
         return_nint = arr.shape[0] // fac + 1
         mout = np.zeros((return_nint), dtype=arr.dtype)
-        mout[:-1] = tmp.reshape(-1, fac).sum(1)
-        mout[-1] = excess.sum(0)
+        mout[:-1] = np.add.reduce(tmp.reshape(-1, fac), 1)
+        mout[-1] = np.add.reduce(excess, 0)
         return mout
     else:
-        return arr.reshape(-1,fac).sum(1)
+        return np.add.reduce(arr.reshape(-1,fac), 1)
 
 
 
@@ -146,7 +146,7 @@ parser.add_argument(
     "--downsamp",
     type=int,
     nargs="*",
-    help="Downsampling factor/s to apply (multiple factors should be separated by spaces)",
+    help="Downsampling factor/s to apply. Multiple factors should be separated by spaces. (NB this sums the time samples together)",
 )
 
 parser.add_argument(
@@ -344,7 +344,9 @@ for i in range(loop_iters):
     new_fil.write(spec.ravel().astype(arr_dtype))
     if additional_fils:
         for ii, d in enumerate(args.downsamp):
-            additional_fils[ii].write(spec[::d, :].ravel().astype(arr_dtype))
+            scrunched_arr =  tscrunch(spec, d)
+            additional_fils[ii].write(scrunched_arr.ravel().astype(arr_dtype))
+            del scrunched_arr
 
     # calc stats
     if args.stats:

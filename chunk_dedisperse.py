@@ -139,7 +139,11 @@ class Mask:
             if c in self.mask_zap_chans:
                 self.first_unmasked_avg[c] = 0
             else:
-                self.first_unmasked_avg[c] = rfimask.avg_stats[:,c][~self.mask[:,c]][0]
+                rfimask_c = c
+                if invertband:
+                    # Things under rfimask itself are unflipped
+                    rfimask_c = self.nchan - 1 - c
+                self.first_unmasked_avg[c] = rfimask.avg_stats[:,rfimask_c][~self.mask[:,c]][0]
                 logging.debug(f"first unmasked avg {c} : at int {np.arange(self.nint)[~self.mask[:,c]][0]}: {self.first_unmasked_avg[c]}")
 
 
