@@ -883,12 +883,12 @@ def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exsta
     zap_int_frac = len(get_ignoreints_from_mask(old_mask | add_mask)) / old_mask.shape[0]
     if  zap_frac >= threshold:
         logging.warning(f"{stage}: zaps {zap_frac} of data, which is over the problem threshold, plotting summary and skipping")
-        logging.info(f"{stage}: working maask unchanged")
+        logging.info(f"{stage}: working mask unchanged")
         make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
         return old_mask, old_mask_exstats
     elif zap_int_frac >= 0.3:  # could prob put this lower
         logging.warning(f"{stage}: completely zaps {zap_int_frac} of the intervals, this probably indicates a problem, plotting summary and exiting")
-        logging.info(f"{stage}: working maask unchanged")
+        logging.info(f"{stage}: working msk unchanged")
         make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
         sys.exit(1)
         return old_mask, old_mask_exstats
