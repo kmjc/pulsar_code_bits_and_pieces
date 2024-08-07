@@ -25,6 +25,8 @@ import logging
 
 from scipy.signal import find_peaks
 from itertools import groupby
+from more_itertools import consecutive_groups
+from math import ceil
 from operator import itemgetter
 
 # catch uncaught exceptions and put them in log too
@@ -865,7 +867,8 @@ def plot_mask_comparison(maska, maskb, title="", ax=None, returnplt=False, color
 
 
 
-def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exstats, threshold, rfimask, means, var, pdf, stage=None, always_plot_summary=False, noupdate=False):
+
+def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exstats, threshold, rfimask, means, var, pdf, stage=None, always_plot_summary=False, noupdate=False, time_lim_zapped_intervals_s=60):
     """
     Check if adding add_mask to old_mask means the masking fraction goes above the <threshold> 
     If it does:
@@ -878,15 +881,31 @@ def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exsta
 
     if always_plot_summary then alway plot things even in masked fraction is over the threshold
     
+    time_lim_zapped_intervals_s: Default 60. If a consecutive chunk of intervals is zapped > this many seconds in length, then there is probably a problem. Exit
     """
     zap_frac = masked_frac(old_mask | add_mask)
-    zap_int_frac = len(get_ignoreints_from_mask(old_mask | add_mask)) / old_mask.shape[0]
+    zapped_ints = get_ignoreints_from_mask(old_mask | add_mask)
+    zap_int_frac = len(zapped_ints) / old_mask.shape[0]
+
+    # check for large chunks of zapped intervals
+    interval_chunk_lengths = np.array([len(list(group)) for group in consecutive_groups(zapped_ints)])
+    interval_chunk_length_limit = ceil(time_lim_zapped_intervals_s / rfimask.dtint)
+    if (interval_chunk_lengths > interval_chunk_length_limit).any():
+        logging.warning(f"{stage}: zaps a section of {max(interval_chunk_lengths)} intervals (={max(interval_chunk_lengths)*rfimask.dtint} s). This probably indicates a problem, plotting summary and exiting")
+        make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
+        if pdf is not None:
+            logging.info("Writing pdf")
+            pdf.close()
+        logging.info("Done")
+        sys.exit(1)
+
+    # check for large masking fractions
     if  zap_frac >= threshold:
         logging.warning(f"{stage}: zaps {zap_frac} of data, which is over the problem threshold, plotting summary and skipping")
         logging.info(f"{stage}: working mask unchanged")
         make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
         return old_mask, old_mask_exstats
-    elif zap_int_frac >= 0.3:  # could prob put this lower
+    elif zap_int_frac >= 0.3:  # Hopefully this is now obselete, leave in just in case
         logging.warning(f"{stage}: completely zaps {zap_int_frac} of the intervals, this probably indicates a problem, plotting summary and exiting")
         logging.info(f"{stage}: working msk unchanged")
         make_summary_plots(add_mask, add_mask_exstats, rfimask, means, var, pdf, title_insert=f"ERROR stage {stage}")
@@ -895,7 +914,6 @@ def check_mask_and_continue(old_mask, old_mask_exstats, add_mask, add_mask_exsta
             pdf.close()
         logging.info("Done")
         sys.exit(1)
-        return old_mask, old_mask_exstats
     else:
         logging.info(f"{stage}: zaps {zap_frac} of data (change = {zap_frac - masked_frac(old_mask)})")
         if always_plot_summary:
