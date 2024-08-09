@@ -14,8 +14,12 @@ def downsample_fil(fname, downsamps, gulp, sum_arr=False):
     arr_dtype = get_dtype(header["nbits"])
 
     if header['nbits'] < 32 and sum_arr:
-        print(f"Note, as tscrunching and native dtype of the filterbank is {arr_dtype}, it will be converted and written as np.float32")
-        out_dtype = np.float32
+        if header['nbits'] == 8:
+            print(f"Note, as tscrunching and native dtype of the filterbank is {arr_dtype}, it will be converted and written as np.uint16")
+            out_dtype = np.uint16
+        else:
+            print(f"Note, as tscrunching and native dtype of the filterbank is {arr_dtype}, it will be converted and written as np.float32")
+            out_dtype = np.float32
     else:
         out_dtype = arr_dtype
 
@@ -75,7 +79,7 @@ def downsample_fil(fname, downsamps, gulp, sum_arr=False):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Downsample a file (using sigpyproc3)")
+    parser = argparse.ArgumentParser(description="Downsample a file")
 
     parser.add_argument("filename", type=str, help="Sigproc filterbank file")
     parser.add_argument(
@@ -94,7 +98,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--tscrunch",
         action='store_true',
-        help="If true then sum <downsamp> elements together. Otherwise only use every <downsamp> element"
+        help="If true then sum <downsamp> elements together. Otherwise only use every <downsamp> element. Data is converted to float32 to do the sum. If native dytpe was uint8 it'll be written as uint16 to avoid overflows, else float32"
     )
 
     args = parser.parse_args()
