@@ -292,6 +292,7 @@ if  __name__ == "__main__":
             additional_fils.append(open(add_fn, "wb"))
             add_header = copy.deepcopy(header)
             add_header["tsamp"] = header["tsamp"] * d
+            add_header["nbits"] = get_nbits(tscrunch_dtype)
             if header.get("nsamples", ""):
                 add_header["nsamples"] = int(header["nsamples"] // d)
             write_header(add_header, additional_fils[i])
