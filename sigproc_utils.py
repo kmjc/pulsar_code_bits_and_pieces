@@ -46,6 +46,12 @@ def get_nbits(dtype):
         raise RuntimeError(f"dtype={dtype} not supported")
 
 
+def try_remove(item, alist):
+    try:
+        alist.remove(item)
+    except ValueError:
+        pass
+
 # OK so if it's a filterbank it SHOULD have HEADER_START and HEADER_END
 # I think I was testing it on one that wasn't properly written, so I had to
 # add them in
@@ -90,3 +96,9 @@ def get_fmin_fmax_invert(header):
         invert = False
 
     return fmin, fmax, invert
+
+def get_lowest_freq_channel(header):
+    """Calculate central freq of lowest freq channel"""
+    fmin, fmax, invert = get_fmin_fmax_invert(header)
+    flo = fmin + abs(header["foff"])/2
+    return flo
