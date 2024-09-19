@@ -20,6 +20,11 @@
 # is detectable via this method
 # to overcome this also mask +-<fdp_tscrunch> time samples either side of masked range
 
+# realized with uint8 I'm probably hitting overflow errors with the tscrunching
+# already factored that into the stats stuff
+# and np.add.reduce changes the dtype if there isn't sufficient precision
+# But my write for the tscrunched fils was definitely overflowing
+
 # add logging
 # add handle_exception
 
@@ -228,6 +233,15 @@ if  __name__ == "__main__":
     nchans = header["nchans"]
     arr_dtype = get_dtype(header["nbits"])
 
+    # make tscrunch_dtype if need it
+    if header["nbits"] == 8:
+        tscrunch_dtype =  np.uint16
+    elif header["nbits"] == 16:
+        tscrunch_dtype = np.float32  # ths one probably isn't necessary, but maybe?
+    else:
+        tscrunch_dtype = arr_dtype
+
+
     if header["nifs"] != 1:
         raise AttributeError(f"Code not written to deal with unsummed polarization data")
 
@@ -278,6 +292,7 @@ if  __name__ == "__main__":
             additional_fils.append(open(add_fn, "wb"))
             add_header = copy.deepcopy(header)
             add_header["tsamp"] = header["tsamp"] * d
+            add_header["nbits"] = get_nbits(tscrunch_dtype)
             if header.get("nsamples", ""):
                 add_header["nsamples"] = int(header["nsamples"] // d)
             write_header(add_header, additional_fils[i])
@@ -345,7 +360,7 @@ if  __name__ == "__main__":
         if additional_fils:
             for ii, d in enumerate(args.downsamp):
                 scrunched_arr =  tscrunch(spec, d)
-                additional_fils[ii].write(scrunched_arr.ravel().astype(arr_dtype))
+                additional_fils[ii].write(scrunched_arr.ravel().astype(tscrunch_dtype))
                 del scrunched_arr
 
         # calc stats
