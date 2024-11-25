@@ -6,7 +6,6 @@ import matplotlib
 matplotlib.use('pdf')
 
 from matplotlib import pyplot as plt
-from matplotlib import colors
 import copy
 from collections.abc import Iterable
 
@@ -29,12 +28,23 @@ from more_itertools import consecutive_groups
 from math import ceil
 from operator import itemgetter
 
+import matplotlib.colors as mc
+import colorsys
+
 # catch uncaught exceptions and put them in log too
 sys.excepthook = handle_exception
 
 # ## Define functions
 
 # ### General utils
+
+def darken_colour(color, amount=0.5):
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    return colorsys.hls_to_rgb(c[0], max(0, min(1, amount * c[1])), c[2])
 
 def output_plot(fig, pdf=None):
     if pdf is None:
@@ -204,7 +214,7 @@ def reshape_rfifind_mask(extra_stats_shape, msk, fdp_gulp, ptsperint):
 
 
 # ## Zapping functions
-def get_zeros_mask_alt(var_stats, ignorechans=[], verbose=False, plot_diagnostics=True, ax=None):
+def get_zeros_mask_alt(var_stats, ignorechans=[], verbose=False, plot_diagnostics=True, ax=None, imshow=True):
     """
     Get a mask where the var_stats = 0
     (changed from std_stats as that seems to always be 0 for the final interval (always always or just with my data? tbd))
@@ -214,7 +224,7 @@ def get_zeros_mask_alt(var_stats, ignorechans=[], verbose=False, plot_diagnostic
 
     verbose and plot_diagnostics both concern where std==0 in the data in places not covered by ignorechans
     """
-    tmp = (var_stats == 0)
+    tmp = (var_stats == 0) | np.isnan(var_stats)
 
     working_mask = np.zeros_like(tmp, dtype=bool)
     if ignorechans:
@@ -222,10 +232,13 @@ def get_zeros_mask_alt(var_stats, ignorechans=[], verbose=False, plot_diagnostic
     if plot_diagnostics:
         if ax is None:
             fig, ax = plt.subplots()
-        ax.imshow(np.ma.array(tmp, mask=working_mask).T, aspect='auto', origin='lower')
+        if imshow:
+            ax.imshow(np.ma.array(tmp, mask=working_mask).T, aspect='auto', origin='lower')
+        else:
+            ax.pcolormesh(np.ma.array(tmp, mask=working_mask).T)
         ax.set_xlabel("int")
         ax.set_ylabel("chan")
-        ax.set_title("Plot of where var_stats==0, masked by the ignorechans")
+        ax.set_title("Plot of where var_stats==0 or NaN, masked by the ignorechans")
 
     # add ignorechans to mask
     for ii in ignorechans:
@@ -417,7 +430,7 @@ def rescale(a, b):
 
 # ID channels with sharp steps in them
 # based off https://stackoverflow.com/questions/48000663/step-detection-in-one-dimensional-data
-def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_plots=False, output_pdf=None):
+def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_plots=False, output_pdf=None, imshow=True):
     """stat of shape (nint, nchan) (numpy masked array)
     for each channel in stat, look for steps (via subtracting the mean and then taking the negative of np.cumsum)
     If the max of that is > thresh it gets zapped
@@ -447,7 +460,10 @@ def get_step_chans(stat, thresh=30, ignorechans=[], return_stats=False, return_p
             if m > thresh:
                 figtmp, axtmp = plt.subplots(2,1)
                 stat_tmp = stat[:,max(0,c-10):min(c+10,stat.shape[1])]
-                axtmp[1].imshow(stat_tmp.T, vmin=stat_tmp.min(), vmax=stat_tmp.max(), aspect='auto', origin='lower')
+                if imshow:
+                    axtmp[1].imshow(stat_tmp.T, vmin=stat_tmp.min(), vmax=stat_tmp.max(), aspect='auto', origin='lower')
+                else:
+                    axtmp[1].pcolormesh(stat_tmp.T, vmin=stat_tmp.min(), vmax=stat_tmp.max())
                 axtmp[1].axhline(min(10,c), c='red')
                 figtmp.suptitle(f"{c}: {dary_step.max()}")
                 axtmp[0].plot(dary)
@@ -695,7 +711,7 @@ def reject_pm_sigma_iteration(arr1d, init_mask, thresh=5, plot=False, positive_o
 
 plt.rcParams['figure.figsize'] = [12, 8]
 
-def plot_stat_map(stat, axis=None, mask=None, **plot_kwargs):
+def plot_stat_map(stat, axis=None, mask=None, imshow=True, **plot_kwargs):
     nint, nchan = stat.shape
     # grids = np.meshgrid(np.arange(nint + 1), np.arange(nchan + 1), indexing='ij')
     # for some WEIRD reason passing in the grids introduces a bunch of artifacts
@@ -719,14 +735,20 @@ def plot_stat_map(stat, axis=None, mask=None, **plot_kwargs):
 
     if axis == None:
         #im = plt.pcolormesh(grids[0], grids[1], to_plot, shading='flat', **plot_kwargs)
-        im = plt.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
+        if imshow:
+            im = plt.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
+        else:
+            im = plt.pcolormesh(to_plot.T, **plot_kwargs)
         plt.xlabel="interval"
         plt.ylabel="channel"
         plt.colorbar(im)
         plt.show()
     else:
         #im = axis.pcolormesh(grids[0], grids[1], to_plot, shading='flat', **plot_kwargs)
-        im = axis.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
+        if imshow:
+            im = axis.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
+        else:
+            im = axis.pcolormesh(to_plot.T, **plot_kwargs)
         plt.colorbar(im, ax=axis)
         return axis
 
@@ -830,14 +852,17 @@ def plot_masked_channels_of_med(thing, channels, ax=None):  #, sig_lims=[3,3]):
     #hi = max([md+sig_lims[1]*std, get_limits_from.max()])
     #ax.set_ylim(lo,hi)
 
-def plot_mask(mask, ax=None):
+def plot_mask(mask, ax=None, imshow=True):
     if ax is None:
         fig, ax = plt.subplots()
-    ax.imshow(mask.T, aspect='auto', origin='lower')
+    if imshow:
+        ax.imshow(mask.T, aspect='auto', origin='lower')
+    else:
+        ax.pcolormesh(mask.T)
     ax.set_ylabel("channel")
     ax.set_xlabel("interval")
 
-def plot_mask_comparison(maska, maskb, title="", ax=None, returnplt=False, colorbar=False, ignorechans=None):
+def plot_mask_comparison(maska, maskb, title="", ax=None, returnplt=False, colorbar=False, ignorechans=None, imshow=True):
     """
     Plot maska - maskb
     If passed in, ignorechans are overplotted in black
@@ -845,7 +870,10 @@ def plot_mask_comparison(maska, maskb, title="", ax=None, returnplt=False, color
     imshow_kwargs =  dict(aspect='auto', origin='lower')
     if ax is None:
         fig, ax = plt.subplots()
-    im = ax.imshow((maska.astype(int) - maskb.astype(int)).T, **imshow_kwargs)
+    if imshow:
+        im = ax.imshow((maska.astype(int) - maskb.astype(int)).T, **imshow_kwargs)
+    else:
+        im = ax.pcolormesh((maska.astype(int) - maskb.astype(int)).T)
     if colorbar:
         plt.colorbar(ax=ax)
 
@@ -854,13 +882,16 @@ def plot_mask_comparison(maska, maskb, title="", ax=None, returnplt=False, color
         ignorechans_mask = np.zeros_like(maska)
         for c in ignorechans:
             ignorechans_mask[:,c] = True
-        ax.imshow(ignorechans_mask.T, cmap=cmap2, **imshow_kwargs)
+        if imshow:
+            ax.imshow(ignorechans_mask.T, cmap=cmap2, **imshow_kwargs)
+        else:
+            ax.pcolormesh(ignorechans_mask.T, cmap=cmap2)
 
 
     
     if title:
-        title += " "
-    title += f"({masked_frac(maska) - masked_frac(maskb)})"
+        title += "\n"
+    title += f"Newly masked data: {100*(masked_frac(maska) - masked_frac(maskb)):.2f}\%"
     ax.set_title(title)
     if returnplt:
         return fig, ax
@@ -1001,20 +1032,28 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
     Use if debug is False, but still want plots iff a step was found
 
     returns:
-    False if no step found, True if step found
-    if return_plots, returns False/True, fig, ax
+    False False if no step found, 
+    True False if step found and a companion peak check is recommended
+    True True if step found and companion peak check should be skipped.
+        This is if there's only one peak. 
+        If it only found one peak and found it of the right sign and in the correct region it's a pretty solid yes
+        But it might be too short a peak to pass the companion check
+
+    if return_plots, returns False/True, False/True, fig, ax
 
     """
-    pks_pos = get_peaks_iqrm(arr1d)
-    pks_neg = get_peaks_iqrm(-arr1d)
+    iqrm_pos = get_peaks_iqrm(arr1d)
+    iqrm_neg = get_peaks_iqrm(-arr1d)
+
+    superyes = False
 
     if np.ma.is_masked(arr1d):
         ign = list(np.where(arr1d.mask)[0])
     else:
         ign = []
 
-    pos_split, pos_starts, pos_ends = split_into_consecutive(pks_pos)
-    neg_split, neg_starts, neg_ends = split_into_consecutive(pks_neg)
+    pos_split, pos_starts, pos_ends = split_into_consecutive(iqrm_pos)
+    neg_split, neg_starts, neg_ends = split_into_consecutive(iqrm_neg)
     ign_split, ign_starts, ign_ends = split_into_consecutive(ign)
 
     if debug:
@@ -1063,21 +1102,23 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
 
     if make_plots:
         fig, ax = plt.subplots(2,1)
-        for x in pks_pos:
-            ax[0].axvline(x, c='red', alpha=0.2)
-        for x in pks_neg:
-            ax[0].axvline(x, c='cyan', alpha=0.2)
+        if debug:
+            # plot the iqrm +ve and -ve outliers, in alpha=0.2 dodgerblue and red
+            for x in iqrm_pos:
+                ax[0].axvline(x, c='red', alpha=0.3, linewidth=0.5, zorder=1)
+            for x in iqrm_neg:
+                ax[0].axvline(x, c='dodgerblue', alpha=0.3, linewidth=0.5, zorder=1)
 
-        ax[0].plot(arr1d)
-        ax[1].plot(np.gradient(arr1d))
+        ax[0].plot(arr1d, linewidth=0.5, zorder=2, c="k")
+        ax[1].plot(np.gradient(arr1d), linewidth=0.5, zorder=2, c="k")
 
 
     if not found_pos_neg and not found_neg_pos:
         if make_plots:
             if return_plots:
-                return False, fig, ax
+                return False, False, fig, ax
             plt.show()
-        return False, None, None  # []
+        return False, False, None, None  # []
 
     if debug:
         print("Running checks on potential steps")
@@ -1097,11 +1138,12 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
     grad = np.gradient(arr1d)
     pks_pos, _ = find_peaks(grad, prominence=prom)
     pks_neg, _ = find_peaks(-grad, prominence=prom)
+    # plot all peaks found in magenta/green alpha=0.2
     if make_plots:
         for pk in pks_pos:
-            ax[1].axvline(pk, c='magenta', alpha=0.2)
+            ax[1].axvline(pk, c="darkred", alpha=1, linewidth=0.6, zorder=1)
         for pk in pks_neg:
-            ax[1].axvline(pk, c='green', alpha=0.2)
+            ax[1].axvline(pk, c="mediumblue", alpha=1, linewidth=0.6, zorder=1)
 
     # sorted combo has elements like:
     # [[iqrm, idx, before, transition], [iqrm, idx, after, transition], sign]
@@ -1112,7 +1154,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
     # Run some checks to see if it's likely this is actually a step
 
     sign_to_name = {+1: "neg->pos", -1: "pos->neg"}
-    sign_to_col = {+1: "red", -1: "cyan"}
+    sign_to_col = {+1: "red", -1: "dodgerblue"}
     sign_to_want = {+1: "+ve", -1: "-ve"}
 
     step = False
@@ -1122,6 +1164,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
 
         select_x = x
         select_y = y
+        # if want to restrict or expand where look for peaks to a set distance around the step
         if region_buffer is not None:
             if len(x) > region_buffer:
                 select_x = x[-region_buffer:]
@@ -1130,6 +1173,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
 
 
         # find_peaks check
+        # look for a peak of the expected sign in the region around the step
         select = [*select_x, *select_y]
         pk_pos = [pk for pk in pks_pos if pk in select]
         pk_neg = [pk for pk in pks_neg if pk in select]
@@ -1151,6 +1195,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
             print(f"find_peaks: WEIRD: only {sign_to_want[-sign]} peaks found at {dontwant}")
         elif debug:
             print("find_peaks: NO PEAKS")
+
 
         # means check
         if mean_check_thresh is not None:
@@ -1203,28 +1248,43 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
             print(diff_fstring)
 
         if make_plots:
-            ax[1].axvline(x[-1], c=sign_to_col[sign])
-            for xx in x:
-                ax[0].axvline(xx, c=sign_to_col[-sign])
-            for yy in y:
-                ax[0].axvline(yy, c=sign_to_col[sign])
-            if region_buffer is not None:
-                if select_x != x:
-                    ax[0].axvline(select_x[0], c='black')
-                if select_y != y:
-                    ax[0].axvline(select_y[-1], c='black')
+            # mark on gradient plot where looking for a peak and what sign
+#            ax[1].axvline(x[-1], c=sign_to_col[sign])
+
+            # mark on data plot the region where actually searched for a peak
+            # go one alpha=0.2 more intense if region IDed as a positive followed by a negative or vice versa
+            # go one alphs=0.2 more intense if it was the region where actually searched for peaks in gradient
+            ax[0].axvspan(x[0], x[-1], color=sign_to_col[-sign], alpha=0.5, linewidth=0.5, zorder=1)
+            ax[0].axvspan(select_x[0], select_x[-1], color=sign_to_col[-sign], alpha=0.5, linewidth=0.5, zorder=1)
+            ax[0].axvspan(y[0], y[-1], color=sign_to_col[sign], alpha=0.5, linewidth=0.5, zorder=1)
+            ax[0].axvspan(select_y[0], select_y[-1], color=sign_to_col[sign], alpha=0.5, linewidth=0.5, zorder=1)
+
+            # mark region searched for peaks on gradient plot
+            ax[1].axvspan(select_x[0], select_y[-1], color=sign_to_col[sign], alpha=0.5, linewidth=0.5, zorder=1)
+
+#            for xx in select_x:
+#                ax[0].axvline(xx, c=sign_to_col[-sign], alpha=0.2, linewidth=0.5, zorder=1)
+#            for yy in select_y:
+#                ax[0].axvline(yy, c=sign_to_col[sign], alpha=0.2, linewidth=0.5, zorder=1)
+#            if region_buffer is not None:
+#                if select_x != x:
+#                    ax[0].axvline(select_x[0], c='black')
+#                if select_y != y:
+#                    ax[0].axvline(select_y[-1], c='black')
     
-    
+    if step and len([*pks_pos, *pks_neg]) == 1:
+        superyes = True
+
     if make_plots:
         if return_plots:
-            return step, fig, ax
+            return step, superyes, fig, ax
         plt.show()
 
     #if out_neg_pos or out_pos_neg:
     #    return out_pos_neg, out_neg_pos
     #else:
     #    return []
-    return step
+    return step, superyes
 
 def is_there_a_peak(diffarr, peak, slc, rng, found_peaks, med, std, sign=1, debug_plot=False):
     """sign is the sign of peak, must be +-1
@@ -1394,18 +1454,18 @@ def check_peaks_have_companions2(diffarr1d, high_prom=1, low_prom=0.25, debug_pl
             fig, ax = plt.subplots(2,1)
         else:
             ax = ax_debug
-        ax[0].plot(tmparr)
+        ax[0].plot(tmparr, c="k", linewidth=0.5, zorder=3)
         for x in peaks_pos:
-            ax[0].axvline(x, c='red')
+            ax[0].axvline(x, c='red', linewidth=0.5, zorder=2)
         for x in peaks_neg_lowerprom:
-            ax[0].axvline(x, c='cyan')
+            ax[0].axvline(x, c='dodgerblue', linewidth=0.5, zorder=2)
         ax[0].set_title("Positive peaks, looking for companions in -ve peaks")
 
-        ax[1].plot(tmparr)
+        ax[1].plot(tmparr, c="k", linewidth=0.5, zorder=3)
         for x in peaks_neg:
-            ax[1].axvline(x, c='cyan')
+            ax[1].axvline(x, c='dodgerblue', linewidth=0.5, zorder=2)
         for x in peaks_pos_lowerprom:
-            ax[1].axvline(x, c='red')
+            ax[1].axvline(x, c='red', linewidth=0.5, zorder=2)
         ax[1].set_title("Negative peaks, looking for companions in +ve peaks")
         if ax_debug is None:
             plt.show()
@@ -1772,9 +1832,9 @@ if __name__ == "__main__":
 
     # make gsk here for same reason if need it
     if 7 in opts:
-        logging.info("Making the generalized spectral kurtosis statistic for the future, estimating d from means**2/var")
-        delta = means**2/var
-        gsk_d_estimate = ((M * delta + 1) / (M - 1)) * (M * (s2 / s1**2) - 1)
+        logging.info("Making the generalized spectral kurtosis statistic for the future, estimating d from np.ma.median(means**2/var, axis=channel)")
+        delta = np.ma.median(means**2/var)
+        gsk_d_estimate = (((M.T * delta.T + 1) / (M.T - 1)) * (M * (s2 / s1**2) - 1).T).T
         gsk_d_estimate_masked = np.ma.array(gsk_d_estimate, mask=base_mask_exstats)
         gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
 
@@ -1877,7 +1937,7 @@ if __name__ == "__main__":
         chans_w_step = []
 
         for c in chans:
-            has_step, fig_step_iqrm, ax_step_iqrm = find_step(means[:,c], plots=True, prom=0.25, region_buffer=5, return_plots=True)
+            has_step, overrule_companion_check, fig_step_iqrm, ax_step_iqrm = find_step(means[:,c], plots=True, prom=0.25, region_buffer=5, return_plots=True)
             if fig_step_iqrm is not None:
                 fig_title = f"{c}: iqrm:{has_step}"
                 if has_step:
@@ -1885,23 +1945,29 @@ if __name__ == "__main__":
                     grad = np.gradient(means[:,c])
                     fig_comp_debug, ax_comp_debug = plt.subplots(2,1)
                     condit, pk, slc, medstd = check_peaks_have_companions2(grad, high_prom=1, low_prom=0.25, debug_plots=True, ax_debug=ax_comp_debug, ignore_sig_thresh=3)
-                    
+
                     fig_title += f" companion_test:{not condit}"
                     if not condit:
                         logging.info("companion test says YES")
                         plt.close(fig_comp_debug)
-                        ax_step_iqrm[0].plot(tmpx[slc], means[slc,c], c='orange')
-                        ax_step_iqrm[0].axvline(pk, c='orange')
-                        ax_step_iqrm[1].plot(tmpx[slc], grad[slc], c='orange')
-                        ax_step_iqrm[1].axvline(pk, c='orange')
+                        # mark the actual peak the got IDed as corresponding to a step
+                        ax_step_iqrm[0].plot(tmpx[slc], means[slc,c], c='black', linewidth=1, zorder=4)
+                        ax_step_iqrm[0].axvline(pk, c='black', linestyle='--', linewidth=0.5, zorder=4)
+                        ax_step_iqrm[1].plot(tmpx[slc], grad[slc], c='black', linewidth=1, zorder=4)
+                        ax_step_iqrm[1].axvline(pk, c='black', linestyle='--', linewidth=0.5, zorder=4)
                         chans_w_step.append(c)
                         
                     else:
                         logging.info("companion test says NO")
+                        if overrule_companion_check:
+                            logging.info("Overruling companion check as only one peak was found")
+                            chans_w_step.append(c)
+
+
 
                 fig_step_iqrm.suptitle(fig_title)
                 output_plot(fig_step_iqrm, pdf=p)
-                if has_step and condit:
+                if (has_step and condit) or overrule_companion_check:
                     fig_comp_debug.suptitle(f"{c}: companion test debug plot")
                     output_plot(fig_comp_debug, pdf=p)
 
@@ -1932,13 +1998,13 @@ if __name__ == "__main__":
         # NB what the plots show is:
         # top:
         #   means
-        #   -ve (cyan) and +ve (red) ints flagged by iqrm
+        #   -ve (dodgerblue) and +ve (red) ints flagged by iqrm
         #   low alpha if not a transition, and alph=1 if there is
         #   if there's a black line that shows region_buffer
         # bottom:
         #   np.gradient of means
-        #   red and cyan mark transitions IDed in the top plot
-        #     cyan = +ve to -ve and red = -ver to +ve
+        #   red and dodgerblue mark transitions IDed in the top plot
+        #     dodgerblue = +ve to -ve and red = -ver to +ve
         #   green and magenta peaks are from find_peaks
         #   whole transition region or transition region limited by region_buffer is searched for find_peaks results
         #     if both signs of peak then iqrm gives False (there is no step)
