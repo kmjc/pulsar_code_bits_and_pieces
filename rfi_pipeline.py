@@ -99,16 +99,16 @@ def make_summary_plots(mask, mask_exstats, rfifind_obj, means, var, pdf, title_i
     if (rfifind_obj.pow_stats[-1,:] == 1).all():
         logging.info("Weird final interval stats for rfifind, it will be masked in pow_stats plot, but not in the mask itself")
         pow_stats_plot_mask[-1,:] = True
-    figtmp, axtmp = plot_map_plus_sums(rfifind_obj.pow_stats, mask=pow_stats_plot_mask, returnplt=True)
+    figtmp, axtmp, cbartmp = plot_map_plus_sums(rfifind_obj.pow_stats, mask=pow_stats_plot_mask, returnplt=True)
     figtmp.suptitle(f"{title_insert} pow_stats ({masked_frac(mask):.2f})")
     output_plot(figtmp, pdf=pdf)
     del pow_stats_plot_mask
 
-    figtmp, axtmp = plot_map_plus_sums(means.data, mask=mask_exstats, returnplt=True)
+    figtmp, axtmp, cbartmp = plot_map_plus_sums(means.data, mask=mask_exstats, returnplt=True)
     figtmp.suptitle(f"{title_insert} means ({masked_frac(mask_exstats):.2f})")
     output_plot(figtmp, pdf=pdf)
 
-    figtmp, axtmp = plot_map_plus_sums(var.data, mask=mask_exstats, returnplt=True)
+    figtmp, axtmp, cbartmp = plot_map_plus_sums(var.data, mask=mask_exstats, returnplt=True)
     figtmp.suptitle(f"{title_insert} var ({masked_frac(mask_exstats):.2f})")
     output_plot(figtmp, pdf=pdf)
 
@@ -752,9 +752,10 @@ def plot_stat_map(stat, axis=None, cbar_axis=None, mask=None, imshow=True, **plo
         else:
             im = axis.pcolormesh(to_plot.T, **plot_kwargs)
         if cbar_axis is None:
-            cbar_axis = axis
-        plt.colorbar(im, ax=cbar_axis)
-        return axis
+            cbar = plt.colorbar(im, ax=axis)
+        else:
+            cbar = plt.colorbar(im, cax=cbar_axis, orientation="horizontal")
+        return axis, cbar
 
 def plot_stat_v_nchan(stat, axis=None, mask=None, reduction_function=np.ma.median, **plot_kwargs):
     nint, nchan = stat.shape
@@ -773,8 +774,20 @@ def plot_stat_v_nchan(stat, axis=None, mask=None, reduction_function=np.ma.media
         plt.xlabel="channel"
         plt.show()
     else:
+        z_min, z_max = None, None
         for red_func in reduction_function:
-            axis.plot(red_func(to_plot, axis=0), np.arange(nchan), **plot_kwargs)
+            z = red_func(to_plot, axis=0)
+            axis.plot(z, np.arange(nchan), **plot_kwargs)
+            if z_min is None:
+                z_min = z.min()
+            else:
+                z_min = min(z_min, z.min())
+            if z_max is None:
+                z_max = z.max()
+            else:
+                z_max = max(z_max, z.max())
+        return z_min, z_max
+            
 
 def plot_stat_v_nint(stat, axis=None, mask=None, reduction_function=np.ma.median, **plot_kwargs):
     nint, nchan = stat.shape
@@ -791,13 +804,24 @@ def plot_stat_v_nint(stat, axis=None, mask=None, reduction_function=np.ma.median
 
     if axis == None:
         for red_func in reduction_function:
-            plt.plot(x, red_func(to_plot, axis=1), **plot_kwargs)
+            plt.plot(x, z, **plot_kwargs)
 
         plt.xlabel("interval")
         plt.show()
     else:
+        z_min, z_max = None, None
         for red_func in reduction_function:
+            z = red_func(to_plot, axis=1)
             axis.plot(x, red_func(to_plot, axis=1), **plot_kwargs)
+            if z_min is None:
+                z_min = z.min()
+            else:
+                z_min = min(z_min, z.min())
+            if z_max is None:
+                z_max = z.max()
+            else:
+                z_max = max(z_max, z.max())
+        return z_min, z_max
 
 def plot_map_plus_sums(stat, mask=None, reduction_function=np.ma.median, returnplt=False, fill=True, **plot_kwargs):
     """returnplt => return fig, ((ax0, ax1), (ax2, ax3))
@@ -806,31 +830,53 @@ def plot_map_plus_sums(stat, mask=None, reduction_function=np.ma.median, returnp
     #grids = np.meshgrid(np.arange(nint + 1), np.arange(nchan + 1), indexing='ij')
     widths = [3,1]
     heights = [1,3]
-    fig, ((ax0, ax1), (ax2, ax3)) = plt.subplots(2, 2,
-                                                 sharex='col', sharey='row',
-                                                 gridspec_kw={'width_ratios': widths, 'height_ratios': heights})
-    ax1.set_axis_off()
+
+    figsize = None
+    if "figsize" in plot_kwargs:
+        figsize = plot_kwargs["figsize"]
+    fig = plt.figure(figsize=figsize)#layout="constrained")
+    # make outer grid to hold colourbar and data
+    outer_grid = fig.add_gridspec(2, 1, wspace=0, hspace=0.3, height_ratios=[0.95,0.05])
+    inner_grid = outer_grid[0].subgridspec(2, 2, wspace=0, hspace=0, width_ratios=widths, height_ratios=heights)
+
+    ((ax0, ax1), (ax2, ax3)) = inner_grid.subplots()
+    ax0.sharex(ax2)
+    ax3.sharey(ax2)
+    axcbar = fig.add_subplot(outer_grid[1])
+
     if mask is not None:
         statt = np.ma.masked_array(data=stat, mask=mask)
     else:
         statt = stat
     if isinstance(statt, np.ma.MaskedArray) and fill:
-        plot_stat_map(statt.filled(np.ma.median(statt)), axis=ax2)
+        ax2, cbar = plot_stat_map(statt.filled(np.ma.median(statt)), axis=ax2, cbar_axis=axcbar)
     else:
         plot_stat_map(statt, axis=ax2)
-    plot_stat_v_nchan(statt, axis=ax3, reduction_function=reduction_function)
-    plot_stat_v_nint(statt, axis=ax0, reduction_function=reduction_function)
+    x1, x2 = plot_stat_v_nchan(statt, axis=ax3, reduction_function=reduction_function)
+    #ax3.set_xlim(0.9*x1, 1.1*x2)
+    y1, y2 = plot_stat_v_nint(statt, axis=ax0, reduction_function=reduction_function)
+    #ax0.set_ylim(0.9*y1, 1.1*y2)
 
     # colour bar throws things off, this rescales the v_nint plot
-    pos_map = ax2.get_position()
-    pos_int = ax0.get_position()
-    ax0.set_position([pos_map.x0,pos_int.y0,pos_map.width,pos_int.height])
+    # don't need this as cbar is in its own axis
+    #pos_map = ax2.get_position()
+    #pos_int = ax0.get_position()
+    #ax0.set_position([pos_map.x0,pos_int.y0,pos_map.width,pos_int.height])
+
+    for spine in ["top", "right"]:
+        _ = ax1.spines[spine].set_visible(False)
+    
+    ax1.tick_params(labelbottom=False, labeltop=False)
+    ax3.tick_params(labelleft=False)
+
+    ax1.set_xticks([])
+    ax1.set_yticks([])
 
     # labels
-    ax2.set_xlabel("interval")
-    ax2.set_ylabel("channel")
+    ax2.set_xlabel("Interval")
+    ax2.set_ylabel("Channel")
     if returnplt:
-        return fig, ((ax0, ax1), (ax2, ax3))
+        return fig, ((ax0, ax1), (ax2, ax3)), cbar
     else:
         plt.show()
 
@@ -1890,11 +1936,11 @@ if __name__ == "__main__":
     logging.info("Plotting reference plots, masked by the base mask must apply + original mask from rfifind")
     rfimask_mask_exstats = reshape_rfifind_mask(M.shape, rfimask.mask, extra_stats_gulp, rfimask.ptsperint)
 
-    fig_ref_means, ax_ref_means = plot_map_plus_sums(means.data, base_mask_exstats|rfimask_mask_exstats, returnplt=True)
+    fig_ref_means, ax_ref_means, cbar_ref_means = plot_map_plus_sums(means.data, base_mask_exstats|rfimask_mask_exstats, returnplt=True)
     fig_ref_means.suptitle("Means rfimask + base mask")
     output_plot(fig_ref_means, pdf=p)
 
-    fig_ref_var, ax_ref_var = plot_map_plus_sums(var.data, base_mask_exstats|rfimask_mask_exstats, returnplt=True)
+    fig_ref_var, ax_ref_var, cbar_ref_var = plot_map_plus_sums(var.data, base_mask_exstats|rfimask_mask_exstats, returnplt=True)
     fig_ref_var.suptitle("Var rfimask + base mask")
     output_plot(fig_ref_var, pdf=p)
 
@@ -1902,7 +1948,7 @@ if __name__ == "__main__":
     if (rfimask.pow_stats[-1,:] == 1).all():
         logging.info("Weird final interval stats for rfifind, it will be masked in pow_stats plot, but not in the mask itself")
         pow_stats_plot_mask[-1,:] = True
-    fig_ref_pow, ax_ref_pow = plot_map_plus_sums(rfimask.pow_stats, pow_stats_plot_mask, returnplt=True)
+    fig_ref_pow, ax_ref_pow, cbar_ref_pow = plot_map_plus_sums(rfimask.pow_stats, pow_stats_plot_mask, returnplt=True)
     fig_ref_pow.suptitle("pow_stats rfimask + base mask")
     output_plot(fig_ref_pow, pdf=p)
     del pow_stats_plot_mask
@@ -2108,7 +2154,7 @@ if __name__ == "__main__":
         output_plot(fig_iqrm_means_mask, pdf=p)
 
 
-        fig_iqrm_means, ax_iqrm_means = plot_map_plus_sums(means.data, mask_means_2diqrm|base_mask_exstats, returnplt=True)
+        fig_iqrm_means, ax_iqrm_means, cbar_iqrm_means = plot_map_plus_sums(means.data, mask_means_2diqrm|base_mask_exstats, returnplt=True)
         fig_iqrm_means.suptitle("Means post-2D-iqrm")
         output_plot(fig_iqrm_means, pdf=p)
         logging.info(f"masks {masked_frac(mask_means_2diqrm|base_mask_exstats)}")
@@ -2152,7 +2198,7 @@ if __name__ == "__main__":
         output_plot(fig_iqrm_var_mask, pdf=p)
 
 
-        fig_iqrm_var, ax_iqrm_var = plot_map_plus_sums(var.data, mask_var_2diqrm|base_mask_exstats, returnplt=True)
+        fig_iqrm_var, ax_iqrm_var, cbar_iqrm_var = plot_map_plus_sums(var.data, mask_var_2diqrm|base_mask_exstats, returnplt=True)
         fig_iqrm_var.suptitle("Var post-2D-iqrm")
         output_plot(fig_iqrm_var, pdf=p)
         logging.info(f"masks {masked_frac(mask_var_2diqrm|base_mask_exstats)}")
@@ -2194,7 +2240,7 @@ if __name__ == "__main__":
         pow_stats_plot_mask = (base_mask|iqrm_med_pow_mask)
         if (rfimask.pow_stats[-1,:] == 1).all():
             pow_stats_plot_mask[-1,:] = True
-        fig_iqrm_med_pow, ax_iqrm_med_pow = plot_map_plus_sums(rfimask.pow_stats, mask=pow_stats_plot_mask, returnplt=True)
+        fig_iqrm_med_pow, ax_iqrm_med_pow, cbar_iqrm_med_pow = plot_map_plus_sums(rfimask.pow_stats, mask=pow_stats_plot_mask, returnplt=True)
         fig_iqrm_med_pow.suptitle("pow_stats masked by base + iqrm 1D on medians along both axes")
 
         logging.info("5: Running 2D iqrm on pow_stats both int-wise and chan-wise")
@@ -2216,7 +2262,7 @@ if __name__ == "__main__":
         pow_stats_plot_mask = (mask_pow_iqrm_combo|base_mask)
         if (rfimask.pow_stats[-1,:] == 1).all():
             pow_stats_plot_mask[-1,:] = True
-        fig_iqrm_pow, ax_iqrm_pow = plot_map_plus_sums(rfimask.pow_stats, pow_stats_plot_mask, returnplt=True)
+        fig_iqrm_pow, ax_iqrm_pow, cbar_iqrm_pow = plot_map_plus_sums(rfimask.pow_stats, pow_stats_plot_mask, returnplt=True)
         fig_iqrm_pow.suptitle("pow_stats post-1D-and-2D-iqrm")
         output_plot(fig_iqrm_pow, pdf=p)
         logging.info(f"masks {masked_frac(mask_pow_iqrm_combo|base_mask)}")
@@ -2258,7 +2304,7 @@ if __name__ == "__main__":
         output_plot(fig_iqrm_gsk_mask, pdf=p)
 
 
-        fig_iqrm_gsk, ax_iqrm_gsk = plot_map_plus_sums(gsk_d_estimate_masked.data, mask_gsk_2diqrm_chan|base_mask_exstats, returnplt=True)
+        fig_iqrm_gsk, ax_iqrm_gsk, cbar_iqrm_gsk = plot_map_plus_sums(gsk_d_estimate_masked.data, mask_gsk_2diqrm_chan|base_mask_exstats, returnplt=True)
         fig_iqrm_gsk.suptitle("GSK post-2D-iqrm")
         output_plot(fig_iqrm_gsk, pdf=p)
         logging.info(f"masks {masked_frac(mask_gsk_2diqrm_chan|base_mask_exstats)}")
