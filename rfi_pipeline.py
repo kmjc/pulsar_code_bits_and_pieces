@@ -2097,15 +2097,17 @@ if __name__ == "__main__":
         logging.info(f"found {len(chns)} channels with an unusually high std(means):")
         logging.info(f"{chns}")
         fig_outlier_std, ax_outlier_std = plt.subplots(2,1)
-        ax_outlier_std[0].plot(thing, 'x-')
-        ax_outlier_std[0].plot(np.ma.array(thing.data, mask=q), '+-')
-        ax_outlier_std[0].set_xlabel("channel")
-        ax_outlier_std[0].set_ylabel("std of means")
-        for c in chns:
-            ax_outlier_std[1].plot(means[:,c])
-        ax_outlier_std[1].set_xlabel("int")
-        ax_outlier_std[1].set_ylabel("means")
-        fig_outlier_std.suptitle(f"Channels with outlier std(means):\n{chns}")
+        ax_outlier_std[0].plot(thing, '-', c="k")
+        ax_outlier_std[0].plot(np.ma.array(thing.data, mask=((~q)|thing.mask)), 'o', markersize=3, c="red", label="Outlier")
+        ax_outlier_std[0].legend()
+        ax_outlier_std[0].set_xlabel("Channel")
+        ax_outlier_std[0].set_ylabel("Standard Deviation\nof Means")
+        offset=5
+        for i,c in enumerate(chns):
+            ax_outlier_std[1].plot(means[:,c] - np.ma.median(means[:,c]) + i*offset, c=cset[i])
+        ax_outlier_std[1].set_xlabel("Interval")
+        ax_outlier_std[1].set_ylabel("Means (offset)")
+        ax_outlier_std[0].set_title(f"Channels with outlier std(means):\n{chns}")
         output_plot(fig_outlier_std, pdf=p)
 
         mask_outlier_std = np.zeros_like(base_mask)
