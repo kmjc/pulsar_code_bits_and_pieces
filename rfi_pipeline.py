@@ -711,7 +711,7 @@ def reject_pm_sigma_iteration(arr1d, init_mask, thresh=5, plot=False, positive_o
 
 plt.rcParams['figure.figsize'] = [12, 8]
 
-def plot_stat_map(stat, axis=None, mask=None, imshow=True, **plot_kwargs):
+def plot_stat_map(stat, axis=None, cbar_axis=None, mask=None, imshow=True, **plot_kwargs):
     nint, nchan = stat.shape
     # grids = np.meshgrid(np.arange(nint + 1), np.arange(nchan + 1), indexing='ij')
     # for some WEIRD reason passing in the grids introduces a bunch of artifacts
@@ -727,6 +727,8 @@ def plot_stat_map(stat, axis=None, mask=None, imshow=True, **plot_kwargs):
         # https://stackoverflow.com/questions/27092991/white-lines-in-matplotlibs-pcolor
         # https://github.com/matplotlib/matplotlib/issues/1188
         # trying switching to imshow
+
+    # cbar_axis only use if axis is not None
 
     if type(mask) != np.ndarray:
         to_plot = stat
@@ -749,7 +751,9 @@ def plot_stat_map(stat, axis=None, mask=None, imshow=True, **plot_kwargs):
             im = axis.imshow(to_plot.T, aspect='auto', origin='lower', **plot_kwargs)
         else:
             im = axis.pcolormesh(to_plot.T, **plot_kwargs)
-        plt.colorbar(im, ax=axis)
+        if cbar_axis is None:
+            cbar_axis = axis
+        plt.colorbar(im, ax=cbar_axis)
         return axis
 
 def plot_stat_v_nchan(stat, axis=None, mask=None, reduction_function=np.ma.median, **plot_kwargs):
@@ -1007,6 +1011,17 @@ def split_into_consecutive(lst, startsends=True):
         ends.append(subsec[-1])
     return out, starts, ends
 
+def any_indices_with_region(idx, other_idxes, region):
+    """
+    Returns True if there are indexes within +- region of idx within other_idxes
+    (if idx is in other_idxes it is ignored)
+    """
+    tmp = other_idxes[other_idxes!=idx]
+    diff = np.abs(tmp - idx)
+    if (diff > region).all():
+        return False
+    return True
+
 # try looking for places where iqrm switches from +ve to -ve with nothing or masked values in between?
 def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_check_thresh=None, region_buffer=None):
     """
@@ -1138,6 +1153,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
     grad = np.gradient(arr1d)
     pks_pos, _ = find_peaks(grad, prominence=prom)
     pks_neg, _ = find_peaks(-grad, prominence=prom)
+    all_peaks = np.array([*pks_pos, *pks_neg])
     # plot all peaks found in magenta/green alpha=0.2
     if make_plots:
         for pk in pks_pos:
@@ -1157,6 +1173,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
     sign_to_col = {+1: "red", -1: "dodgerblue"}
     sign_to_want = {+1: "+ve", -1: "-ve"}
 
+    overrule_region = int(len(arr1d)/10)
     step = False
     for i, [x,y,sign] in enumerate(sorted_combo):
         if debug:
@@ -1188,6 +1205,11 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
         if want and not dontwant:
             if debug:
                 print(f"find_peaks: STEP: only {sign_to_want[sign]} peaks found at {want}")
+            # check if there are no other close peaks and in which case overrule companion check
+            for pk in pk_pos:
+                if not any_indices_with_region(pk, all_peaks, overrule_region):
+                    logging.debug(f"Overruling companion test due to peak at {pk} with not others found within +-{overrule_region}")
+                    superyes = True
             step = True
         elif pk_neg and pk_pos and debug:
             print("find_peaks: NOT_STEP: +ve and -ve peaks found at", pk_pos, pk_neg)
@@ -1272,8 +1294,9 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
 #                if select_y != y:
 #                    ax[0].axvline(select_y[-1], c='black')
     
-    if step and len([*pks_pos, *pks_neg]) == 1:
-        superyes = True
+    # now defunct
+    #if step and len(all_peaks) == 1:
+    #    superyes = True
 
     if make_plots:
         if return_plots:
@@ -1833,10 +1856,15 @@ if __name__ == "__main__":
     # make gsk here for same reason if need it
     if 7 in opts:
         logging.info("Making the generalized spectral kurtosis statistic for the future, estimating d from np.ma.median(means**2/var, axis=channel)")
-        delta = np.ma.median(means**2/var)
+        all_deltas = means**2/var
+        all_deltas[base_mask_exstats] = np.nan
+        delta = np.nanmedian(all_deltas, axis=1)
         gsk_d_estimate = (((M.T * delta.T + 1) / (M.T - 1)) * (M * (s2 / s1**2) - 1).T).T
         gsk_d_estimate_masked = np.ma.array(gsk_d_estimate, mask=base_mask_exstats)
-        gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
+        #gsk_d_estimate_masked.mask[np.isnan(gsk_d_estimate)] = True
+        # shouldn't need the above masking step, but let's check
+        # (also it changes base_mask_exstats itself) (and base_mask if the shapes were the same too)
+        assert not np.isnan(gsk_d_estimate_masked).any()
 
     # ### Now have base_mask should be using as minimum input for all other steps
     M = np.ma.array(M, mask=base_mask_exstats)
