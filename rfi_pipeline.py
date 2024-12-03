@@ -1088,7 +1088,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
     But if the baseline is flat might be worth checking out again
 
     debug = True
-    print some info, and always make a plot
+    print more info (if log level set to logging.DEBUG), and always make a plot
     plots = True
     Use if debug is False, but still want plots iff a step was found
 
@@ -1117,9 +1117,9 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
     neg_split, neg_starts, neg_ends = split_into_consecutive(iqrm_neg)
     ign_split, ign_starts, ign_ends = split_into_consecutive(ign)
 
-    if debug:
-        print(f"positive sections flagged: {pos_split}")
-        print(f"negative sections flagged: {neg_split}")
+
+    logging.debug(f"positive sections flagged: {pos_split}")
+    logging.debug(f"negative sections flagged: {neg_split}")
 
     # look for a positive section followed by a negative section or only separated by ignorechans
     found_pos_neg = []
@@ -1133,8 +1133,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
         for j, neg in enumerate(neg_split):
             if neg[0] <= end+1 and neg[-1] >= end+1:
                 found_pos_neg.append([pos_split[i], neg])
-                if debug:
-                    print("found pos-> neg", pos_split[i], neg)
+                logging.debug("found pos-> neg", pos_split[i], neg)
         #if end+1 in neg_starts:
         #    found_pos_neg.append([pos_split[i], neg_split[neg_starts.index(end+1)]])
 
@@ -1148,8 +1147,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
         for j, pos in enumerate(pos_split):
             if pos[0] <= end+1 and pos[-1] >= end+1:
                 found_neg_pos.append([neg_split[i], pos])
-                if debug:
-                    print("found neg-> pos", neg_split[i], pos)
+                logging.debug("found neg-> pos", neg_split[i], pos)
         #if end+1 in pos_starts:
         #    found_neg_pos.append([neg_split[i], pos_split[pos_starts.index(end+1)]])
 
@@ -1181,8 +1179,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
             plt.show()
         return False, False, None, None  # []
 
-    if debug:
-        print("Running checks on potential steps")
+    logging.debug("Running checks on potential steps")
 
     # setup to check means before and after potential steps:
     # was not helpful
@@ -1222,8 +1219,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
     overrule_region = int(len(arr1d)/10)
     step = False
     for i, [x,y,sign] in enumerate(sorted_combo):
-        if debug:
-            print(f"Checking {sign_to_name[sign]}: {x}, {y}")
+        logging.debug(f"Checking {sign_to_name[sign]}: {x}, {y}")
 
         select_x = x
         select_y = y
@@ -1249,20 +1245,19 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
             dontwant = pk_pos
         
         if want and not dontwant:
-            if debug:
-                print(f"find_peaks: STEP: only {sign_to_want[sign]} peaks found at {want}")
+            logging.debug(f"find_peaks: STEP: only {sign_to_want[sign]} peaks found at {want}")
             # check if there are no other close peaks and in which case overrule companion check
             for pk in pk_pos:
                 if not any_indices_with_region(pk, all_peaks, overrule_region):
-                    logging.debug(f"Overruling companion test due to peak at {pk} with not others found within +-{overrule_region}")
+                    logging.info(f"Overruling companion test due to peak at {pk} with not others found within +-{overrule_region}")
                     superyes = True
             step = True
-        elif pk_neg and pk_pos and debug:
-            print("find_peaks: NOT_STEP: +ve and -ve peaks found at", pk_pos, pk_neg)
-        elif dontwant and debug:
-            print(f"find_peaks: WEIRD: only {sign_to_want[-sign]} peaks found at {dontwant}")
-        elif debug:
-            print("find_peaks: NO PEAKS")
+        elif pk_neg and pk_pos:
+            logging.debug("find_peaks: NOT_STEP: +ve and -ve peaks found at", pk_pos, pk_neg)
+        elif dontwant:
+            logging.debug(f"find_peaks: WEIRD: only {sign_to_want[-sign]} peaks found at {dontwant}")
+        else:
+            logging.debug("find_peaks: NO PEAKS")
 
 
         # means check
@@ -1276,7 +1271,7 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
             md_check2, md_diff2 = check_mean(masked_arr1d_wiqrm, sign, slc_pre, slc_post, mean_check_thresh, fn=np.ma.median)
 
             if len(sorted_combo) == 1:
-                print(f"between mean/median checks invalid: i={i}, aka same as checks 1 and 2")
+                logging.debug(f"between mean/median checks invalid: i={i}, aka same as checks 1 and 2")
                 mn_check3, mn_check4, md_check3, md_check4 = [None, None, None, None]
                 mn_diff3, mn_diff4, md_diff3, md_diff4 = [None, None, None, None]
             else:
@@ -1290,11 +1285,11 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
                     i_post = sorted_combo[i+1][0][0]
 
                 if i_pre >= x[0]:
-                    print("between mean/median checks invalid: no space before")
+                    logging.debug("between mean/median checks invalid: no space before")
                     mn_check3, mn_check4, md_check3, md_check4 = [None, None, None, None]
                     mn_diff3, mn_diff4, md_diff3, md_diff4 = [None, None, None, None]
                 elif i_post <=  y[-1] + 1:
-                    print("between mean/median checks invalid: no space after")
+                    logging.debug("between mean/median checks invalid: no space after")
                     mn_check3, mn_check4, md_check3, md_check4 = [None, None, None, None]
                     mn_diff3, mn_diff4, md_diff3, md_diff4 = [None, None, None, None]
                 else:
@@ -1306,14 +1301,14 @@ def find_step(arr1d, debug=False, plots=False, return_plots=False, prom=1, mean_
                     md_check3, md_diff3 = check_mean(masked_arr1d, sign, slc_between_pre, slc_between_post, mean_check_thresh, fn=np.ma.median)
                     md_check4, md_diff4 = check_mean(masked_arr1d_wiqrm, sign, slc_between_pre, slc_between_post, mean_check_thresh, fn=np.ma.median)
 
-            print(f"MEAN/MED checks:")
-            print(mn_check1, md_check1, mn_check2, md_check2, mn_check3, md_check3, mn_check4, md_check4)
+            logging.info(f"MEAN/MED checks:")
+            logging.info(mn_check1, md_check1, mn_check2, md_check2, mn_check3, md_check3, mn_check4, md_check4)
             diff_fstring = f"{mn_diff1:.2f}, {md_diff1:.2f}, {mn_diff2:.2f}, {md_diff2:.2f}"
             if [mn_check3, mn_check4, md_check3, md_check4] != [None, None, None, None]:
                 diff_fstring += f", {mn_diff3:.2f}, {md_diff3:.2f}, {mn_diff4:.2f}, {md_diff4:.2f}"
             else:
                 diff_fstring += f", {mn_diff3}, {md_diff3}, {mn_diff4}, {md_diff4}"
-            print(diff_fstring)
+            logging.info(diff_fstring)
 
         if make_plots:
             # mark on gradient plot where looking for a peak and what sign
@@ -1650,7 +1645,7 @@ parser.add_argument(
     help=".mask file output from rfifind. Must also have a corresponding .stats and .inf file"
 )
 parser.add_argument(
-    "extra_stats_file",
+    "--extra_stats_file",
     type=str,
     help="""npz file containing extra stats from the fdp process. Must contain n, num_unmasked_points, s1, s2, gulp.
     n = number of points in each interval, useful as the last one is often shorter
@@ -1831,24 +1826,37 @@ if __name__ == "__main__":
     rfimask = rfifind.rfifind(maskfile)
     logging.info(f"loaded mask from {maskfile}")
 
-    extra_stats = np.load(extra_stats_fn, allow_pickle=True)
-    if args.dont_flip_band:
-        M = extra_stats["num_unmasked_points"][:,:]
-        s1 = extra_stats["s1"][:,:]
-        s2 = extra_stats["s2"][:,:]
+    use_rfifind_meanstd = False
+    if extra_stats_fn is None:
+        if 7 in opts:
+            raise RuntimeError(f"GSK requires extra_stats_fn as it contains s1 and s2")
+        else:
+            use_rfifind_meanstd = True
+
+    if use_rfifind_meanstd:
+        extra_stats_gulp = rfimask.ptsperint
+        M = np.zeros_like(rfimask.mask)
+        means = rfimask.avg_stats
+        var = rfimask.std_stats**2
     else:
-        # flip everything to presto channel convention
-        logging.info("Reversing channel order in extra stats to match presto convention")
-        M = extra_stats["num_unmasked_points"][:,::-1]
-        s1 = extra_stats["s1"][:,::-1]
-        s2 = extra_stats["s2"][:,::-1]
+        extra_stats = np.load(extra_stats_fn, allow_pickle=True)
+        if args.dont_flip_band:
+            M = extra_stats["num_unmasked_points"][:,:]
+            s1 = extra_stats["s1"][:,:]
+            s2 = extra_stats["s2"][:,:]
+        else:
+            # flip everything to presto channel convention
+            logging.info("Reversing channel order in extra stats to match presto convention")
+            M = extra_stats["num_unmasked_points"][:,::-1]
+            s1 = extra_stats["s1"][:,::-1]
+            s2 = extra_stats["s2"][:,::-1]
 
 
-    N = extra_stats["n"]
-    extra_stats_gulp = extra_stats["gulp"]
-    # something really weird happens with the means and var if you make them with masked arrays. Make and mask afterwards
-    means = s1/M
-    var = (s2 - s1**2/M)/M
+        N = extra_stats["n"]
+        extra_stats_gulp = extra_stats["gulp"]
+        # something really weird happens with the means and var if you make them with masked arrays. Make and mask afterwards
+        means = s1/M
+        var = (s2 - s1**2/M)/M
 
     # ## make some other parameters
     r = rfimask.nchan/rfac
@@ -1870,8 +1878,12 @@ if __name__ == "__main__":
 
     # ### M mask (where num_points_unmasked from fdp is under some threshold)
     # cut off anywhere where <0.5 of the gulp was nonzero
-    logging.info(f"Ignoring anywhere where the fraction of points used to calculate the stats was < {m_frac_threshold}")
-    mmask = (M.T < m_frac_threshold*N).T
+    if extra_stats_fn is None:
+        logging.info("No extra stats file: skipping the mask based on a threshold number of unmasked points")
+        mmask = np.zeros_like(m0)
+    else:
+        logging.info(f"Ignoring anywhere where the fraction of points used to calculate the stats was < {m_frac_threshold}")
+        mmask = (M.T < m_frac_threshold*N).T
     # right the gulp is different for fdp and rfifind. damn. will have to record that in extra_stats
 
 
@@ -1913,9 +1925,10 @@ if __name__ == "__main__":
         assert not np.isnan(gsk_d_estimate_masked).any()
 
     # ### Now have base_mask should be using as minimum input for all other steps
-    M = np.ma.array(M, mask=base_mask_exstats)
-    s1 = np.ma.array(s1, mask=base_mask_exstats)
-    s2 = np.ma.array(s2, mask=base_mask_exstats)
+    if not use_rfifind_meanstd:
+        M = np.ma.array(M, mask=base_mask_exstats)
+        s1 = np.ma.array(s1, mask=base_mask_exstats)
+        s2 = np.ma.array(s2, mask=base_mask_exstats)
     means = np.ma.array(means, mask=base_mask_exstats)
     var = np.ma.array(var, mask=base_mask_exstats)
 
@@ -2034,7 +2047,8 @@ if __name__ == "__main__":
                     else:
                         logging.info("companion test says NO")
                         if overrule_companion_check:
-                            logging.info("Overruling companion check as only one peak was found")
+                            logging.info("Overruling companion check as only one close peak was found")
+                            fig_title += ", OVERULE companion test"
                             chans_w_step.append(c)
 
 
@@ -2085,7 +2099,8 @@ if __name__ == "__main__":
         #     if onlt one sign of peak is present (and it's the correct sign) the iqrm gives True
         # if orange is present in either plot that shows the peak and region searched for a companion of the opposite sign in the companion check
 
-
+    # krzy 12 colour
+    cset = '#9F0162', '#009F81', '#FF5AAF', '#00FCCF', '#8400CD', '#008DF9', '#00C2F9', '#FFB2FD', '#A40122', '#E20134', '#FF6E3A', '#FFC33B'[::-1]
     if 3 in opts:
         logging.info("3: Looking for channels where std of the means is a highly significant outlier")
         thresh=50
