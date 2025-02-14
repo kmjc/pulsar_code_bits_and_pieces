@@ -2119,7 +2119,7 @@ if __name__ == "__main__":
         ax_outlier_std[0].set_ylabel("Standard Deviation\nof Means")
         offset=5
         for i,c in enumerate(chns):
-            ax_outlier_std[1].plot(means[:,c] - np.ma.median(means[:,c]) + i*offset, c=cset[i])
+            ax_outlier_std[1].plot(means[:,c] - np.ma.median(means[:,c]) + i*offset, c=cset[i%len(cset)])
         ax_outlier_std[1].set_xlabel("Interval")
         ax_outlier_std[1].set_ylabel("Means (offset)")
         ax_outlier_std[0].set_title(f"Channels with outlier std(means):\n{chns}")
