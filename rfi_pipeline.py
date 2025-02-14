@@ -2100,7 +2100,7 @@ if __name__ == "__main__":
         # if orange is present in either plot that shows the peak and region searched for a companion of the opposite sign in the companion check
 
     # krzy 12 colour
-    cset = '#9F0162', '#009F81', '#FF5AAF', '#00FCCF', '#8400CD', '#008DF9', '#00C2F9', '#FFB2FD', '#A40122', '#E20134', '#FF6E3A', '#FFC33B'[::-1]
+    cset = ['#9F0162', '#009F81', '#FF5AAF', '#00FCCF', '#8400CD', '#008DF9', '#00C2F9', '#FFB2FD', '#A40122', '#E20134', '#FF6E3A', '#FFC33B'][::-1]
     if 3 in opts:
         logging.info("3: Looking for channels where std of the means is a highly significant outlier")
         thresh=50
